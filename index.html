@@ -389,7 +389,7 @@
   }
   .back-btn:hover{ border-color:var(--navy); background:#f0f2f6; }
 
-  /* ===== 처리일지 보드 ===== */
+  /* ===== 경과지 보드 ===== */
   .log-btn{
     font-family:inherit; font-size:11.5px; font-weight:700; cursor:pointer;
     border:1px solid var(--line); border-radius:14px; padding:4px 10px;
@@ -484,7 +484,7 @@
       <button type="button" id="btnClearSelected" class="ghost">취소</button>
     </div>
     <div class="tool-buttons-wide">
-      <button type="button" id="btnOpenLog" class="tb-btn" title="이 폴더의 처리일지 보기">📝 처리일지</button>
+      <button type="button" id="btnOpenLog" class="tb-btn" title="이 폴더의 경과지 보기">📝 경과지</button>
       <button type="button" id="btnOpenCalc" class="tb-btn" title="이 폴더의 계산 워크시트 보기">🧮 계산기</button>
       <button type="button" id="btnOpenDiagram" class="tb-btn" title="이 폴더의 관계도/구조도 보기">🕸 관계도</button>
       <button id="btnOpenScan" class="tb-btn" title="문서 스캔 · PDF 조립">📷 스캔</button>
@@ -494,7 +494,7 @@
     <div class="topbar-item tool-menu-narrow">
       <button type="button" id="btnToolMenu" class="tb-btn" title="도구 모음">🛠 <span class="tool-menu-label">도구</span></button>
       <div id="toolMenuPopup" class="nx-popup">
-        <button type="button" class="tool-menu-item" id="menuOpenLog">📝 처리일지</button>
+        <button type="button" class="tool-menu-item" id="menuOpenLog">📝 경과지</button>
         <button type="button" class="tool-menu-item" id="menuOpenCalc">🧮 계산기</button>
         <button type="button" class="tool-menu-item" id="menuOpenDiagram">🕸 관계도</button>
         <button type="button" class="tool-menu-item" id="menuOpenScan">📷 스캔</button>
@@ -835,7 +835,7 @@ graph TD
   const explorerPanelHead = document.getElementById('explorerPanelHead');
   const editorFrame = document.getElementById('editorFrame');
 
-  // 오른쪽 패널 안의 모든 하위 화면(탐색기/편집기/처리일지/계산기/관계도/캡처확인)을 한 번에 숨김.
+  // 오른쪽 패널 안의 모든 하위 화면(탐색기/편집기/경과지/계산기/관계도/캡처확인)을 한 번에 숨김.
   // 각 화면을 열 때 이걸 먼저 호출한 뒤 자기 화면만 다시 보이게 해서, 뒤로가기 없이 다른 도구로
   // 바로 넘어가도 이전 화면이 안 겹쳐 보이게 한다. (logView 등은 아래에서 나중에 선언되지만
   // 함수 몸통 안 참조라 실행 시점엔 이미 선언이 끝나 있어 문제없음)
@@ -1107,14 +1107,14 @@ graph TD
     }
   });
 
-  // ---- 처리일지 보드 ----
+  // ---- 경과지 보드 ----
   const logView = document.getElementById('logView');
   const logFolderLabel = document.getElementById('logFolderLabel');
   const logDateInput = document.getElementById('logDateInput');
   const logTextInput = document.getElementById('logTextInput');
   const btnLogAdd = document.getElementById('btnLogAdd');
   const logList = document.getElementById('logList');
-  const LOG_FILE_NAME = '처리일지.json';
+  const LOG_FILE_NAME = '경과지.json';
 
   let logCurrentPath = [];
   let logEntries = [];
@@ -1159,10 +1159,10 @@ graph TD
       };
       if (logFileId) payload.fileId = logFileId;
       const res = await callGas('uploadFile', payload);
-      if (res.error){ alert('처리일지 저장 실패: ' + res.error); return; }
+      if (res.error){ alert('경과지 저장 실패: ' + res.error); return; }
       if (!logFileId) logFileId = res.id;
     }catch(err){
-      alert('처리일지 저장 중 오류: ' + (err && err.message ? err.message : err));
+      alert('경과지 저장 중 오류: ' + (err && err.message ? err.message : err));
     }
   }
 
@@ -1171,7 +1171,7 @@ graph TD
     logCurrentPath = explorerPath.slice();
     hideAllPanelViews();
     logView.style.display = 'flex';
-    logFolderLabel.textContent = logCurrentPath.join(' / ') + ' 의 처리일지';
+    logFolderLabel.textContent = logCurrentPath.join(' / ') + ' 의 경과지';
     logDateInput.value = new Date().toISOString().slice(0, 10);
     logList.innerHTML = '<div class="log-empty">불러오는 중…</div>';
 
@@ -1189,7 +1189,7 @@ graph TD
     }catch(err){
       logFileId = null;
       logEntries = [];
-      console.warn('처리일지 로드 실패, 빈 상태로 시작', err);
+      console.warn('경과지 로드 실패, 빈 상태로 시작', err);
     }
     renderLogList();
   }
@@ -1198,7 +1198,7 @@ graph TD
     hideAllPanelViews();
     explorerView.style.display = 'block';
     explorerPanelHead.style.display = 'flex';
-    navigateTo(logCurrentPath); // 방금 저장한 처리일지.json이 목록에 바로 보이도록 새로고침
+    navigateTo(logCurrentPath); // 방금 저장한 경과지.json이 목록에 바로 보이도록 새로고침
   }
 
   document.getElementById('btnOpenLog').addEventListener('click', openLogView);
@@ -1206,7 +1206,7 @@ graph TD
   document.getElementById('btnLogRef').addEventListener('click', ()=>{
     const sorted = logEntries.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const text = sorted.map(e => (e.date || '') + ' — ' + (e.text || '')).join('\n');
-    addTextAttachment('처리일지 · ' + logCurrentPath.join('/'), text);
+    addTextAttachment('경과지 · ' + logCurrentPath.join('/'), text);
   });
 
   btnLogAdd.addEventListener('click', ()=>{
@@ -1872,7 +1872,7 @@ graph TD
   let chatMessages = []; // Claude API 형식: [{role:'user'|'assistant', content:'...'}]
   let pendingAttachments = []; // [{id,name,type:'file'|'folder',mimeType?,path?}] — 채팅에 끌어다 놓거나 첨부한 항목들 (다음 전송에 무조건 반영)
   let pendingCaptures = []; // [{id,name,dataUrl}] — 화면캡처로 즉석에서 찍은 이미지 (드라이브에 저장 안 하고 바로 첨부)
-  let pendingTextAttachments = []; // [{id,name,text}] — 처리일지/계산기/관계도 등에서 "지금 화면 그대로" 참조 버튼으로 넘긴 것 (저장 전 상태 포함)
+  let pendingTextAttachments = []; // [{id,name,text}] — 경과지/계산기/관계도 등에서 "지금 화면 그대로" 참조 버튼으로 넘긴 것 (저장 전 상태 포함)
   let pendingRefMedia = []; // [{id,name,block}] — 편집기에 열린 이미지·PDF를 "참조" 버튼으로 명시적으로 넘긴 것 (block은 이미 Claude API 형식)
 
   function renderAttachBar(){
@@ -1926,7 +1926,7 @@ graph TD
     });
   }
 
-  // 처리일지/계산기/관계도 등에서 "지금 이 내용 그대로" 버튼을 눌렀을 때 쓰는 공용 함수
+  // 경과지/계산기/관계도 등에서 "지금 이 내용 그대로" 버튼을 눌렀을 때 쓰는 공용 함수
   function addTextAttachment(name, text){
     if (!text || !text.trim()) { alert('참조할 내용이 비어 있습니다.'); return; }
     pendingTextAttachments.push({ id: 'txt' + Date.now(), name, text });

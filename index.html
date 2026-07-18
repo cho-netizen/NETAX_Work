@@ -365,6 +365,13 @@
   }
   .diagram-preview svg{ max-width:100%; height:auto; }
   .diagram-preview .diagram-error{ color:#a83232; font-size:12.5px; white-space:pre-wrap; padding:10px; }
+
+  /* ===== 화면캡처 확인 뷰 ===== */
+  .capture-preview-wrap{
+    flex:1; overflow:auto; background:#eef0f4; padding:20px;
+    display:flex; align-items:flex-start; justify-content:center;
+  }
+  .capture-preview-wrap img{ max-width:100%; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.15); }
   .back-btn:hover{ border-color:var(--navy); color:var(--navy); }
 
   @media (max-width: 720px){
@@ -557,6 +564,19 @@ graph TD
   A[아버지] --> B[자녀1]
   A --> C[자녀2]"></textarea>
           <div id="diagramPreview" class="diagram-preview"></div>
+        </div>
+      </div>
+
+      <div id="captureView" style="display:none; flex:1; flex-direction:column; min-height:0;">
+        <div class="editor-toolbar">
+          <button class="back-btn" id="btnCaptureCancel">‹ 취소</button>
+          <span class="editor-filename">화면 캡처 확인</span>
+          <div class="spacer"></div>
+          <button type="button" id="btnCaptureRetake" class="ghost-btn">🔄 다시 찍기</button>
+          <button type="button" id="btnCaptureConfirm" class="save-btn">✓ 채팅에 첨부</button>
+        </div>
+        <div class="capture-preview-wrap">
+          <img id="capturePreviewImg" alt="캡처 미리보기">
         </div>
       </div>
 
@@ -1588,8 +1608,7 @@ graph TD
       canvas.getContext('2d').drawImage(bitmapSource, 0, 0, width, height);
       const dataUrl = canvas.toDataURL('image/png');
 
-      pendingCaptures.push({ id: 'cap' + Date.now(), name: '화면캡처_' + (pendingCaptures.length + 1), dataUrl });
-      renderAttachBar();
+      openCaptureView(dataUrl); // 바로 첨부하지 않고, 오른쪽에 크게 보여줘서 뭘 찍었는지 확인부터
     }catch(err){
       if (err && err.name !== 'NotAllowedError'){
         alert('화면 캡처 중 오류: ' + (err && err.message ? err.message : err));
@@ -1600,6 +1619,39 @@ graph TD
   }
 
   if (btnScreenCapture) btnScreenCapture.addEventListener('click', captureScreen);
+
+  // ---- 화면캡처 확인 뷰 (오른쪽 패널에 크게 보여주고 첨부/재촬영/취소 선택) ----
+  const captureView = document.getElementById('captureView');
+  const capturePreviewImg = document.getElementById('capturePreviewImg');
+  let pendingCaptureDataUrl = null;
+
+  function openCaptureView(dataUrl){
+    pendingCaptureDataUrl = dataUrl;
+    capturePreviewImg.src = dataUrl;
+    explorerView.style.display = 'none';
+    explorerPanelHead.style.display = 'none';
+    captureView.style.display = 'flex';
+  }
+
+  function closeCaptureView(){
+    captureView.style.display = 'none';
+    explorerView.style.display = 'block';
+    explorerPanelHead.style.display = 'flex';
+    pendingCaptureDataUrl = null;
+  }
+
+  document.getElementById('btnCaptureCancel').addEventListener('click', closeCaptureView);
+  document.getElementById('btnCaptureRetake').addEventListener('click', ()=>{
+    closeCaptureView();
+    captureScreen();
+  });
+  document.getElementById('btnCaptureConfirm').addEventListener('click', ()=>{
+    if (pendingCaptureDataUrl){
+      pendingCaptures.push({ id: 'cap' + Date.now(), name: '화면캡처_' + (pendingCaptures.length + 1), dataUrl: pendingCaptureDataUrl });
+      renderAttachBar();
+    }
+    closeCaptureView();
+  });
 
 
   // 파일탐색기에서 채팅창으로 드래그&드롭

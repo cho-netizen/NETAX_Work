@@ -193,6 +193,16 @@
   .workspace.explorer-collapsed .panel.explorer{ display:none; }
   .workspace.explorer-collapsed .panel.chat{ flex:1 1 100%; max-height:none; border:none; }
 
+  /* 탐색기 "띄우기" — 기본은 생략(채팅만)이지만, 채팅 위에 잠깐 겹쳐서 보여줌 */
+  .explorer-float-backdrop{ display:none; }
+  .workspace.explorer-floating .explorer-float-backdrop{
+    display:block; position:fixed; inset:0; background:rgba(13,27,61,0.45); z-index:90;
+  }
+  .workspace.explorer-floating .panel.explorer{
+    display:flex; position:fixed; top:6vh; left:5vw; right:5vw; bottom:6vh; z-index:91;
+    border-radius:12px; overflow:hidden; box-shadow:0 16px 48px rgba(0,0,0,0.4); border:1px solid var(--line);
+  }
+
   .panel-head{
     display:flex; align-items:center; gap:8px; height:38px; padding:0 14px;
     border-bottom:1px solid var(--line); font-size:12.5px; font-weight:700; color:var(--navy);
@@ -531,6 +541,7 @@
   </div>
 
   <div class="workspace" id="workspace">
+    <div class="explorer-float-backdrop" id="explorerFloatBackdrop"></div>
     <div class="panel chat">
       <div class="chat-body" id="chatBody"></div>
       <div class="attach-bar" id="attachBar" style="display:none;"></div>
@@ -630,27 +641,33 @@ graph TD
   const REPORT_WRITER_URL = 'https://work.netax.kr/report-writer/'; // 독립 도메인으로 이전 후 경로
 
   // ============================================================
-  // 레이아웃 전환: 좌우배치 → 상하배치 → 탐색기 생략 — 버튼 하나로 순환
+  // 레이아웃 전환: 좌우배치 → 상하배치 → 탐색기 생략 → 탐색기 띄우기 — 버튼 하나로 순환
   // ============================================================
   const workspace = document.getElementById('workspace');
   const btnWorkspaceMode = document.getElementById('btnWorkspaceMode');
-  const WORKSPACE_MODE_KEY = 'nx_workspace_mode'; // 'row' | 'col' | 'hide'
-  const WORKSPACE_MODES = ['row', 'col', 'hide'];
+  const WORKSPACE_MODE_KEY = 'nx_workspace_mode'; // 'row' | 'col' | 'hide' | 'float'
+  const WORKSPACE_MODES = ['row', 'col', 'hide', 'float'];
   const WORKSPACE_MODE_META = {
-    row:  { icon: '⬓', title: '좌우 배치 (클릭할 때마다 순환: 좌우 → 상하 → 탐색기 생략)' },
-    col:  { icon: '⬒', title: '상하 배치 (클릭할 때마다 순환: 좌우 → 상하 → 탐색기 생략)' },
-    hide: { icon: '💬', title: '탐색기 생략 · 채팅만 (클릭할 때마다 순환: 좌우 → 상하 → 탐색기 생략)' }
+    row:   { icon: '⬓', title: '좌우 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기)' },
+    col:   { icon: '⬒', title: '상하 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기)' },
+    hide:  { icon: '💬', title: '탐색기 생략 · 채팅만 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기)' },
+    float: { icon: '🗗', title: '탐색기 띄우기 · 채팅 위에 잠깐 보기 (클릭하면 다시 좌우 배치로)' }
   };
 
   function applyWorkspaceMode(mode){
-    workspace.classList.toggle('layout-row', mode === 'row' || mode === 'hide');
+    workspace.classList.toggle('layout-row', mode === 'row' || mode === 'hide' || mode === 'float');
     workspace.classList.toggle('layout-col', mode === 'col');
-    workspace.classList.toggle('explorer-collapsed', mode === 'hide');
+    workspace.classList.toggle('explorer-collapsed', mode === 'hide' || mode === 'float');
+    workspace.classList.toggle('explorer-floating', mode === 'float');
     btnWorkspaceMode.textContent = WORKSPACE_MODE_META[mode].icon;
     btnWorkspaceMode.title = WORKSPACE_MODE_META[mode].title;
   }
+  // 화면 크기·방향에 맞춘 스마트 디폴트: 크거나 가로모드→우측, 작거나 세로모드→아래, 폰 크기→생략
   function detectDefaultMode(){
-    return 'hide'; // 처음 열었을 때는 채팅만 보이는 "생략" 상태로 시작
+    const w = window.innerWidth, h = window.innerHeight;
+    if (w < 640) return 'hide';   // 폰 크기 화면
+    if (w >= h) return 'row';     // 가로모드거나 충분히 넓은 화면
+    return 'col';                 // 세로모드의 작거나 중간 크기 화면(탭 등)
   }
   function setWorkspaceMode(mode){
     applyWorkspaceMode(mode);
@@ -663,11 +680,17 @@ graph TD
   });
   applyWorkspaceMode(localStorage.getItem(WORKSPACE_MODE_KEY) || detectDefaultMode());
 
+  // 배경(어두운 바깥 부분) 클릭하면 "띄우기"를 닫고 "생략"으로 되돌아감
+  const explorerFloatBackdrop = document.getElementById('explorerFloatBackdrop');
+  if (explorerFloatBackdrop){
+    explorerFloatBackdrop.addEventListener('click', ()=> setWorkspaceMode('hide'));
+  }
+
   // 오른쪽 패널(탐색기 자리) 안에 뭔가를 보여줘야 하는데 지금 "생략" 모드라면,
-  // 보여줄 자리 자체가 꺼져있어 아무것도 안 보이게 되므로 자동으로 좌우배치로 되돌린다.
+  // 완전히 다른 배치로 바꾸지 않고 "띄우기"로 잠깐 보여준다 (기본값은 생략으로 유지됨)
   function ensureExplorerVisible(){
     if (workspace.classList.contains('explorer-collapsed')){
-      setWorkspaceMode('row');
+      setWorkspaceMode('float');
     }
   }
 

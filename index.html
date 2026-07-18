@@ -85,6 +85,13 @@
     .tool-menu-narrow{ display:block; }
   }
 
+  /* 폰 크기: 설정 버튼의 모델·강도 표시 대신 그냥 "설정"으로 축약 */
+  .settings-label-narrow{ display:none; }
+  @media (max-width: 480px){
+    .settings-label-wide{ display:none; }
+    .settings-label-narrow{ display:inline; }
+  }
+
   /* ===== AI 설정 모달 ===== */
   .modal-overlay{
     position:fixed; inset:0; background:rgba(13,27,61,0.55);
@@ -416,9 +423,8 @@
 <body>
 
   <div class="topbar">
-    <select id="customerSelect" class="topbar-select">
-      <option value="">고객 불러오는 중…</option>
-    </select>
+    <input type="text" id="customerSelect" class="topbar-select" list="customerListOptions" placeholder="고객 불러오는 중…" autocomplete="off">
+    <datalist id="customerListOptions"></datalist>
     <button id="btnWorkspaceMode" class="tb-btn" title="좌우 배치 (클릭할 때마다 순환: 좌우 → 상하 → 탐색기 생략)">⬓</button>
     <div class="spacer"></div>
     <div id="selectionInline" class="selection-inline" style="display:none;">
@@ -448,7 +454,7 @@
         <button type="button" class="tool-menu-item" id="menuOpenFullEditor">🖋 편집</button>
       </div>
     </div>
-    <button id="btnOpenSettings" class="tb-btn" title="AI 설정">⚙ <span id="chatModelLabel">Sonnet 5</span><span class="sep">·</span><span id="chatEffortLabel">보통</span></button>
+    <button id="btnOpenSettings" class="tb-btn" title="AI 설정">⚙ <span class="settings-label-wide"><span id="chatModelLabel">Sonnet 5</span><span class="sep">·</span><span id="chatEffortLabel">보통</span></span><span class="settings-label-narrow">설정</span></button>
   </div>
 
   <div class="modal-overlay" id="settingsOverlay" style="display:none;">
@@ -759,6 +765,7 @@ graph TD
   // 상태
   // ============================================================
   const customerSelect = document.getElementById('customerSelect');
+  const customerDatalist = document.getElementById('customerListOptions');
   const breadcrumbEl = document.getElementById('breadcrumb');
   const explorerBody = document.getElementById('explorerBody');
   const explorerView = document.getElementById('explorerView');
@@ -795,21 +802,22 @@ graph TD
   const btnRenameSelected = document.getElementById('btnRenameSelected');
   const btnShareSelected = document.getElementById('btnShareSelected');
 
+  let currentCustomerNames = []; // 지금 목록에 있는 유효한 고객명 (자유 타이핑 검증용)
+
   function setSelectOptions(selectEl, names, placeholderIfEmpty){
-    selectEl.innerHTML = '';
-    if (!names.length){
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = placeholderIfEmpty;
-      selectEl.appendChild(opt);
-      return;
-    }
+    currentCustomerNames = names.slice();
+    customerDatalist.innerHTML = '';
     names.forEach(name=>{
       const opt = document.createElement('option');
       opt.value = name;
-      opt.textContent = name;
-      selectEl.appendChild(opt);
+      customerDatalist.appendChild(opt);
     });
+    if (!names.length){
+      selectEl.value = '';
+      selectEl.placeholder = placeholderIfEmpty;
+    } else {
+      selectEl.placeholder = '고객 검색/선택';
+    }
   }
 
   function renderBreadcrumb(){
@@ -1523,7 +1531,8 @@ graph TD
   }
 
   customerSelect.addEventListener('change', ()=>{
-    if (customerSelect.value) navigateTo(basePath.concat([customerSelect.value]));
+    const val = customerSelect.value.trim();
+    if (val && currentCustomerNames.includes(val)) navigateTo(basePath.concat([val]));
   });
 
   loadCustomers();

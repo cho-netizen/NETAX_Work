@@ -334,6 +334,7 @@
   }
   .icon-round-btn:hover{ background:#f0f2f6; color:var(--navy); }
   .icon-round-btn.send{ width:26px; height:26px; font-size:11px; opacity:0.55; }
+  .icon-round-btn.send.stop-mode{ opacity:1; background:#a83232; color:#fff; }
   .icon-round-btn.send:hover{ opacity:1; background:#f0f2f6; }
   .icon-round-btn.voice{
     width:38px; height:38px; font-size:17px;
@@ -2174,6 +2175,8 @@ graph TD
     }
   }
 
+  let currentChatAbortController = null; // 요청 중 '중지' 버튼으로 취소하기 위한 컨트롤러
+
   async function sendChatMessage(){
     const text = chatInputEl.value.trim();
     if (!text) return;
@@ -2199,7 +2202,9 @@ graph TD
     appendBubble('user', text + attachNote + captureNote + textAttachNote + refMediaNote);
     chatInputEl.value = '';
     chatInputEl.disabled = true;
-    btnChatSend.disabled = true;
+    btnChatSend.textContent = '⏹'; // 요청 중엔 전송 버튼이 중지 버튼 역할을 함
+    btnChatSend.title = '중지';
+    btnChatSend.classList.add('stop-mode');
     pendingAttachments = [];
     pendingCaptures = [];
     pendingTextAttachments = [];
@@ -2239,9 +2244,11 @@ graph TD
     }
 
     try{
+      currentChatAbortController = new AbortController();
       const res = await fetch(GAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        signal: currentChatAbortController.signal,
         body: JSON.stringify(Object.assign({
           messages: requestMessages,
           context: {
@@ -2262,15 +2269,29 @@ graph TD
         if (isVoiceTurn) speakReply(data.reply || '');
       }
     }catch(err){
-      thinkingBubble.textContent = '네트워크 오류: ' + (err && err.message ? err.message : err);
+      if (err && err.name === 'AbortError'){
+        thinkingBubble.textContent = '⏹ 중단됨';
+        chatMessages.pop(); // 방금 push한 사용자 메시지도 취소된 걸로 취급 (응답 없이 기록만 남으면 다음 턴에 어색해짐)
+      } else {
+        thinkingBubble.textContent = '네트워크 오류: ' + (err && err.message ? err.message : err);
+      }
     }finally{
+      currentChatAbortController = null;
       chatInputEl.disabled = false;
-      btnChatSend.disabled = false;
+      btnChatSend.textContent = '➤';
+      btnChatSend.title = '보내기';
+      btnChatSend.classList.remove('stop-mode');
       chatInputEl.focus();
     }
   }
 
-  btnChatSend.addEventListener('click', sendChatMessage);
+  btnChatSend.addEventListener('click', ()=>{
+    if (currentChatAbortController){
+      currentChatAbortController.abort(); // 요청 중이면 전송이 아니라 중지
+    } else {
+      sendChatMessage();
+    }
+  });
   chatInputEl.addEventListener('keydown', (e)=>{
     if (e.key === 'Enter' && !e.shiftKey){
       e.preventDefault();
@@ -2484,8 +2505,8 @@ graph TD
         btnVoiceInput.classList.remove('recording');
         btnVoiceInput.textContent = '🎤';
         chatInputEl.placeholder = '메시지 입력';
-        // 방금 인식된 말이 바로 전송 중이면(버튼이 잠겨있으면) 여기서 섣불리 풀지 않고 sendChatMessage 쪽에서 풀리게 둔다
-        if (!btnChatSend.disabled) chatInputEl.disabled = false;
+        // 방금 인식된 말이 바로 전송 중이면 여기서 섣불리 풀지 않고 sendChatMessage 쪽에서 풀리게 둔다
+        if (!currentChatAbortController) chatInputEl.disabled = false;
       };
       voiceRecognition.start();
     });

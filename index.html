@@ -87,8 +87,11 @@
     font-family:'Noto Serif KR',serif; font-weight:700; font-size:15px;
     border-radius:10px 10px 0 0;
   }
-  .modal-close{ cursor:pointer; color:rgba(255,255,255,0.7); font-size:14px; }
-  .modal-close:hover{ color:#fff; }
+  .modal-close{
+    cursor:pointer; color:#fff; font-size:18px; font-weight:700; line-height:1;
+    width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  }
+  .modal-close:hover{ background:rgba(255,255,255,0.18); }
   .modal-body{ padding:16px 18px; display:flex; flex-direction:column; gap:4px; }
   .modal-label{ font-size:12px; font-weight:700; color:var(--navy); margin-top:10px; margin-bottom:2px; }
   .modal-hint{ font-size:11px; color:var(--sub); line-height:1.5; margin-top:3px; }
@@ -190,7 +193,7 @@
   .float-close-btn{
     display:none; position:absolute; top:8px; right:8px; z-index:20;
     width:28px; height:28px; border-radius:50%; border:none; cursor:pointer;
-    background:rgba(13,27,61,0.75); color:#fff; font-size:14px;
+    background:var(--navy); color:#fff; font-size:15px; font-weight:800;
     align-items:center; justify-content:center;
   }
   .float-close-btn:hover{ background:var(--navy-deep); }
@@ -278,7 +281,7 @@
     display:flex; align-items:center; gap:6px; background:#f0f2f6; border:1px solid var(--line);
     border-radius:14px; padding:4px 8px; font-size:11.5px; color:var(--ink);
   }
-  .attach-chip .x{ cursor:pointer; color:var(--sub); font-weight:700; padding:0 2px; }
+  .attach-chip .x{ cursor:pointer; color:var(--navy); font-weight:800; font-size:13px; padding:0 3px; }
   .attach-chip .x:hover{ color:#a83232; }
 
   /* ===== 탐색기 / 편집기 패널 ===== */
@@ -352,7 +355,7 @@
   .log-entry .log-date{ flex:0 0 84px; font-size:11.5px; font-weight:700; color:var(--gold); white-space:nowrap; }
   .log-entry .log-text{ flex:1; font-size:13px; color:var(--ink); line-height:1.5; white-space:pre-wrap; }
   .log-entry .log-del{
-    flex:0 0 auto; background:none; border:none; color:#c3c8d1; cursor:pointer; font-size:13px; padding:0 2px;
+    flex:0 0 auto; background:none; border:none; color:var(--sub); cursor:pointer; font-size:16px; font-weight:800; padding:0 4px;
   }
   .log-entry .log-del:hover{ color:#a83232; }
   .log-empty{ padding:16px 14px; font-size:12.5px; color:var(--sub); }
@@ -374,7 +377,7 @@
   }
   .calc-table .calc-result{ font-weight:700; color:var(--navy); white-space:nowrap; text-align:right; padding-right:10px; }
   .calc-table .calc-result.is-error{ color:#a83232; font-weight:600; }
-  .calc-del{ background:none; border:none; color:#c3c8d1; cursor:pointer; font-size:13px; }
+  .calc-del{ background:none; border:none; color:var(--sub); cursor:pointer; font-size:16px; font-weight:800; }
   .calc-del:hover{ color:#a83232; }
 
   /* ===== 관계도/구조도 캔버스 ===== */
@@ -738,6 +741,21 @@ graph TD
   const editorView = document.getElementById('editorView');
   const explorerPanelHead = document.getElementById('explorerPanelHead');
   const editorFrame = document.getElementById('editorFrame');
+
+  // 오른쪽 패널 안의 모든 하위 화면(탐색기/편집기/처리일지/계산기/관계도/캡처확인)을 한 번에 숨김.
+  // 각 화면을 열 때 이걸 먼저 호출한 뒤 자기 화면만 다시 보이게 해서, 뒤로가기 없이 다른 도구로
+  // 바로 넘어가도 이전 화면이 안 겹쳐 보이게 한다. (logView 등은 아래에서 나중에 선언되지만
+  // 함수 몸통 안 참조라 실행 시점엔 이미 선언이 끝나 있어 문제없음)
+  function hideAllPanelViews(){
+    explorerView.style.display = 'none';
+    editorView.style.display = 'none';
+    if (typeof logView !== 'undefined' && logView) logView.style.display = 'none';
+    if (typeof calcView !== 'undefined' && calcView) calcView.style.display = 'none';
+    if (typeof diagramView !== 'undefined' && diagramView) diagramView.style.display = 'none';
+    if (typeof captureView !== 'undefined' && captureView) captureView.style.display = 'none';
+    explorerPanelHead.style.display = 'none';
+  }
+
   const editorFilename = document.getElementById('editorFilename');
 
   // explorerPath: [고객명, 사건명, ...하위 폴더들] — 항상 최소 2단계(고객/사건) 유지
@@ -956,9 +974,8 @@ graph TD
   }
 
   function openEditor(file){
-    explorerView.style.display = 'none';
+    hideAllPanelViews();
     editorView.style.display = 'flex';
-    explorerPanelHead.style.display = 'none'; // 편집기 툴바(뒤로가기+파일명)와 중복되므로 숨김
     editorFilename.textContent = file.name;
     currentOpenFile = { id: file.id, name: file.name, mimeType: file.mimeType };
 
@@ -974,7 +991,7 @@ graph TD
 
   document.getElementById('btnBack').addEventListener('click', ()=>{
     editorFrame.src = 'about:blank';
-    editorView.style.display = 'none';
+    hideAllPanelViews();
     explorerView.style.display = 'block';
     explorerPanelHead.style.display = 'flex'; // 탐색 중일 때는 경로표시줄 다시 보이게
     currentOpenFile = null;
@@ -1043,8 +1060,7 @@ graph TD
   async function openLogView(){
     ensureExplorerVisible();
     logCurrentPath = explorerPath.slice();
-    explorerView.style.display = 'none';
-    explorerPanelHead.style.display = 'none';
+    hideAllPanelViews();
     logView.style.display = 'flex';
     logFolderLabel.textContent = logCurrentPath.join(' / ') + ' 의 처리일지';
     logDateInput.value = new Date().toISOString().slice(0, 10);
@@ -1070,7 +1086,7 @@ graph TD
   }
 
   function closeLogView(){
-    logView.style.display = 'none';
+    hideAllPanelViews();
     explorerView.style.display = 'block';
     explorerPanelHead.style.display = 'flex';
     navigateTo(logCurrentPath); // 방금 저장한 처리일지.json이 목록에 바로 보이도록 새로고침
@@ -1090,9 +1106,6 @@ graph TD
     logTextInput.value = '';
     renderLogList();
     saveLog();
-  });
-  logTextInput.addEventListener('keydown', (e)=>{
-    if (e.key === 'Enter'){ e.preventDefault(); btnLogAdd.click(); }
   });
 
   // ---- 계산기 워크시트 ----
@@ -1239,8 +1252,7 @@ graph TD
   async function openCalcView(){
     ensureExplorerVisible();
     calcCurrentPath = explorerPath.slice();
-    explorerView.style.display = 'none';
-    explorerPanelHead.style.display = 'none';
+    hideAllPanelViews();
     calcView.style.display = 'flex';
     calcFolderLabel.textContent = calcCurrentPath.join(' / ') + ' 의 계산기';
     calcRowsBody.innerHTML = '<tr><td colspan="5" class="log-empty">불러오는 중…</td></tr>';
@@ -1266,7 +1278,7 @@ graph TD
   }
 
   function closeCalcView(){
-    calcView.style.display = 'none';
+    hideAllPanelViews();
     explorerView.style.display = 'block';
     explorerPanelHead.style.display = 'flex';
     navigateTo(calcCurrentPath); // 방금 저장한 계산기.json이 목록에 바로 보이도록 새로고침
@@ -1346,8 +1358,7 @@ graph TD
   async function openDiagramView(){
     ensureExplorerVisible();
     diagramCurrentPath = explorerPath.slice();
-    explorerView.style.display = 'none';
-    explorerPanelHead.style.display = 'none';
+    hideAllPanelViews();
     diagramView.style.display = 'flex';
     diagramFolderLabel.textContent = diagramCurrentPath.join(' / ') + ' 의 관계도';
 
@@ -1371,7 +1382,7 @@ graph TD
   }
 
   function closeDiagramView(){
-    diagramView.style.display = 'none';
+    hideAllPanelViews();
     explorerView.style.display = 'block';
     explorerPanelHead.style.display = 'flex';
     navigateTo(diagramCurrentPath); // 방금 저장한 관계도.mmd가 목록에 바로 보이도록 새로고침
@@ -1822,8 +1833,7 @@ graph TD
     ensureExplorerVisible();
     pendingCaptureDataUrl = dataUrl;
     capturePreviewImg.src = dataUrl;
-    explorerView.style.display = 'none';
-    explorerPanelHead.style.display = 'none';
+    hideAllPanelViews();
     captureView.style.display = 'flex';
 
     if (autoRefMode){
@@ -1851,7 +1861,7 @@ graph TD
   }
 
   function closeCaptureView(){
-    captureView.style.display = 'none';
+    hideAllPanelViews();
     explorerView.style.display = 'block';
     explorerPanelHead.style.display = 'flex';
     pendingCaptureDataUrl = null;

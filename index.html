@@ -71,6 +71,19 @@
   .nx-popup select:focus{ outline:2px solid var(--gold-light); outline-offset:1px; }
   .nx-popup select option{ color:var(--ink); background:#fff; }
   .nx-popup .case-path{ font-size:11.5px; color:rgba(255,255,255,0.7); }
+  .nx-popup .tool-menu-item{
+    background:none; border:none; color:#fff; text-align:left; cursor:pointer;
+    font-family:inherit; font-size:13px; padding:8px 6px; border-radius:6px;
+  }
+  .nx-popup .tool-menu-item:hover{ background:rgba(255,255,255,0.12); }
+
+  /* 넓은 화면: 도구 버튼 각각 다 보이고, 도구모음 버튼은 숨김 / 좁은 화면: 반대 */
+  .tool-buttons-wide{ display:contents; }
+  .tool-menu-narrow{ display:none; }
+  @media (max-width: 720px){
+    .tool-buttons-wide{ display:none; }
+    .tool-menu-narrow{ display:block; }
+  }
 
   /* ===== AI 설정 모달 ===== */
   .modal-overlay{
@@ -416,13 +429,25 @@
       <button type="button" id="btnDeleteSelected" class="danger">🗑 삭제</button>
       <button type="button" id="btnClearSelected" class="ghost">취소</button>
     </div>
-    <button type="button" id="btnAutoRef" class="autoref-toggle" title="자동참조 모드: AI가 알아서 폴더/파일을 읽을지, 명시적으로 요청했을 때만 읽을지"><span class="dot"></span>수동참조</button>
-    <button type="button" id="btnOpenLog" class="tb-btn" title="이 폴더의 처리일지 보기">📝 처리일지</button>
-    <button type="button" id="btnOpenCalc" class="tb-btn" title="이 폴더의 계산 워크시트 보기">🧮 계산기</button>
-    <button type="button" id="btnOpenDiagram" class="tb-btn" title="이 폴더의 관계도/구조도 보기">🕸 관계도</button>
-    <button id="btnOpenScan" class="tb-btn" title="문서 스캔 · PDF 조립">📷 스캔</button>
-    <button type="button" id="btnScreenCapture" class="tb-btn" title="다른 창(홈택스 등) 화면 캡처해서 첨부">📸 캡처</button>
-    <button id="btnOpenFullEditor" class="tb-btn" title="전체화면으로 직접 편집 (AI 개입 없이)">🖋 편집</button>
+    <div class="tool-buttons-wide">
+      <button type="button" id="btnOpenLog" class="tb-btn" title="이 폴더의 처리일지 보기">📝 처리일지</button>
+      <button type="button" id="btnOpenCalc" class="tb-btn" title="이 폴더의 계산 워크시트 보기">🧮 계산기</button>
+      <button type="button" id="btnOpenDiagram" class="tb-btn" title="이 폴더의 관계도/구조도 보기">🕸 관계도</button>
+      <button id="btnOpenScan" class="tb-btn" title="문서 스캔 · PDF 조립">📷 스캔</button>
+      <button type="button" id="btnScreenCapture" class="tb-btn" title="다른 창(홈택스 등) 화면 캡처해서 첨부">📸 캡처</button>
+      <button id="btnOpenFullEditor" class="tb-btn" title="전체화면으로 직접 편집 (AI 개입 없이)">🖋 편집</button>
+    </div>
+    <div class="topbar-item tool-menu-narrow">
+      <button type="button" id="btnToolMenu" class="tb-btn" title="도구 모음">🛠 도구</button>
+      <div id="toolMenuPopup" class="nx-popup">
+        <button type="button" class="tool-menu-item" id="menuOpenLog">📝 처리일지</button>
+        <button type="button" class="tool-menu-item" id="menuOpenCalc">🧮 계산기</button>
+        <button type="button" class="tool-menu-item" id="menuOpenDiagram">🕸 관계도</button>
+        <button type="button" class="tool-menu-item" id="menuOpenScan">📷 스캔</button>
+        <button type="button" class="tool-menu-item" id="menuScreenCapture">📸 캡처</button>
+        <button type="button" class="tool-menu-item" id="menuOpenFullEditor">🖋 편집</button>
+      </div>
+    </div>
     <button id="btnOpenSettings" class="tb-btn" title="AI 설정">⚙ <span id="chatModelLabel">Sonnet 5</span><span class="sep">·</span><span id="chatEffortLabel">보통</span></button>
   </div>
 
@@ -433,6 +458,11 @@
         <span class="modal-close" id="btnCloseSettings" title="닫기">✕</span>
       </div>
       <div class="modal-body">
+
+        <div class="modal-checkrow">
+          <label><input type="checkbox" id="settingsAutoRef"> 자동참조 사용 (AI가 알아서 판단해서 지금 보고 있는 폴더/파일을 확인)</label>
+        </div>
+        <div class="modal-hint">꺼두면, AI는 각 창의 "📎 참조" 버튼으로 직접 첨부했거나 "이 파일 참고해서"처럼 명시적으로 요청했을 때만 읽습니다.</div>
 
         <label class="modal-label">모델</label>
         <select id="settingsModel">
@@ -819,12 +849,10 @@ graph TD
   function renderSelectionBar(){
     if (!selectedItems.size){
       selectionInline.style.display = 'none';
-      btnAutoRef.style.display = '';
       return;
     }
     selectionCountText.textContent = selectedItems.size + '개 선택됨';
     selectionInline.style.display = 'flex';
-    btnAutoRef.style.display = 'none'; // 자동참조 버튼 자리를 선택 상태로 대체 (레이아웃이 안 밀리게)
 
     const items = Array.from(selectedItems.values());
     const single = items.length === 1 ? items[0] : null;
@@ -1500,26 +1528,37 @@ graph TD
 
   loadCustomers();
 
+  // ---- 좁은 화면용 "🛠 도구" 모음 팝업 (넓은 화면의 개별 버튼들과 완전히 같은 동작) ----
+  const btnToolMenu = document.getElementById('btnToolMenu');
+  const toolMenuPopup = document.getElementById('toolMenuPopup');
+  btnToolMenu.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    toolMenuPopup.classList.toggle('show');
+  });
+  document.addEventListener('click', (e)=>{
+    if (toolMenuPopup.classList.contains('show') && !toolMenuPopup.contains(e.target) && e.target !== btnToolMenu){
+      toolMenuPopup.classList.remove('show');
+    }
+  });
+  function wireToolMenuItem(id, handler){
+    document.getElementById(id).addEventListener('click', ()=>{
+      toolMenuPopup.classList.remove('show');
+      handler();
+    });
+  }
+  wireToolMenuItem('menuOpenLog', openLogView);
+  wireToolMenuItem('menuOpenCalc', openCalcView);
+  wireToolMenuItem('menuOpenDiagram', openDiagramView);
+  wireToolMenuItem('menuOpenScan', openScanModal);
+  wireToolMenuItem('menuScreenCapture', captureScreen);
+  wireToolMenuItem('menuOpenFullEditor', openFullEditor);
+
   // ============================================================
-  // 자동참조 토글 (ON: AI가 알아서 판단해 폴더/파일을 읽음 / OFF: 명시적으로 요청했을 때만)
+  // 자동참조 (ON: AI가 알아서 판단해 폴더/파일을 읽음 / OFF: 명시적으로 요청했을 때만) — ⚙설정 모달 안 체크박스로 관리
   // ============================================================
   const AUTOREF_KEY = 'nx_autoref_mode';
-  const btnAutoRef = document.getElementById('btnAutoRef');
+  const settingsAutoRef = document.getElementById('settingsAutoRef');
   let autoRefMode = localStorage.getItem(AUTOREF_KEY) === '1';
-
-  function renderAutoRefButton(){
-    btnAutoRef.innerHTML = '<span class="dot"></span>' + (autoRefMode ? '자동참조' : '수동참조');
-    btnAutoRef.classList.toggle('is-on', autoRefMode);
-    btnAutoRef.title = autoRefMode
-      ? '자동참조 중 — AI가 알아서 폴더/파일을 읽습니다. 클릭하면 수동참조로 전환'
-      : '수동참조 중 — 명시적으로 요청했을 때만 AI가 읽습니다. 클릭하면 자동참조로 전환';
-  }
-  btnAutoRef.addEventListener('click', ()=>{
-    autoRefMode = !autoRefMode;
-    localStorage.setItem(AUTOREF_KEY, autoRefMode ? '1' : '0');
-    renderAutoRefButton();
-  });
-  renderAutoRefButton();
 
   document.getElementById('btnAttachSelected').addEventListener('click', attachSelectedFiles);
   document.getElementById('btnClearSelected').addEventListener('click', ()=>{
@@ -1680,6 +1719,7 @@ graph TD
 
   function openSettingsModal(){
     populateSettingsForm(aiSettings);
+    settingsAutoRef.checked = autoRefMode;
     settingsOverlay.style.display = 'flex';
   }
   function closeSettingsModal(){
@@ -1696,10 +1736,13 @@ graph TD
   });
   document.getElementById('btnResetSettings').addEventListener('click', ()=>{
     populateSettingsForm(DEFAULT_AI_SETTINGS);
+    settingsAutoRef.checked = false;
   });
   document.getElementById('btnSaveSettings').addEventListener('click', ()=>{
     aiSettings = readSettingsForm();
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings));
+    autoRefMode = settingsAutoRef.checked;
+    localStorage.setItem(AUTOREF_KEY, autoRefMode ? '1' : '0');
     closeSettingsModal();
     updateChatModelBadge();
   });

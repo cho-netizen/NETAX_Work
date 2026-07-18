@@ -1,0 +1,1876 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231b2a41'/%3E%3Ctext x='32' y='45' font-family='Georgia,serif' font-size='34' font-weight='700' fill='%23c9a227' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E">
+<title>NX 작업실 — 레이아웃 프로토타입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0D1B3D; --navy-deep:#081226; --gold:#C8A244; --gold-light:#DCC17E;
+    --bar-bg:#20242c; --bar-fg:#e8e8ec;
+    --bg:#e9eaee; --panel:#ffffff; --line:#d8dce3; --ink:#1b2430; --sub:#6b7280;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);font-family:'Noto Sans KR',sans-serif;color:var(--ink);}
+  body{ display:flex; flex-direction:column; overflow:hidden; }
+
+  /* ===== 상단바 ===== */
+  .topbar{
+    display:flex; align-items:center; gap:14px;
+    height:52px; padding:0 16px; background:var(--navy); color:#fff;
+    border-bottom:3px solid var(--gold); flex-shrink:0;
+  }
+  .topbar{
+    display:flex; align-items:center; gap:8px;
+    height:48px; padding:0 10px; background:var(--navy); color:#fff;
+    border-bottom:3px solid var(--gold); flex-shrink:0;
+    overflow-x:auto; /* 좁은 화면에서 다 안 들어가면 가로 스크롤로 방어 */
+  }
+  .topbar-item{ position:relative; flex-shrink:0; }
+  .spacer{ flex:1; }
+  .layout-toggle{
+    display:flex; align-items:center; gap:4px; background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.25); border-radius:8px; padding:3px; flex-shrink:0;
+  }
+  .layout-toggle button{
+    background:none; border:none; color:rgba(255,255,255,0.55); cursor:pointer;
+    padding:6px 9px; border-radius:6px; font-size:15px; line-height:1; font-family:inherit;
+  }
+  .layout-toggle button.active{ background:var(--gold); color:var(--navy-deep); }
+  .layout-toggle button:hover:not(.active){ color:#fff; }
+
+  .topbar-select{
+    background:rgba(255,255,255,0.08); color:#fff; border:1px solid rgba(255,255,255,0.25);
+    border-radius:6px; padding:6px 9px; font-family:inherit; font-size:12.5px; cursor:pointer;
+    flex-shrink:0; max-width:38vw;
+  }
+  .topbar-select:focus{ outline:2px solid var(--gold-light); outline-offset:1px; }
+  .topbar-select option{ color:var(--ink); background:#fff; }
+
+  .tb-btn{
+    font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;
+    border:1px solid rgba(255,255,255,0.25); border-radius:8px; padding:6px 9px;
+    background:rgba(255,255,255,0.08); color:#e8e8ec; flex-shrink:0;
+  }
+  .tb-btn:hover{ background:rgba(255,255,255,0.16); }
+
+  /* ===== 상단바 그루핑 팝업 (report-writer의 popupMenu와 같은 방식) ===== */
+  .nx-popup{
+    position:absolute; top:calc(100% + 6px); left:0; z-index:50;
+    display:none; flex-direction:column; gap:8px;
+    background:#16233f; border:1px solid rgba(255,255,255,0.15); border-radius:8px;
+    padding:10px; min-width:220px; box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  }
+  .nx-popup.show{ display:flex; }
+  .nx-popup select{
+    background:rgba(255,255,255,0.08); color:#fff; border:1px solid rgba(255,255,255,0.25);
+    border-radius:6px; padding:6px 10px; font-family:inherit; font-size:12.5px; cursor:pointer;
+  }
+  .nx-popup select:focus{ outline:2px solid var(--gold-light); outline-offset:1px; }
+  .nx-popup select option{ color:var(--ink); background:#fff; }
+  .nx-popup .case-path{ font-size:11.5px; color:rgba(255,255,255,0.7); }
+
+  /* ===== AI 설정 모달 ===== */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(13,27,61,0.55);
+    display:flex; align-items:center; justify-content:center; z-index:100;
+  }
+  .modal-panel{
+    width:min(420px, 92vw); max-height:86vh; overflow-y:auto;
+    background:#fff; border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,0.25);
+  }
+  .modal-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 18px; background:var(--navy); color:#fff;
+    font-family:'Noto Serif KR',serif; font-weight:700; font-size:15px;
+    border-radius:10px 10px 0 0;
+  }
+  .modal-close{ cursor:pointer; color:rgba(255,255,255,0.7); font-size:14px; }
+  .modal-close:hover{ color:#fff; }
+  .modal-body{ padding:16px 18px; display:flex; flex-direction:column; gap:4px; }
+  .modal-label{ font-size:12px; font-weight:700; color:var(--navy); margin-top:10px; margin-bottom:2px; }
+  .modal-hint{ font-size:11px; color:var(--sub); line-height:1.5; margin-top:3px; }
+  .modal-body select, .modal-body input[type="number"], .modal-body textarea{
+    font-family:inherit; font-size:13px; padding:7px 9px; border:1px solid var(--line); border-radius:6px;
+    color:var(--ink); width:100%;
+  }
+  .modal-body textarea{ resize:vertical; }
+  .modal-checkrow{ display:flex; flex-direction:column; gap:6px; margin-top:8px; font-size:12.5px; color:var(--ink); }
+  .modal-checkrow label{ display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .modal-foot{
+    display:flex; justify-content:flex-end; gap:8px; padding:12px 18px;
+    border-top:1px solid var(--line);
+  }
+  .ghost-btn{
+    font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; border-radius:6px; padding:7px 14px;
+    border:1px solid var(--line); background:none; color:var(--sub);
+  }
+  .save-btn{
+    font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; border-radius:6px; padding:7px 14px;
+    border:none; background:var(--navy); color:#fff;
+  }
+  .save-btn:hover{ background:var(--navy-deep); }
+
+  /* ===== 문서 스캔 · PDF 조립 모달 ===== */
+  .scan-panel{ width:min(880px, 96vw); }
+  .scan-body{ display:flex; gap:20px; flex-wrap:wrap; }
+  .scan-section{ flex:1; min-width:280px; display:flex; flex-direction:column; gap:8px; }
+  .scan-section-title{ font-size:12.5px; font-weight:700; color:var(--navy); }
+
+  .scan-stage-wrap{ display:flex; flex-direction:column; gap:8px; }
+  .scan-stage{
+    position:relative; max-width:100%; background:#111; border-radius:6px; overflow:hidden;
+    display:inline-block; touch-action:none;
+  }
+  .scan-stage canvas{ display:block; max-width:100%; }
+  .scan-quad-svg{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .scan-quad-svg polygon{ fill:rgba(200,162,68,0.18); stroke:var(--gold); stroke-width:2; }
+  .scan-handle{
+    position:absolute; width:18px; height:18px; margin:-9px 0 0 -9px;
+    background:var(--gold); border:2px solid #fff; border-radius:50%;
+    box-shadow:0 0 4px rgba(0,0,0,0.4); cursor:grab; touch-action:none;
+  }
+  .scan-handle:active{ cursor:grabbing; }
+
+  .scan-controls{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; font-size:12px; color:var(--ink); }
+  .scan-check{ display:flex; align-items:center; gap:5px; cursor:pointer; }
+  .scan-slider{ display:flex; align-items:center; gap:6px; }
+
+  .scan-tray{ display:flex; flex-direction:column; gap:6px; max-height:300px; overflow-y:auto; }
+  .scan-tray-item{
+    display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fafbfc;
+  }
+  .scan-tray-item img{ width:36px; height:48px; object-fit:cover; border-radius:3px; border:1px solid var(--line); }
+  .scan-tray-item .pdf-chip-icon{ width:36px; height:48px; display:flex; align-items:center; justify-content:center; font-size:20px; background:#eef0f4; border-radius:3px; }
+  .scan-tray-item .name{ flex:1; font-size:12px; color:var(--ink); word-break:break-all; }
+  .scan-tray-item button{
+    font-size:11px; border:1px solid var(--line); background:#fff; border-radius:5px; padding:3px 6px; cursor:pointer; color:var(--sub);
+  }
+  .scan-tray-item button:hover{ color:var(--navy); border-color:var(--navy); }
+  .scan-hint{ font-size:11px; color:var(--sub); }
+
+  .scan-export-foot{ justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+  .scan-name-input{
+    flex:1; min-width:160px; font-family:inherit; font-size:12.5px; padding:7px 9px;
+    border:1px solid var(--line); border-radius:6px;
+  }
+
+  /* ===== 전체화면 편집기: 배경을 가리지 않는 "뜨는 창" ===== */
+  .floating-layer{ position:fixed; inset:0; z-index:100; pointer-events:none; }
+  .full-editor-panel{
+    position:absolute; pointer-events:auto;
+    background:#fff; border-radius:8px; box-shadow:0 14px 44px rgba(0,0,0,0.35);
+    display:flex; flex-direction:column; overflow:hidden;
+    min-width:380px; min-height:280px;
+  }
+  .full-editor-panel.maximized{
+    top:0 !important; left:0 !important; width:100vw !important; height:100vh !important;
+    border-radius:0;
+  }
+  .full-editor-panel .modal-head{ cursor:move; user-select:none; border-radius:8px 8px 0 0; }
+  .win-btn{ cursor:pointer; color:rgba(255,255,255,0.7); font-size:13px; margin-right:12px; }
+  .win-btn:hover{ color:#fff; }
+  .full-editor-frame{ flex:1; width:100%; border:none; }
+  .resize-handle{
+    position:absolute; right:0; bottom:0; width:18px; height:18px; cursor:nwse-resize;
+    background:linear-gradient(135deg, transparent 0 50%, rgba(0,0,0,0.28) 50% 100%);
+  }
+  .full-editor-panel.maximized .resize-handle{ display:none; }
+
+  /* ===== 작업 영역 ===== */
+  .workspace{ display:flex; flex:1; min-height:0; }
+  .workspace.layout-row{ flex-direction:row; }
+  .workspace.layout-col{ flex-direction:column; }
+
+  .panel{ display:flex; flex-direction:column; min-width:0; min-height:0; background:var(--panel); }
+  .layout-row .panel.chat{ flex:0 0 40%; border-right:1px solid var(--line); }
+  .layout-row .panel.explorer{ flex:1; }
+  .layout-col .panel.chat{ flex:0 0 auto; min-height:300px; max-height:42%; border-bottom:1px solid var(--line); }
+  .layout-col .panel.explorer{ flex:1; }
+
+  .panel-head{
+    display:flex; align-items:center; gap:8px; height:38px; padding:0 14px;
+    border-bottom:1px solid var(--line); font-size:12.5px; font-weight:700; color:var(--navy);
+    flex-shrink:0; background:#f4f5f8;
+  }
+  .panel-head .dot{ width:6px; height:6px; border-radius:50%; background:var(--gold); }
+  .autoref-toggle{
+    display:flex; align-items:center; gap:6px; flex-shrink:0;
+    font-family:inherit; font-size:11.5px; font-weight:700; cursor:pointer;
+    border:1px solid rgba(255,255,255,0.25); border-radius:20px; padding:4px 10px 4px 8px;
+    background:var(--navy); color:#fff;
+  }
+  .autoref-toggle .dot{ width:7px; height:7px; border-radius:50%; background:#7c8598; flex-shrink:0; }
+  .autoref-toggle.is-on .dot{ background:var(--gold); box-shadow:0 0 4px rgba(200,162,68,0.7); }
+
+  /* ===== AI 채팅 패널 ===== */
+  .chat-body{ flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .msg{ max-width:82%; padding:10px 13px; border-radius:10px; font-size:13.5px; line-height:1.55; }
+  .msg.ai{ background:#f0f2f6; color:var(--ink); align-self:flex-start; border-top-left-radius:2px; }
+  .msg.me{ background:var(--navy); color:#fff; align-self:flex-end; border-top-right-radius:2px; }
+  .apply-edit-btn{
+    margin-top:8px; display:block; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
+    border:none; border-radius:6px; padding:7px 12px; background:var(--gold); color:var(--navy-deep);
+  }
+  .apply-edit-btn:hover{ background:var(--gold-light); }
+  .apply-edit-btn:disabled{ background:#cfd4dc; color:var(--sub); cursor:default; }
+  .chat-input-wrap{
+    display:flex; flex-direction:column; gap:6px; padding:10px 12px;
+    border-top:1px solid var(--line); flex-shrink:0;
+  }
+  .chat-input-wrap input{
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+    font-family:inherit; font-size:13.5px;
+  }
+  .chat-toolbar{ display:flex; align-items:center; gap:8px; }
+  .chip-btn{
+    display:flex; align-items:center; gap:4px; font-family:inherit; font-size:11.5px; font-weight:600;
+    cursor:pointer; border:1px solid var(--line); border-radius:14px; padding:4px 10px;
+    background:#f4f5f8; color:var(--sub);
+  }
+  .chip-btn:hover{ background:#eaecef; color:var(--navy); }
+  .chip-btn .sep{ color:#c3c8d1; }
+  .icon-round-btn{
+    width:30px; height:30px; border-radius:50%; border:1px solid var(--line);
+    background:#fff; color:var(--sub); font-size:13px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .icon-round-btn:hover{ background:#f0f2f6; color:var(--navy); }
+  .icon-round-btn.send{ width:26px; height:26px; font-size:11px; opacity:0.55; }
+  .icon-round-btn.send:hover{ opacity:1; background:#f0f2f6; }
+  .icon-round-btn.voice{
+    width:38px; height:38px; font-size:17px;
+    background:var(--gold); border-color:var(--gold); color:var(--navy-deep);
+  }
+  .icon-round-btn.voice:hover{ background:var(--gold-light); }
+  .icon-round-btn.recording{ background:#d9534f; border-color:#d9534f; color:#fff; animation:pulseRec 1.1s ease-in-out infinite; }
+  @keyframes pulseRec{ 0%,100%{ box-shadow:0 0 0 0 rgba(217,83,79,0.5);} 50%{ box-shadow:0 0 0 6px rgba(217,83,79,0);} }
+
+  /* ===== 파일 드래그&드롭 첨부 ===== */
+  .chat-body.drag-over{ background:#eef3fb; outline:2px dashed var(--gold); outline-offset:-6px; }
+  .attach-bar{ display:flex; flex-wrap:wrap; gap:6px; padding:8px 12px 0 12px; }
+  .attach-chip{
+    display:flex; align-items:center; gap:6px; background:#f0f2f6; border:1px solid var(--line);
+    border-radius:14px; padding:4px 8px; font-size:11.5px; color:var(--ink);
+  }
+  .attach-chip .x{ cursor:pointer; color:var(--sub); font-weight:700; padding:0 2px; }
+  .attach-chip .x:hover{ color:#a83232; }
+
+  /* ===== 탐색기 / 편집기 패널 ===== */
+  .breadcrumb{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--sub); }
+  .breadcrumb b{ color:var(--navy); }
+  .breadcrumb .sep{ color:#c3c8d1; }
+  .explorer-body{ flex:1; overflow-y:auto; padding:6px; }
+  .folder-row, .file-row{
+    display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:6px;
+    font-size:13.5px; cursor:pointer; color:var(--ink);
+  }
+  .folder-row:hover, .file-row:hover{ background:#f0f2f6; }
+  .folder-row .icon{ color:var(--gold); font-size:15px; }
+  .file-row .icon{ color:#8a93a3; font-size:15px; }
+  .file-row .meta{ margin-left:auto; font-size:11.5px; color:var(--sub); }
+  .file-row .file-check, .folder-row .file-check{ flex-shrink:0; cursor:pointer; accent-color:var(--gold); width:14px; height:14px; }
+  .file-row.is-selected, .folder-row.is-selected{ background:#fbf4e3; }
+  .selection-inline{
+    display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--navy); flex-shrink:0;
+    background:#fbf4e3; border:1px solid var(--gold); border-radius:20px; padding:4px 8px;
+  }
+  .selection-inline button{
+    font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; border-radius:12px; padding:3px 8px;
+    border:1px solid var(--navy); background:var(--navy); color:#fff;
+  }
+  .selection-inline button.ghost{ background:none; color:var(--sub); border-color:var(--line); }
+
+  /* ===== 탐색기 상태 표시 ===== */
+  .explorer-status{ padding:16px 14px; font-size:13px; color:var(--sub); }
+  .explorer-status.is-error{ color:#a83232; }
+  .explorer-empty{ padding:16px 14px; font-size:12.5px; color:var(--sub); }
+
+  /* ===== 편집기(실제 iframe) ===== */
+  .editor-toolbar{
+    display:flex; align-items:center; gap:10px; height:40px; padding:0 12px;
+    border-bottom:1px solid var(--line); flex-shrink:0; background:#f9fafb;
+  }
+  .editor-filename{ font-size:12.5px; color:var(--sub); }
+  .editor-frame{ flex:1; width:100%; border:none; background:#fff; }
+  .back-btn{
+    background:none; border:1px solid var(--line); border-radius:6px; padding:5px 11px;
+    font-size:12px; color:var(--sub); cursor:pointer; font-family:inherit;
+  }
+  .back-btn:hover{ border-color:var(--navy); color:var(--navy); }
+
+  @media (max-width: 720px){
+    .layout-row .panel.chat{ flex:0 0 45%; }
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head>
+<body>
+
+  <div class="topbar">
+    <select id="customerSelect" class="topbar-select">
+      <option value="">고객 불러오는 중…</option>
+    </select>
+    <div class="layout-toggle" role="group" aria-label="레이아웃 전환">
+      <button id="btnRow" title="좌우 배치" aria-label="좌우 배치">⬓</button>
+      <button id="btnCol" title="상하 배치" aria-label="상하 배치">⬒</button>
+    </div>
+    <div class="spacer"></div>
+    <div id="selectionInline" class="selection-inline" style="display:none;">
+      <span id="selectionCountText"></span>
+      <button type="button" id="btnAttachSelected">첨부</button>
+      <button type="button" id="btnClearSelected" class="ghost">취소</button>
+    </div>
+    <button type="button" id="btnAutoRef" class="autoref-toggle" title="자동참조 모드: AI가 알아서 폴더/파일을 읽을지, 명시적으로 요청했을 때만 읽을지"><span class="dot"></span>수동참조</button>
+    <button id="btnOpenSettings" class="tb-btn" title="AI 설정">⚙ 설정</button>
+    <button id="btnOpenScan" class="tb-btn" title="문서 스캔 · PDF 조립">📷 스캔</button>
+    <button id="btnOpenFullEditor" class="tb-btn" title="전체화면으로 직접 편집 (AI 개입 없이)">🖋 편집</button>
+  </div>
+
+  <div class="modal-overlay" id="settingsOverlay" style="display:none;">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <span>AI 설정</span>
+        <span class="modal-close" id="btnCloseSettings" title="닫기">✕</span>
+      </div>
+      <div class="modal-body">
+
+        <label class="modal-label">모델</label>
+        <select id="settingsModel">
+          <option value="claude-sonnet-5">Claude Sonnet 5</option>
+          <option value="claude-opus-4-8">Claude Opus 4.8</option>
+          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+          <option value="claude-fable-5">Claude Fable 5</option>
+          <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Preview)</option>
+          <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+          <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option>
+        </select>
+
+        <label class="modal-label">사고 강도</label>
+        <select id="settingsEffort">
+          <option value="low">낮음 (빠름)</option>
+          <option value="medium" selected>보통</option>
+          <option value="high">높음 (신중하게, 느림)</option>
+        </select>
+
+        <label class="modal-label">온도 (temperature, 비워두면 모델 기본값)</label>
+        <input type="number" id="settingsTemperature" min="0" max="1" step="0.1" placeholder="예: 0.7">
+        <div class="modal-hint">※ 온도는 Claude Haiku(낮음 강도일 때만) 또는 Gemini 계열에서만 실제로 적용됩니다. Sonnet/Opus/Fable은 사고 강도(adaptive thinking)를 쓰기 때문에 온도 값을 무시합니다.</div>
+
+        <label class="modal-label">최대 출력 토큰 (비워두면 강도별 기본값: 낮음 1,536 / 보통 6,000 / 높음 16,000)</label>
+        <input type="number" id="settingsMaxTokens" min="256" max="64000" step="500" placeholder="예: 8000">
+
+        <div class="modal-checkrow">
+          <label><input type="checkbox" id="settingsWebSearch"> 웹서치 사용</label>
+          <label><input type="checkbox" id="settingsWebFetch"> 웹페이지 가져오기 사용</label>
+          <label><input type="checkbox" id="settingsCodeExec"> 코드실행 사용</label>
+        </div>
+
+        <div class="modal-checkrow">
+          <label><input type="checkbox" id="settingsAdvisor"> 어드바이저(자문 AI) 사용</label>
+        </div>
+        <div id="advisorModelRow" style="display:none;">
+          <label class="modal-label">어드바이저 모델</label>
+          <select id="settingsAdvisorModel">
+            <option value="claude-opus-4-8">Claude Opus 4.8</option>
+            <option value="claude-sonnet-5">Claude Sonnet 5</option>
+          </select>
+        </div>
+
+        <label class="modal-label">시스템 프롬프트 (비워두면 기본 프롬프트 사용)</label>
+        <textarea id="settingsSystemPrompt" rows="3" placeholder="예: 너는 이음세무컨설팅의 개인 업무 보조 AI다..."></textarea>
+
+      </div>
+      <div class="modal-foot">
+        <button id="btnResetSettings" class="ghost-btn">기본값으로</button>
+        <button id="btnSaveSettings" class="save-btn">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="scanOverlay" style="display:none;">
+    <div class="modal-panel scan-panel">
+      <div class="modal-head">
+        <span>문서 스캔 · PDF 조립</span>
+        <span class="modal-close" id="btnCloseScan" title="닫기">✕</span>
+      </div>
+      <div class="modal-body scan-body">
+
+        <div class="scan-section">
+          <div class="scan-section-title">① 스캔 (귀퉁이를 드래그해서 원근 보정)</div>
+          <input type="file" id="scanFileInput" accept="image/*">
+          <div id="scanStageWrap" class="scan-stage-wrap" style="display:none;">
+            <div id="scanStage" class="scan-stage">
+              <canvas id="scanPreviewCanvas"></canvas>
+              <div class="scan-handle" id="handle-tl" data-corner="tl"></div>
+              <div class="scan-handle" id="handle-tr" data-corner="tr"></div>
+              <div class="scan-handle" id="handle-br" data-corner="br"></div>
+              <div class="scan-handle" id="handle-bl" data-corner="bl"></div>
+              <svg id="scanQuadSvg" class="scan-quad-svg"><polygon id="scanQuadPoly"></polygon></svg>
+            </div>
+            <div class="scan-controls">
+              <button id="btnAutoDetect" class="ghost-btn">자동 인식 다시</button>
+              <label class="scan-check"><input type="checkbox" id="scanGrayscale"> 흑백(문서용)</label>
+              <label class="scan-slider">대비 <input type="range" id="scanContrast" min="0" max="100" value="20"></label>
+              <button id="btnWarpAndAdd" class="save-btn">펴서 페이지에 담기</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="scan-section">
+          <div class="scan-section-title">② 페이지 모음 (순서·회전 조정 후 PDF로)</div>
+          <input type="file" id="scanPdfInsertInput" accept="application/pdf" title="기존 PDF 파일을 페이지 묶음 끝에 추가">
+          <div id="scanTray" class="scan-tray"></div>
+          <div class="scan-hint">기존 PDF를 추가하면 그 PDF의 모든 페이지가 통째로 지금 순서 끝에 삽입됩니다.</div>
+        </div>
+
+      </div>
+      <div class="modal-foot scan-export-foot">
+        <input type="text" id="scanOutputName" placeholder="파일 이름 (예: 계약서_스캔)" class="scan-name-input">
+        <button id="btnDownloadPdf" class="ghost-btn">PC에 다운로드</button>
+        <button id="btnSaveToFolder" class="save-btn">현재 폴더에 저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="floating-layer" id="fullEditorOverlay" style="display:none;">
+    <div class="full-editor-panel" id="fullEditorPanel">
+      <div class="modal-head" id="fullEditorHead">
+        <span id="fullEditorTitle">전체화면 편집</span>
+        <div class="spacer"></div>
+        <span class="win-btn" id="btnMaximizeFullEditor" title="최대화/복원">⬜</span>
+        <span class="modal-close" id="btnCloseFullEditor" title="닫기">✕</span>
+      </div>
+      <iframe id="fullEditorFrame" class="full-editor-frame" title="전체화면 문서 편집기"></iframe>
+      <div class="resize-handle" id="fullEditorResizeHandle"></div>
+    </div>
+  </div>
+
+  <div class="workspace" id="workspace">
+    <div class="panel chat">
+      <div class="chat-body" id="chatBody">
+        <div class="msg ai">안녕하세요. 우측 탐색기에서 보고 계신 위치나 열어두신 파일에 대해 물어보시면 답변해드립니다. (자동참조 토글로 "알아서 읽기" 여부를 바꿀 수 있어요, 또는 우측 파일을 여기로 끌어다 놓으셔도 됩니다)</div>
+      </div>
+      <div class="attach-bar" id="attachBar" style="display:none;"></div>
+      <div class="chat-input-wrap">
+        <input type="text" id="chatInputEl" placeholder="메시지를 입력하세요… (파일을 여기로 끌어다 놓을 수 있어요)" aria-label="메시지 입력">
+        <div class="chat-toolbar">
+          <button type="button" id="chatModelBadge" class="chip-btn" title="모델·강도 설정 열기">
+            <span id="chatModelLabel">Sonnet 5</span><span class="sep">·</span><span id="chatEffortLabel">보통</span>
+          </button>
+          <div class="spacer"></div>
+          <button type="button" id="btnVoiceInput" class="icon-round-btn voice" title="음성으로 입력">🎤</button>
+          <button type="button" id="btnChatSend" class="icon-round-btn send" title="보내기">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel explorer">
+      <div class="panel-head" id="explorerPanelHead">
+        <div class="breadcrumb" id="breadcrumb">&nbsp;</div>
+      </div>
+
+      <div id="explorerView">
+        <div class="explorer-body" id="explorerBody">
+          <div class="explorer-status">불러오는 중…</div>
+        </div>
+      </div>
+
+      <div id="editorView" style="display:none; flex:1; flex-direction:column; min-height:0;">
+        <div class="editor-toolbar">
+          <button class="back-btn" id="btnBack">‹ 탐색기로 돌아가기</button>
+          <span class="editor-filename" id="editorFilename"></span>
+        </div>
+        <iframe id="editorFrame" class="editor-frame" title="문서 편집기"></iframe>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ============================================================
+  // 설정 — 아래 두 값만 채우면 실제 데이터로 동작합니다.
+  // ============================================================
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbz9pam82WMSMKHYo6-6EtEguMbpZ0AaqHirVzwcW6ZFRsdq4WGluvhpPkYUoTE2l_bm/exec';
+  const REPORT_WRITER_URL = 'https://desk.netax.kr/report-writer/'; // 실제 report-writer 경로로 교체
+
+  // ============================================================
+  // 레이아웃 전환 (기존 그대로)
+  // ============================================================
+  const workspace = document.getElementById('workspace');
+  const btnRow = document.getElementById('btnRow');
+  const btnCol = document.getElementById('btnCol');
+  const LAYOUT_KEY = 'nx_workspace_layout';
+
+  function applyLayout(mode){
+    workspace.classList.toggle('layout-row', mode === 'row');
+    workspace.classList.toggle('layout-col', mode === 'col');
+    btnRow.classList.toggle('active', mode === 'row');
+    btnCol.classList.toggle('active', mode === 'col');
+  }
+  function detectDefault(){
+    return window.innerWidth >= window.innerHeight ? 'row' : 'col';
+  }
+  function initLayout(){
+    const saved = localStorage.getItem(LAYOUT_KEY);
+    applyLayout(saved || detectDefault());
+  }
+  btnRow.addEventListener('click', () => { applyLayout('row'); localStorage.setItem(LAYOUT_KEY, 'row'); });
+  btnCol.addEventListener('click', () => { applyLayout('col'); localStorage.setItem(LAYOUT_KEY, 'col'); });
+  initLayout();
+
+  // ============================================================
+  // GAS 호출 (listFolder)
+  // ============================================================
+  async function callGas(action, payload){
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      // GAS 웹앱의 CORS preflight 회피를 위해 text/plain으로 보냄 (서버에서 JSON.parse로 처리)
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action }, payload))
+    });
+    if (!res.ok) throw new Error('네트워크 오류 (status ' + res.status + ')');
+    return res.json();
+  }
+
+  async function listFolder(path){
+    const data = await callGas('listFolder', { path });
+    if (data.error) throw new Error(data.error);
+    return data; // { path, folderId, folders:[{id,name}], files:[{id,name,mimeType,modifiedDate,url}] }
+  }
+
+  // ============================================================
+  // 상태
+  // ============================================================
+  const customerSelect = document.getElementById('customerSelect');
+  const breadcrumbEl = document.getElementById('breadcrumb');
+  const explorerBody = document.getElementById('explorerBody');
+  const explorerView = document.getElementById('explorerView');
+  const editorView = document.getElementById('editorView');
+  const explorerPanelHead = document.getElementById('explorerPanelHead');
+  const editorFrame = document.getElementById('editorFrame');
+  const editorFilename = document.getElementById('editorFilename');
+
+  // explorerPath: [고객명, 사건명, ...하위 폴더들] — 항상 최소 2단계(고객/사건) 유지
+  let explorerPath = [];
+  // 디폴트(작업대상) 폴더의 실제 위치 — 참 루트(구글드라이브 전체) 기준. loadCustomers()에서 서버가 알려주는 값으로 채워짐.
+  let basePath = [];
+  // 체크박스로 선택된 항목들 (파일이든 폴더든) — 여러 개 골라서 한 번에 채팅에 첨부하기 위함
+  // key: id, value: { id, name, type:'file'|'folder', mimeType?, path? }
+  let selectedItems = new Map();
+  let lastRenderedFiles = []; // 현재 화면에 그려진 파일 목록 (id로 다시 찾기 위함)
+  const selectionInline = document.getElementById('selectionInline');
+  const selectionCountText = document.getElementById('selectionCountText');
+
+  function setSelectOptions(selectEl, names, placeholderIfEmpty){
+    selectEl.innerHTML = '';
+    if (!names.length){
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = placeholderIfEmpty;
+      selectEl.appendChild(opt);
+      return;
+    }
+    names.forEach(name=>{
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      selectEl.appendChild(opt);
+    });
+  }
+
+  function renderBreadcrumb(){
+    breadcrumbEl.innerHTML = '';
+    explorerPath.forEach((seg, i)=>{
+      const b = document.createElement('b');
+      b.textContent = seg;
+      if (i < explorerPath.length - 1){
+        b.style.cursor = 'pointer';
+        b.addEventListener('click', ()=> navigateTo(explorerPath.slice(0, i + 1)));
+      }
+      breadcrumbEl.appendChild(b);
+      if (i < explorerPath.length - 1){
+        const sep = document.createElement('span');
+        sep.className = 'sep';
+        sep.textContent = '›';
+        breadcrumbEl.appendChild(sep);
+      }
+    });
+  }
+
+  function showExplorerStatus(text, isError){
+    explorerBody.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'explorer-status' + (isError ? ' is-error' : '');
+    div.textContent = text;
+    explorerBody.appendChild(div);
+  }
+
+  function iconForFile(mimeType){
+    if (mimeType && mimeType.indexOf('folder') !== -1) return '📁';
+    if (mimeType && mimeType.indexOf('image/') === 0) return '🖼️';
+    if (mimeType === 'application/pdf') return '📕';
+    return '📄';
+  }
+
+  function renderSelectionBar(){
+    if (!selectedItems.size){
+      selectionInline.style.display = 'none';
+      btnAutoRef.style.display = '';
+      return;
+    }
+    selectionCountText.textContent = selectedItems.size + '개 선택됨';
+    selectionInline.style.display = 'flex';
+    btnAutoRef.style.display = 'none'; // 자동참조 버튼 자리를 선택 상태로 대체 (레이아웃이 안 밀리게)
+  }
+
+  // 체크박스 상태와 선택바를 다시 그림 (파일 목록 자체를 새로 그리지 않고 표시만 갱신)
+  function refreshSelectionUi(){
+    explorerBody.querySelectorAll('.file-row, .folder-row[data-item-id]').forEach(row=>{
+      const id = row.dataset.itemId;
+      const checked = selectedItems.has(id);
+      row.classList.toggle('is-selected', checked);
+      const cb = row.querySelector('.file-check');
+      if (cb) cb.checked = checked;
+    });
+    renderSelectionBar();
+  }
+
+  // 선택된 파일/폴더를 한 번에 채팅 첨부 목록으로 보냄
+  function attachSelectedFiles(){
+    selectedItems.forEach(item => addAttachment(item));
+    selectedItems.clear();
+    refreshSelectionUi();
+  }
+
+  function renderExplorer(data){
+    explorerPath = data.path;
+    renderBreadcrumb();
+    explorerBody.innerHTML = '';
+    selectedItems.clear(); // 새 폴더로 이동하면 이전 화면의 선택은 의미 없으므로 초기화
+    lastRenderedFiles = data.files;
+
+    // 참 루트(구글드라이브 전체)에 도달하기 전까지는 ".." 상위 폴더 이동 허용
+    if (explorerPath.length > 0){
+      const up = document.createElement('div');
+      up.className = 'folder-row';
+      up.innerHTML = '<span class="icon">📁</span> .. (상위 폴더)';
+      up.addEventListener('click', ()=> navigateTo(explorerPath.slice(0, -1)));
+      explorerBody.appendChild(up);
+    }
+
+    data.folders.forEach(f=>{
+      const folderPath = explorerPath.concat([f.name]);
+      const row = document.createElement('div');
+      row.className = 'folder-row';
+      row.draggable = true;
+      row.dataset.itemId = f.id;
+      row.innerHTML = '<input type="checkbox" class="file-check" title="여러 개 선택해서 한 번에 첨부하려면 체크하세요">'
+        + '<span class="icon">📁</span> ' + escapeHtml(f.name);
+
+      row.addEventListener('click', ()=> navigateTo(folderPath));
+
+      const checkbox = row.querySelector('.file-check');
+      checkbox.addEventListener('click', (e)=>{ e.stopPropagation(); }); // 체크박스 클릭이 폴더 진입으로 이어지지 않게
+      checkbox.addEventListener('change', ()=>{
+        if (checkbox.checked) selectedItems.set(f.id, { id: f.id, name: f.name, type: 'folder', path: folderPath });
+        else selectedItems.delete(f.id);
+        refreshSelectionUi();
+      });
+
+      row.addEventListener('dragstart', (e)=>{
+        const itemsToDrag = (selectedItems.has(f.id) && selectedItems.size > 1)
+          ? Array.from(selectedItems.values())
+          : [{ id: f.id, name: f.name, type: 'folder', path: folderPath }];
+        e.dataTransfer.setData('application/json', JSON.stringify(itemsToDrag));
+        e.dataTransfer.effectAllowed = 'copy';
+      });
+
+      explorerBody.appendChild(row);
+    });
+
+    data.files.forEach(f=>{
+      const row = document.createElement('div');
+      row.className = 'file-row';
+      row.draggable = true;
+      row.dataset.itemId = f.id;
+      row.innerHTML = '<input type="checkbox" class="file-check" title="여러 개 선택해서 한 번에 첨부하려면 체크하세요">'
+        + '<span class="icon">' + iconForFile(f.mimeType) + '</span> '
+        + escapeHtml(f.name) + '<span class="meta">' + escapeHtml(f.modifiedDate || '') + '</span>';
+
+      row.addEventListener('click', ()=> openEditor(f));
+
+      const checkbox = row.querySelector('.file-check');
+      checkbox.addEventListener('click', (e)=>{
+        e.stopPropagation(); // 체크박스 클릭이 행 클릭(편집기 열기)으로 이어지지 않게
+      });
+      checkbox.addEventListener('change', ()=>{
+        if (checkbox.checked) selectedItems.set(f.id, { id: f.id, name: f.name, type: 'file', mimeType: f.mimeType });
+        else selectedItems.delete(f.id);
+        refreshSelectionUi();
+      });
+
+      row.addEventListener('dragstart', (e)=>{
+        // 지금 끄는 행이 "선택된 여러 항목" 중 하나면 선택된 항목 전부를, 아니면 이 파일 하나만 실어보냄
+        const itemsToDrag = (selectedItems.has(f.id) && selectedItems.size > 1)
+          ? Array.from(selectedItems.values())
+          : [{ id: f.id, name: f.name, type: 'file', mimeType: f.mimeType }];
+        e.dataTransfer.setData('application/json', JSON.stringify(itemsToDrag));
+        e.dataTransfer.effectAllowed = 'copy';
+      });
+
+      explorerBody.appendChild(row);
+    });
+
+    if (!data.folders.length && !data.files.length){
+      const empty = document.createElement('div');
+      empty.className = 'explorer-empty';
+      empty.textContent = '이 폴더는 비어 있습니다.';
+      explorerBody.appendChild(empty);
+    }
+
+    renderSelectionBar(); // 폴더 이동으로 선택이 초기화됐으니 선택바도 숨김 처리
+  }
+
+  function escapeHtml(s){
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  async function navigateTo(path){
+    showExplorerStatus('불러오는 중…');
+    try{
+      const data = await listFolder(path);
+      renderExplorer(data);
+    }catch(err){
+      showExplorerStatus('폴더를 불러오지 못했습니다: ' + err.message, true);
+    }
+  }
+
+  // 지금 편집기에 열려 있는 파일 (없으면 null) — 채팅으로 넘길 "현재 화면 상태" 컨텍스트에 사용
+  let currentOpenFile = null;
+  // report-writer(우리 렌더러)로 열려 있는지 — 이때만 postMessage로 실시간 내용 조회/적용 가능
+  let isReportWriterOpen = false;
+
+  // 텍스트 계열(우리 렌더러로 열 대상)인지 판별 — 그 외(이미지/PDF/기타)는 구글드라이브 자체 미리보기로 보냄
+  function isTextRenderable(mimeType, name){
+    if (mimeType === 'application/vnd.google-apps.document') return true;
+    if (mimeType && mimeType.indexOf('text/') === 0) return true;
+    if (/\.(md|txt|html?|htm)$/i.test(name || '')) return true;
+    return false;
+  }
+
+  function openEditor(file){
+    explorerView.style.display = 'none';
+    editorView.style.display = 'flex';
+    explorerPanelHead.style.display = 'none'; // 편집기 툴바(뒤로가기+파일명)와 중복되므로 숨김
+    editorFilename.textContent = file.name;
+    currentOpenFile = { id: file.id, name: file.name, mimeType: file.mimeType };
+
+    if (isTextRenderable(file.mimeType, file.name)){
+      isReportWriterOpen = true;
+      editorFrame.src = REPORT_WRITER_URL + '?fileId=' + encodeURIComponent(file.id);
+    } else {
+      isReportWriterOpen = false;
+      // 이미지・PDF・기타 파일: 구글드라이브 자체 미리보기 사용 (별도 뷰어를 만들 필요 없음)
+      editorFrame.src = 'https://drive.google.com/file/d/' + encodeURIComponent(file.id) + '/preview';
+    }
+  }
+
+  document.getElementById('btnBack').addEventListener('click', ()=>{
+    editorFrame.src = 'about:blank';
+    editorView.style.display = 'none';
+    explorerView.style.display = 'block';
+    explorerPanelHead.style.display = 'flex'; // 탐색 중일 때는 경로표시줄 다시 보이게
+    currentOpenFile = null;
+    isReportWriterOpen = false;
+  });
+
+  // ---- report-writer(iframe)와의 실시간 통신 (postMessage) ----
+  let msgReqCounter = 0;
+  const pendingContentRequests = {};
+
+  window.addEventListener('message', (event)=>{
+    const msg = event.data;
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'nx-content-response' && pendingContentRequests[msg.requestId]){
+      pendingContentRequests[msg.requestId](msg.content);
+      delete pendingContentRequests[msg.requestId];
+    }
+  });
+
+  // 지금 편집기(report-writer)에 실제로 타이핑되어 있는(저장 전 포함) 내용을 물어봄
+  function getEditorLiveContent(){
+    return new Promise((resolve)=>{
+      if (!isReportWriterOpen || !editorFrame.contentWindow){ resolve(null); return; }
+      const requestId = 'req' + (++msgReqCounter);
+      const timer = setTimeout(()=>{ delete pendingContentRequests[requestId]; resolve(null); }, 1500);
+      pendingContentRequests[requestId] = (content)=>{ clearTimeout(timer); resolve(content); };
+      editorFrame.contentWindow.postMessage({ type: 'nx-get-content', requestId }, '*');
+    });
+  }
+
+  // AI가 제안한 새 문서 내용을 편집기에 실제로 적용
+  function applyEditorContent(newContent){
+    if (!isReportWriterOpen || !editorFrame.contentWindow) return;
+    editorFrame.contentWindow.postMessage({ type: 'nx-set-content', content: newContent }, '*');
+  }
+
+  // report-writer가 아니라 구글드라이브 자체 미리보기(이미지·PDF)로 열려 있는 파일은
+  // "실시간 타이핑 내용" 개념이 없으므로, 대신 파일 자체를 이미지/문서 블록으로 가져와 메시지에 실어보낸다.
+  async function getOpenFileMediaBlock(){
+    if (!currentOpenFile || isReportWriterOpen) return null;
+    const mt = currentOpenFile.mimeType || '';
+    const isImage = mt.indexOf('image/') === 0;
+    const isPdf = mt === 'application/pdf';
+    if (!isImage && !isPdf) return null; // 그 외 형식은 아직 미지원 (필요시 확장 가능)
+
+    try{
+      const data = await callGas('readFile', { fileId: currentOpenFile.id });
+      if (data.error || !data.base64) return null;
+      return {
+        type: isImage ? 'image' : 'document',
+        source: { type: 'base64', media_type: data.mimeType || mt, data: data.base64 }
+      };
+    }catch(err){
+      console.warn('열려있는 파일을 첨부하지 못했습니다', err);
+      return null;
+    }
+  }
+
+  // ============================================================
+  // 고객/사건 선택 로딩
+  // ============================================================
+  async function loadCustomers(){
+    setSelectOptions(customerSelect, [], '고객 불러오는 중…');
+    try{
+      const data = await listFolder(); // 인자 없이 호출 = "디폴트(현재 작업대상) 폴더를 열어줘"
+      basePath = data.path; // 디폴트 폴더의 실제 위치 (참 루트 기준)
+      const names = data.folders.map(f => f.name);
+      setSelectOptions(customerSelect, names, '고객 폴더 없음');
+      if (names.length){
+        customerSelect.value = names[0];
+        await navigateTo(basePath.concat([names[0]]));
+      } else {
+        showExplorerStatus('고객 폴더가 없습니다.');
+      }
+    }catch(err){
+      setSelectOptions(customerSelect, [], '불러오기 실패');
+      showExplorerStatus('고객 목록을 불러오지 못했습니다: ' + err.message, true);
+    }
+  }
+
+  customerSelect.addEventListener('change', ()=>{
+    if (customerSelect.value) navigateTo(basePath.concat([customerSelect.value]));
+  });
+
+  loadCustomers();
+
+  // ============================================================
+  // 자동참조 토글 (ON: AI가 알아서 판단해 폴더/파일을 읽음 / OFF: 명시적으로 요청했을 때만)
+  // ============================================================
+  const AUTOREF_KEY = 'nx_autoref_mode';
+  const btnAutoRef = document.getElementById('btnAutoRef');
+  let autoRefMode = localStorage.getItem(AUTOREF_KEY) === '1';
+
+  function renderAutoRefButton(){
+    btnAutoRef.innerHTML = '<span class="dot"></span>' + (autoRefMode ? '자동참조' : '수동참조');
+    btnAutoRef.classList.toggle('is-on', autoRefMode);
+    btnAutoRef.title = autoRefMode
+      ? '자동참조 중 — AI가 알아서 폴더/파일을 읽습니다. 클릭하면 수동참조로 전환'
+      : '수동참조 중 — 명시적으로 요청했을 때만 AI가 읽습니다. 클릭하면 자동참조로 전환';
+  }
+  btnAutoRef.addEventListener('click', ()=>{
+    autoRefMode = !autoRefMode;
+    localStorage.setItem(AUTOREF_KEY, autoRefMode ? '1' : '0');
+    renderAutoRefButton();
+  });
+  renderAutoRefButton();
+
+  document.getElementById('btnAttachSelected').addEventListener('click', attachSelectedFiles);
+  document.getElementById('btnClearSelected').addEventListener('click', ()=>{
+    selectedItems.clear();
+    refreshSelectionUi();
+  });
+
+  // ============================================================
+  // AI 설정 (모델/강도/도구 등 — 예전 NX Assistant 화면에 있던 설정들을 여기로 이전)
+  // ============================================================
+  const AI_SETTINGS_KEY = 'nx_ai_settings';
+  const DEFAULT_AI_SETTINGS = {
+    model: 'claude-sonnet-5',
+    effort: 'medium',
+    temperature: null,          // null이면 요청에 아예 안 실어서 모델 기본값 사용
+    maxTokens: null,            // null이면 강도(effort)별 기본 상한 사용
+    enableWebSearch: false,
+    enableWebFetch: false,
+    enableCodeExecution: false,
+    enableAdvisor: false,
+    advisorModel: 'claude-opus-4-8',
+    systemPrompt: ''            // 비어있으면 GAS의 DEFAULT_SYSTEM_PROMPT 사용
+  };
+
+  function loadAiSettings(){
+    try{
+      const raw = localStorage.getItem(AI_SETTINGS_KEY);
+      if (raw) return Object.assign({}, DEFAULT_AI_SETTINGS, JSON.parse(raw));
+    }catch(err){ console.warn('AI 설정 로드 실패, 기본값 사용', err); }
+    return Object.assign({}, DEFAULT_AI_SETTINGS);
+  }
+
+  let aiSettings = loadAiSettings();
+
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const settingsModel = document.getElementById('settingsModel');
+  const settingsEffort = document.getElementById('settingsEffort');
+  const settingsTemperature = document.getElementById('settingsTemperature');
+  const settingsMaxTokens = document.getElementById('settingsMaxTokens');
+  const settingsWebSearch = document.getElementById('settingsWebSearch');
+  const settingsWebFetch = document.getElementById('settingsWebFetch');
+  const settingsCodeExec = document.getElementById('settingsCodeExec');
+  const settingsAdvisor = document.getElementById('settingsAdvisor');
+  const advisorModelRow = document.getElementById('advisorModelRow');
+  const settingsAdvisorModel = document.getElementById('settingsAdvisorModel');
+  const settingsSystemPrompt = document.getElementById('settingsSystemPrompt');
+
+  function populateSettingsForm(s){
+    settingsModel.value = s.model;
+    settingsEffort.value = s.effort;
+    settingsTemperature.value = (s.temperature === null || s.temperature === undefined) ? '' : s.temperature;
+    settingsMaxTokens.value = (s.maxTokens === null || s.maxTokens === undefined) ? '' : s.maxTokens;
+    settingsWebSearch.checked = !!s.enableWebSearch;
+    settingsWebFetch.checked = !!s.enableWebFetch;
+    settingsCodeExec.checked = !!s.enableCodeExecution;
+    settingsAdvisor.checked = !!s.enableAdvisor;
+    settingsAdvisorModel.value = s.advisorModel;
+    advisorModelRow.style.display = s.enableAdvisor ? 'block' : 'none';
+    settingsSystemPrompt.value = s.systemPrompt || '';
+  }
+
+  function readSettingsForm(){
+    const tempRaw = settingsTemperature.value.trim();
+    const maxTokRaw = settingsMaxTokens.value.trim();
+    return {
+      model: settingsModel.value,
+      effort: settingsEffort.value,
+      temperature: tempRaw === '' ? null : Math.max(0, Math.min(1, Number(tempRaw))),
+      maxTokens: maxTokRaw === '' ? null : Math.max(256, Math.min(64000, Math.floor(Number(maxTokRaw)))),
+      enableWebSearch: settingsWebSearch.checked,
+      enableWebFetch: settingsWebFetch.checked,
+      enableCodeExecution: settingsCodeExec.checked,
+      enableAdvisor: settingsAdvisor.checked,
+      advisorModel: settingsAdvisorModel.value,
+      systemPrompt: settingsSystemPrompt.value.trim()
+    };
+  }
+
+  function openSettingsModal(){
+    populateSettingsForm(aiSettings);
+    settingsOverlay.style.display = 'flex';
+  }
+  function closeSettingsModal(){
+    settingsOverlay.style.display = 'none';
+  }
+
+  document.getElementById('btnOpenSettings').addEventListener('click', openSettingsModal);
+  document.getElementById('btnCloseSettings').addEventListener('click', closeSettingsModal);
+  settingsOverlay.addEventListener('click', (e)=>{
+    if (e.target === settingsOverlay) closeSettingsModal(); // 바깥(어두운 영역) 클릭 시 닫기
+  });
+  settingsAdvisor.addEventListener('change', ()=>{
+    advisorModelRow.style.display = settingsAdvisor.checked ? 'block' : 'none';
+  });
+  document.getElementById('btnResetSettings').addEventListener('click', ()=>{
+    populateSettingsForm(DEFAULT_AI_SETTINGS);
+  });
+  document.getElementById('btnSaveSettings').addEventListener('click', ()=>{
+    aiSettings = readSettingsForm();
+    localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings));
+    closeSettingsModal();
+    updateChatModelBadge();
+  });
+
+  // 입력창 아래 "모델 · 강도" 뱃지 표시 갱신
+  const MODEL_LABELS = {
+    'claude-sonnet-5': 'Sonnet 5',
+    'claude-opus-4-8': 'Opus 4.8',
+    'claude-haiku-4-5-20251001': 'Haiku 4.5',
+    'claude-fable-5': 'Fable 5',
+    'gemini-3.1-pro-preview': 'Gemini 3.1 Pro',
+    'gemini-3.5-flash': 'Gemini 3.5 Flash',
+    'gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite'
+  };
+  const EFFORT_LABELS = { low: '빠름', medium: '보통', high: '신중' };
+  const chatModelLabel = document.getElementById('chatModelLabel');
+  const chatEffortLabel = document.getElementById('chatEffortLabel');
+  function updateChatModelBadge(){
+    chatModelLabel.textContent = MODEL_LABELS[aiSettings.model] || aiSettings.model;
+    chatEffortLabel.textContent = EFFORT_LABELS[aiSettings.effort] || aiSettings.effort;
+  }
+  document.getElementById('chatModelBadge').addEventListener('click', openSettingsModal);
+  updateChatModelBadge();
+
+  // 채팅 전송 시 GAS로 실어보낼 AI 설정 payload 조립 (값이 기본값/공백이면 아예 안 실어서 서버 기본값이 적용되게 함)
+  function buildAiSettingsPayload(){
+    const payload = { model: aiSettings.model, effort: aiSettings.effort };
+    if (aiSettings.temperature !== null && aiSettings.temperature !== undefined) payload.temperature = aiSettings.temperature;
+    if (aiSettings.maxTokens !== null && aiSettings.maxTokens !== undefined) payload.maxTokens = aiSettings.maxTokens;
+    if (aiSettings.enableWebSearch) payload.enableWebSearch = true;
+    if (aiSettings.enableWebFetch) payload.enableWebFetch = true;
+    if (aiSettings.enableCodeExecution) payload.enableCodeExecution = true;
+    if (aiSettings.enableAdvisor){
+      payload.enableAdvisor = true;
+      payload.advisorModel = aiSettings.advisorModel;
+    }
+    if (aiSettings.systemPrompt) payload.systemPrompt = aiSettings.systemPrompt;
+    return payload;
+  }
+
+  // ============================================================
+  // AI 채팅 — 실제 GAS 연결
+  // ============================================================
+  const chatBody = document.getElementById('chatBody');
+  const chatInputEl = document.getElementById('chatInputEl');
+  const btnChatSend = document.getElementById('btnChatSend');
+  const attachBar = document.getElementById('attachBar');
+
+  let chatMessages = []; // Claude API 형식: [{role:'user'|'assistant', content:'...'}]
+  let pendingAttachments = []; // [{id,name,type:'file'|'folder',mimeType?,path?}] — 채팅에 끌어다 놓거나 첨부한 항목들 (다음 전송에 무조건 반영)
+
+  function renderAttachBar(){
+    attachBar.innerHTML = '';
+    if (!pendingAttachments.length){
+      attachBar.style.display = 'none';
+      return;
+    }
+    attachBar.style.display = 'flex';
+    pendingAttachments.forEach(item=>{
+      const chip = document.createElement('div');
+      chip.className = 'attach-chip';
+      const icon = item.type === 'folder' ? '📁' : '📎';
+      chip.innerHTML = icon + ' ' + escapeHtml(item.name) + ' <span class="x" title="첨부 취소">✕</span>';
+      chip.querySelector('.x').addEventListener('click', ()=>{
+        pendingAttachments = pendingAttachments.filter(a => a.id !== item.id);
+        renderAttachBar();
+      });
+      attachBar.appendChild(chip);
+    });
+  }
+
+  function addAttachment(item){
+    if (!item || !item.id) return;
+    if (pendingAttachments.find(a => a.id === item.id)) return; // 중복 방지
+    pendingAttachments.push({
+      id: item.id,
+      name: item.name,
+      type: item.type === 'folder' ? 'folder' : 'file',
+      mimeType: item.mimeType,
+      path: item.path // 폴더인 경우에만 있음
+    });
+    renderAttachBar();
+  }
+
+  // 파일탐색기에서 채팅창으로 드래그&드롭
+  chatBody.addEventListener('dragover', (e)=>{
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    chatBody.classList.add('drag-over');
+  });
+  chatBody.addEventListener('dragleave', ()=>{
+    chatBody.classList.remove('drag-over');
+  });
+  chatBody.addEventListener('drop', (e)=>{
+    e.preventDefault();
+    chatBody.classList.remove('drag-over');
+    const raw = e.dataTransfer.getData('application/json');
+    if (!raw) return;
+    try{
+      const parsed = JSON.parse(raw);
+      const list = Array.isArray(parsed) ? parsed : [parsed]; // 항상 배열로 옴 (단일 파일도 1개짜리 배열)
+      list.forEach(addAttachment);
+    }catch(err){ console.warn('첨부 데이터 파싱 실패', err); }
+  });
+
+  function appendBubble(role, text){
+    const div = document.createElement('div');
+    div.className = 'msg ' + (role === 'user' ? 'me' : 'ai');
+    div.textContent = text;
+    chatBody.appendChild(div);
+    chatBody.scrollTop = chatBody.scrollHeight;
+    return div;
+  }
+
+  // AI 응답 안에 <<<EDIT_DOCUMENT>>>...<<<END_EDIT_DOCUMENT>>> 구간이 있으면
+  // "편집기에 적용하기" 버튼을 붙여서 렌더링 (없으면 그냥 평범한 텍스트)
+  const EDIT_START = '<<<EDIT_DOCUMENT>>>';
+  const EDIT_END = '<<<END_EDIT_DOCUMENT>>>';
+
+  function renderAssistantReply(bubbleEl, replyText){
+    const startIdx = replyText.indexOf(EDIT_START);
+    const endIdx = replyText.indexOf(EDIT_END);
+    bubbleEl.innerHTML = '';
+
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx && isReportWriterOpen){
+      const before = replyText.slice(0, startIdx).trim();
+      const newContent = replyText.slice(startIdx + EDIT_START.length, endIdx).trim();
+      const after = replyText.slice(endIdx + EDIT_END.length).trim();
+
+      const textPart = document.createElement('div');
+      textPart.textContent = [before, after].filter(Boolean).join('\n\n') || '편집기에 열려 있는 문서에 대한 수정안을 준비했습니다.';
+      bubbleEl.appendChild(textPart);
+
+      const applyBtn = document.createElement('button');
+      applyBtn.className = 'apply-edit-btn';
+      applyBtn.textContent = '📝 편집기에 적용하기';
+      applyBtn.addEventListener('click', ()=>{
+        applyEditorContent(newContent);
+        applyBtn.textContent = '✓ 적용됨';
+        applyBtn.disabled = true;
+      });
+      bubbleEl.appendChild(applyBtn);
+    } else {
+      bubbleEl.textContent = replyText;
+    }
+  }
+
+  async function sendChatMessage(){
+    const text = chatInputEl.value.trim();
+    if (!text) return;
+
+    const isVoiceTurn = voiceTriggeredSend; // 이번 전송이 음성으로 시작됐는지 (답변을 소리로 읽어줄지 결정)
+    voiceTriggeredSend = false;
+
+    const attachmentsForThisMessage = pendingAttachments.slice();
+    const attachNote = attachmentsForThisMessage.length
+      ? ' ' + attachmentsForThisMessage.map(a => (a.type === 'folder' ? '📁' : '📎') + a.name).join(', ')
+      : '';
+
+    appendBubble('user', text + attachNote);
+    chatInputEl.value = '';
+    chatInputEl.disabled = true;
+    btnChatSend.disabled = true;
+    pendingAttachments = [];
+    renderAttachBar();
+
+    const thinkingBubble = appendBubble('assistant', '생각 중…');
+
+    // report-writer가 열려있으면 "지금 타이핑 중인(저장 전) 내용"까지 실시간으로 받아옴 — 이미지/PDF와 동일하게 자동참조 ON일 때만
+    const liveContent = autoRefMode ? await getEditorLiveContent() : null;
+    // report-writer가 아니라 이미지·PDF 뷰어로 열려 있으면, 자동참조가 ON일 때만 그 파일을 이번 요청에 실어보냄.
+    // (OFF일 때 매턴 자동전송하면 낭비이므로, 명시적으로 열어보고 싶으면 첨부 기능을 쓰거나 자동참조를 켜야 함)
+    const openFileMediaBlock = autoRefMode ? await getOpenFileMediaBlock() : null;
+
+    const openFileCtx = currentOpenFile
+      ? Object.assign({}, currentOpenFile, (liveContent !== null ? { liveContent } : {}))
+      : null;
+
+    // 대화 기록(chatMessages)에는 가벼운 텍스트만 남긴다 — 이미지를 기록에 박아두면
+    // 다음 턴부터 대화 전체를 다시 보낼 때마다 그 이미지까지 매번 반복 전송되어 낭비가 누적된다.
+    chatMessages.push({ role: 'user', content: text });
+
+    // 실제 API 요청에는(이번 한 턴에 한해서만) 이미지/문서 블록을 살짝 끼워 보낸다.
+    const requestMessages = chatMessages.slice();
+    if (openFileMediaBlock){
+      requestMessages[requestMessages.length - 1] = {
+        role: 'user',
+        content: [{ type: 'text', text: text }, openFileMediaBlock]
+      };
+    }
+
+    try{
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({
+          messages: requestMessages,
+          context: {
+            currentPath: explorerPath,
+            openFile: openFileCtx,
+            attachedItems: attachmentsForThisMessage
+          },
+          autoRef: autoRefMode
+        }, buildAiSettingsPayload()))
+      });
+      const data = await res.json();
+      if (data.error){
+        thinkingBubble.textContent = '오류: ' + data.error;
+      } else {
+        renderAssistantReply(thinkingBubble, data.reply || '(빈 응답)');
+        chatMessages.push({ role: 'assistant', content: data.reply || '' });
+        if (isVoiceTurn) speakReply(data.reply || '');
+      }
+    }catch(err){
+      thinkingBubble.textContent = '네트워크 오류: ' + (err && err.message ? err.message : err);
+    }finally{
+      chatInputEl.disabled = false;
+      btnChatSend.disabled = false;
+      chatInputEl.focus();
+    }
+  }
+
+  btnChatSend.addEventListener('click', sendChatMessage);
+  chatInputEl.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      sendChatMessage();
+    }
+  });
+
+  // ---- 음성채팅 (마이크 버튼) — 말하면 자동 전송, AI 답변은 소리로 읽어줌 ----
+  const btnVoiceInput = document.getElementById('btnVoiceInput');
+  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const hasSpeechSynthesis = 'speechSynthesis' in window;
+  let voiceRecognition = null;
+  let isVoiceRecording = false;
+  let voiceTriggeredSend = false; // 이번 전송이 음성으로 시작됐는지 — sendChatMessage에서 답변을 읽어줄지 판단
+
+  // AI 응답 텍스트를 소리로 읽어줌 (문서수정 제안의 <<<EDIT_DOCUMENT>>> 원문 덩어리는 읽지 않고, 앞뒤 설명만 읽음)
+  function speakReply(text){
+    if (!hasSpeechSynthesis || !text) return;
+    let spoken = text;
+    const s = text.indexOf(EDIT_START), en = text.indexOf(EDIT_END);
+    if (s !== -1 && en !== -1 && en > s){
+      const before = text.slice(0, s).trim();
+      const after = text.slice(en + EDIT_END.length).trim();
+      spoken = [before, after].filter(Boolean).join(' ') || '문서 수정안을 준비했습니다. 편집기에 적용하기 버튼을 눌러주세요.';
+    }
+    if (!spoken) return;
+
+    window.speechSynthesis.cancel(); // 이전에 읽던 게 남아있으면 끊고 새로 읽기
+    const utter = new SpeechSynthesisUtterance(spoken);
+    utter.lang = 'ko-KR';
+    utter.onstart = ()=>{ btnVoiceInput.disabled = true; }; // AI가 말하는 동안 마이크가 그 소리를 다시 듣지 않게 잠금
+    utter.onend = ()=>{ btnVoiceInput.disabled = false; };
+    utter.onerror = ()=>{ btnVoiceInput.disabled = false; };
+    window.speechSynthesis.speak(utter);
+  }
+
+  if (!SpeechRecognitionCtor){
+    btnVoiceInput.title = '이 브라우저는 음성 입력을 지원하지 않습니다 (크롬 권장)';
+    btnVoiceInput.style.opacity = '0.4';
+  } else {
+    btnVoiceInput.addEventListener('click', ()=>{
+      if (isVoiceRecording){
+        voiceRecognition && voiceRecognition.stop();
+        return;
+      }
+      if (hasSpeechSynthesis) window.speechSynthesis.cancel(); // 마이크 다시 켤 때, AI가 아직 말하는 중이면 끊기
+
+      voiceRecognition = new SpeechRecognitionCtor();
+      voiceRecognition.lang = 'ko-KR';
+      voiceRecognition.interimResults = false;
+      voiceRecognition.maxAlternatives = 1;
+
+      voiceRecognition.onstart = ()=>{
+        isVoiceRecording = true;
+        btnVoiceInput.classList.add('recording');
+        btnVoiceInput.textContent = '●';
+      };
+      voiceRecognition.onresult = (e)=>{
+        const transcript = e.results[0][0].transcript.trim();
+        if (!transcript) return;
+        chatInputEl.value = transcript;
+        voiceTriggeredSend = true;
+        sendChatMessage(); // 음성채팅은 말이 끝나면 바로 전송 (엔터/버튼 없이)
+      };
+      voiceRecognition.onerror = (e)=>{
+        if (e.error !== 'no-speech' && e.error !== 'aborted'){
+          alert('음성 인식 중 오류: ' + e.error);
+        }
+      };
+      voiceRecognition.onend = ()=>{
+        isVoiceRecording = false;
+        btnVoiceInput.classList.remove('recording');
+        btnVoiceInput.textContent = '🎤';
+      };
+      voiceRecognition.start();
+    });
+  }
+
+  // ============================================================
+  // 문서 스캔 · PDF 조립
+  // ============================================================
+  const scanOverlay = document.getElementById('scanOverlay');
+  const scanFileInput = document.getElementById('scanFileInput');
+  const scanStageWrap = document.getElementById('scanStageWrap');
+  const scanStage = document.getElementById('scanStage');
+  const scanPreviewCanvas = document.getElementById('scanPreviewCanvas');
+  const scanQuadPoly = document.getElementById('scanQuadPoly');
+  const scanGrayscale = document.getElementById('scanGrayscale');
+  const scanContrast = document.getElementById('scanContrast');
+  const btnAutoDetect = document.getElementById('btnAutoDetect');
+  const btnWarpAndAdd = document.getElementById('btnWarpAndAdd');
+  const scanPdfInsertInput = document.getElementById('scanPdfInsertInput');
+  const scanTray = document.getElementById('scanTray');
+  const scanOutputName = document.getElementById('scanOutputName');
+  const btnDownloadPdf = document.getElementById('btnDownloadPdf');
+  const btnSaveToFolder = document.getElementById('btnSaveToFolder');
+
+  let scanImageEl = null;      // 로드된 원본 이미지 (Image 객체, 원본 해상도)
+  let scanDisplayScale = 1;    // 원본 해상도 대비 화면 표시 배율
+  let scanDW = 0, scanDH = 0;  // 화면에 표시되는 캔버스 크기(px)
+  let scanCorners = null;      // {tl,tr,br,bl} — 화면 표시 좌표계 기준
+  let docPages = [];           // 페이지 모음: {type:'image', dataUrl, rotation, name} | {type:'pdf', name, bytes, pageCount}
+
+  function openScanModal(){ scanOverlay.style.display = 'flex'; }
+  function closeScanModal(){ scanOverlay.style.display = 'none'; }
+  document.getElementById('btnOpenScan').addEventListener('click', openScanModal);
+
+  // ---- 전체화면 편집기 (AI 개입 없이, 드래그·크기조절·최대화 가능한 뜨는 창) ----
+  const fullEditorOverlay = document.getElementById('fullEditorOverlay');
+  const fullEditorPanel = document.getElementById('fullEditorPanel');
+  const fullEditorFrame = document.getElementById('fullEditorFrame');
+  const fullEditorTitle = document.getElementById('fullEditorTitle');
+  const fullEditorHead = document.getElementById('fullEditorHead');
+  const btnMaximizeFullEditor = document.getElementById('btnMaximizeFullEditor');
+  const fullEditorResizeHandle = document.getElementById('fullEditorResizeHandle');
+
+  const FULL_EDITOR_RECT_KEY = 'nx_full_editor_rect';
+  let isFullEditorMaximized = false;
+  let preMaximizeRect = null; // 최대화 직전 크기·위치를 기억해뒀다가 복원할 때 씀
+
+  function defaultEditorRect(){
+    const w = Math.round(window.innerWidth * 0.78);
+    const h = Math.round(window.innerHeight * 0.8);
+    return { width: w, height: h, top: Math.round((window.innerHeight - h) / 2), left: Math.round((window.innerWidth - w) / 2) };
+  }
+
+  function loadEditorRect(){
+    try{
+      const raw = localStorage.getItem(FULL_EDITOR_RECT_KEY);
+      if (raw) return JSON.parse(raw);
+    }catch(err){ /* 저장된 값이 이상하면 그냥 기본값 사용 */ }
+    return defaultEditorRect();
+  }
+
+  function clampRect(rect){
+    const minVisible = 80; // 창의 최소 이 정도는 화면 안에 걸쳐 있게(완전히 화면 밖으로 나가서 못 찾는 상황 방지)
+    const width = Math.max(380, Math.min(rect.width, window.innerWidth));
+    const height = Math.max(280, Math.min(rect.height, window.innerHeight));
+    const left = Math.max(minVisible - width, Math.min(rect.left, window.innerWidth - minVisible));
+    const top = Math.max(0, Math.min(rect.top, window.innerHeight - minVisible));
+    return { width, height, top, left };
+  }
+
+  function applyRect(rect){
+    fullEditorPanel.style.width = rect.width + 'px';
+    fullEditorPanel.style.height = rect.height + 'px';
+    fullEditorPanel.style.top = rect.top + 'px';
+    fullEditorPanel.style.left = rect.left + 'px';
+  }
+
+  function saveCurrentRect(){
+    if (isFullEditorMaximized) return; // 최대화 상태에서의 좌표는 저장하지 않음(의미 없음)
+    localStorage.setItem(FULL_EDITOR_RECT_KEY, JSON.stringify({
+      width: fullEditorPanel.offsetWidth,
+      height: fullEditorPanel.offsetHeight,
+      top: parseInt(fullEditorPanel.style.top, 10) || 0,
+      left: parseInt(fullEditorPanel.style.left, 10) || 0
+    }));
+  }
+
+  function openFullEditor(){
+    if (currentOpenFile){
+      fullEditorTitle.textContent = '전체화면 편집 — ' + currentOpenFile.name;
+      fullEditorFrame.src = REPORT_WRITER_URL + '?fileId=' + encodeURIComponent(currentOpenFile.id);
+    } else {
+      fullEditorTitle.textContent = '전체화면 편집';
+      fullEditorFrame.src = REPORT_WRITER_URL;
+    }
+    applyRect(clampRect(loadEditorRect()));
+    fullEditorOverlay.style.display = 'block';
+  }
+  function closeFullEditor(){
+    fullEditorOverlay.style.display = 'none';
+    fullEditorFrame.src = 'about:blank';
+  }
+  document.getElementById('btnOpenFullEditor').addEventListener('click', openFullEditor);
+  document.getElementById('btnCloseFullEditor').addEventListener('click', (e)=>{ e.stopPropagation(); closeFullEditor(); });
+
+  // 최대화 ↔ 복원 토글
+  btnMaximizeFullEditor.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    if (!isFullEditorMaximized){
+      preMaximizeRect = {
+        width: fullEditorPanel.offsetWidth, height: fullEditorPanel.offsetHeight,
+        top: parseInt(fullEditorPanel.style.top, 10) || 0, left: parseInt(fullEditorPanel.style.left, 10) || 0
+      };
+      fullEditorPanel.classList.add('maximized');
+      isFullEditorMaximized = true;
+    } else {
+      fullEditorPanel.classList.remove('maximized');
+      isFullEditorMaximized = false;
+      applyRect(clampRect(preMaximizeRect || defaultEditorRect()));
+    }
+  });
+  // 제목표시줄 더블클릭으로도 최대화/복원 (일반 창과 동일한 습관)
+  fullEditorHead.addEventListener('dblclick', ()=> btnMaximizeFullEditor.click());
+
+  // 제목표시줄 드래그로 창 이동
+  fullEditorHead.addEventListener('pointerdown', (e)=>{
+    if (e.target === btnMaximizeFullEditor || e.target.id === 'btnCloseFullEditor') return;
+    if (isFullEditorMaximized) return; // 최대화 상태에서는 이동 의미 없음
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY;
+    const startTop = parseInt(fullEditorPanel.style.top, 10) || 0;
+    const startLeft = parseInt(fullEditorPanel.style.left, 10) || 0;
+    fullEditorHead.setPointerCapture(e.pointerId);
+
+    function onMove(ev){
+      const newLeft = startLeft + (ev.clientX - startX);
+      const newTop = startTop + (ev.clientY - startY);
+      fullEditorPanel.style.left = newLeft + 'px';
+      fullEditorPanel.style.top = Math.max(0, newTop) + 'px'; // 제목표시줄이 화면 위로 넘어가 못 찾는 상황 방지
+    }
+    function onUp(){
+      fullEditorHead.removeEventListener('pointermove', onMove);
+      fullEditorHead.removeEventListener('pointerup', onUp);
+      saveCurrentRect();
+    }
+    fullEditorHead.addEventListener('pointermove', onMove);
+    fullEditorHead.addEventListener('pointerup', onUp);
+  });
+
+  // 모서리 드래그로 창 크기 조절
+  fullEditorResizeHandle.addEventListener('pointerdown', (e)=>{
+    if (isFullEditorMaximized) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX, startY = e.clientY;
+    const startW = fullEditorPanel.offsetWidth, startH = fullEditorPanel.offsetHeight;
+    fullEditorResizeHandle.setPointerCapture(e.pointerId);
+
+    function onMove(ev){
+      const newW = Math.max(380, startW + (ev.clientX - startX));
+      const newH = Math.max(280, startH + (ev.clientY - startY));
+      fullEditorPanel.style.width = newW + 'px';
+      fullEditorPanel.style.height = newH + 'px';
+    }
+    function onUp(){
+      fullEditorResizeHandle.removeEventListener('pointermove', onMove);
+      fullEditorResizeHandle.removeEventListener('pointerup', onUp);
+      saveCurrentRect();
+    }
+    fullEditorResizeHandle.addEventListener('pointermove', onMove);
+    fullEditorResizeHandle.addEventListener('pointerup', onUp);
+  });
+
+  document.getElementById('btnCloseScan').addEventListener('click', closeScanModal);
+  scanOverlay.addEventListener('click', (e)=>{ if (e.target === scanOverlay) closeScanModal(); });
+
+  // ---- 이미지 로드 ----
+  scanFileInput.addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (file) loadScanImage(file);
+  });
+
+  function loadScanImage(file){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=> setupScanStage(img);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function setupScanStage(img){
+    scanImageEl = img;
+    scanStageWrap.style.display = 'flex';
+    const maxW = 480, maxH = 480;
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    scanDisplayScale = Math.min(1, maxW / iw, maxH / ih);
+    scanDW = Math.max(1, Math.round(iw * scanDisplayScale));
+    scanDH = Math.max(1, Math.round(ih * scanDisplayScale));
+    scanPreviewCanvas.width = scanDW;
+    scanPreviewCanvas.height = scanDH;
+    scanStage.style.width = scanDW + 'px';
+    scanStage.style.height = scanDH + 'px';
+    document.getElementById('scanQuadSvg').setAttribute('viewBox', '0 0 ' + scanDW + ' ' + scanDH);
+    const ctx = scanPreviewCanvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, scanDW, scanDH);
+    autoDetectCorners();
+  }
+
+  // ---- 자동 인식 (가장자리 명암 차이 기반 대략적 사각형 추정) ----
+  function toGrayscale(imageData){
+    const { data, width, height } = imageData;
+    const gray = new Float32Array(width * height);
+    for (let i = 0, p = 0; i < data.length; i += 4, p++){
+      gray[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+    return gray;
+  }
+
+  function scanEdgeLine(getVal, length){
+    const startSkip = Math.floor(length * 0.03);
+    let maxDiff = 0, bestIdx = Math.floor(length * 0.06);
+    for (let i = startSkip + 1; i < length * 0.5; i++){
+      const diff = Math.abs(getVal(i) - getVal(i - 1));
+      if (diff > maxDiff){ maxDiff = diff; bestIdx = i; }
+    }
+    return { idx: bestIdx, strength: maxDiff };
+  }
+
+  function detectEdgeInset(gray, width, height){
+    const midX = Math.floor(width / 2), midY = Math.floor(height / 2);
+    const marginLimit = 0.35; // 이보다 안쪽으로 못 들어오면(35% 이상) 신뢰 안 함 → 기본값 대체
+    const THRESH = 15;        // 그레이스케일 차이가 이 정도는 돼야 "진짜 경계"로 인정
+    const fallback = { top: height * 0.06, bottom: height * 0.06, left: width * 0.06, right: width * 0.06 };
+
+    const top = scanEdgeLine(y => gray[y * width + midX], height);
+    const bottom = scanEdgeLine(y => gray[(height - 1 - y) * width + midX], height);
+    const left = scanEdgeLine(x => gray[midY * width + x], width);
+    const right = scanEdgeLine(x => gray[midY * width + (width - 1 - x)], width);
+
+    return {
+      top: (top.strength > THRESH && top.idx < height * marginLimit) ? top.idx : fallback.top,
+      bottom: (bottom.strength > THRESH && bottom.idx < height * marginLimit) ? bottom.idx : fallback.bottom,
+      left: (left.strength > THRESH && left.idx < width * marginLimit) ? left.idx : fallback.left,
+      right: (right.strength > THRESH && right.idx < width * marginLimit) ? right.idx : fallback.right
+    };
+  }
+
+  function autoDetectCorners(){
+    if (!scanImageEl) return;
+    const ctx = scanPreviewCanvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, scanDW, scanDH);
+    const gray = toGrayscale(imageData);
+    const inset = detectEdgeInset(gray, scanDW, scanDH);
+    scanCorners = {
+      tl: { x: inset.left, y: inset.top },
+      tr: { x: scanDW - inset.right, y: inset.top },
+      br: { x: scanDW - inset.right, y: scanDH - inset.bottom },
+      bl: { x: inset.left, y: scanDH - inset.bottom }
+    };
+    renderScanHandles();
+  }
+  btnAutoDetect.addEventListener('click', autoDetectCorners);
+
+  function renderScanHandles(){
+    ['tl', 'tr', 'br', 'bl'].forEach(key=>{
+      const el = document.getElementById('handle-' + key);
+      el.style.left = scanCorners[key].x + 'px';
+      el.style.top = scanCorners[key].y + 'px';
+    });
+    scanQuadPoly.setAttribute('points', ['tl','tr','br','bl'].map(k => scanCorners[k].x + ',' + scanCorners[k].y).join(' '));
+  }
+
+  // 귀퉁이 드래그 (Pointer Events로 마우스·터치 동시 지원)
+  document.querySelectorAll('.scan-handle').forEach(handle=>{
+    handle.addEventListener('pointerdown', (e)=>{
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      const corner = handle.dataset.corner;
+
+      function onMove(ev){
+        const rect = scanStage.getBoundingClientRect();
+        const scaleX = scanDW / rect.width, scaleY = scanDH / rect.height;
+        let x = (ev.clientX - rect.left) * scaleX;
+        let y = (ev.clientY - rect.top) * scaleY;
+        x = Math.max(0, Math.min(scanDW, x));
+        y = Math.max(0, Math.min(scanDH, y));
+        scanCorners[corner] = { x, y };
+        renderScanHandles();
+      }
+      function onUp(){
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+      }
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+    });
+  });
+
+  // ---- 원근보정(호모그래피) 수학 ----
+  function solveLinearSystem(A, B){
+    const n = B.length;
+    for (let i = 0; i < n; i++) A[i] = A[i].concat([B[i]]);
+    for (let col = 0; col < n; col++){
+      let maxRow = col;
+      for (let r = col + 1; r < n; r++) if (Math.abs(A[r][col]) > Math.abs(A[maxRow][col])) maxRow = r;
+      const tmp = A[col]; A[col] = A[maxRow]; A[maxRow] = tmp;
+      const pivot = A[col][col];
+      if (Math.abs(pivot) < 1e-12) continue; // 4점이 거의 일직선인 특이 케이스 방어
+      for (let r = 0; r < n; r++){
+        if (r === col) continue;
+        const factor = A[r][col] / pivot;
+        for (let c = col; c <= n; c++) A[r][c] -= factor * A[col][c];
+      }
+    }
+    const x = new Array(n);
+    for (let i = 0; i < n; i++) x[i] = A[i][n] / (A[i][i] || 1e-12);
+    return x;
+  }
+
+  function computeHomography(srcPts, dstPts){
+    const A = [], B = [];
+    for (let i = 0; i < 4; i++){
+      const { x, y } = srcPts[i];
+      const { x: X, y: Y } = dstPts[i];
+      A.push([x, y, 1, 0, 0, 0, -X * x, -X * y]); B.push(X);
+      A.push([0, 0, 0, x, y, 1, -Y * x, -Y * y]); B.push(Y);
+    }
+    const s = solveLinearSystem(A, B); // [a,b,c,d,e,f,g,h] (i=1 고정)
+    return [s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7], 1];
+  }
+
+  function invert3x3(m){
+    const a=m[0],b=m[1],c=m[2], d=m[3],e=m[4],f=m[5], g=m[6],h=m[7],i=m[8];
+    const C00=e*i-f*h, C01=-(d*i-f*g), C02=d*h-e*g;
+    const C10=-(b*i-c*h), C11=a*i-c*g, C12=-(a*h-b*g);
+    const C20=b*f-c*e, C21=-(a*f-c*d), C22=a*e-b*d;
+    const det = a*C00 + b*C01 + c*C02;
+    const invDet = 1 / (det || 1e-12);
+    return [C00*invDet, C10*invDet, C20*invDet, C01*invDet, C11*invDet, C21*invDet, C02*invDet, C12*invDet, C22*invDet];
+  }
+
+  function bilinearSample(imgData, sx, sy){
+    const w = imgData.width, h = imgData.height, data = imgData.data;
+    if (sx < 0 || sy < 0 || sx > w - 1 || sy > h - 1) return [255, 255, 255];
+    const x0 = Math.floor(sx), y0 = Math.floor(sy);
+    const x1 = Math.min(x0 + 1, w - 1), y1 = Math.min(y0 + 1, h - 1);
+    const fx = sx - x0, fy = sy - y0;
+    const i00 = (y0*w+x0)*4, i10 = (y0*w+x1)*4, i01 = (y1*w+x0)*4, i11 = (y1*w+x1)*4;
+    const r = [];
+    for (let k = 0; k < 3; k++){
+      const top = data[i00+k]*(1-fx) + data[i10+k]*fx;
+      const bottom = data[i01+k]*(1-fx) + data[i11+k]*fx;
+      r.push(top*(1-fy) + bottom*fy);
+    }
+    return r;
+  }
+
+  function applyEnhance(ctx, w, h, grayscale, contrastPct){
+    if (!grayscale && !contrastPct) return;
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    const c = (contrastPct / 100) * 80; // 0~80 스케일로 완만하게 매핑
+    const factor = (259 * (c + 255)) / (255 * (259 - c));
+    for (let p = 0; p < d.length; p += 4){
+      let r = d[p], g = d[p+1], b = d[p+2];
+      if (grayscale){
+        const gray = 0.299*r + 0.587*g + 0.114*b;
+        r = g = b = gray;
+      }
+      d[p]   = Math.max(0, Math.min(255, factor*(r-128)+128));
+      d[p+1] = Math.max(0, Math.min(255, factor*(g-128)+128));
+      d[p+2] = Math.max(0, Math.min(255, factor*(b-128)+128));
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  function warpAndAddPage(){
+    const scale = 1 / scanDisplayScale;
+    const srcPts = ['tl','tr','br','bl'].map(k => ({ x: scanCorners[k].x*scale, y: scanCorners[k].y*scale }));
+    const dist = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+    let outW = Math.round(Math.max(dist(srcPts[0],srcPts[1]), dist(srcPts[3],srcPts[2])));
+    let outH = Math.round(Math.max(dist(srcPts[0],srcPts[3]), dist(srcPts[1],srcPts[2])));
+    const MAX_DIM = 2000;
+    if (outW > MAX_DIM || outH > MAX_DIM){
+      const s = MAX_DIM / Math.max(outW, outH);
+      outW = Math.round(outW*s); outH = Math.round(outH*s);
+    }
+    outW = Math.max(50, outW); outH = Math.max(50, outH);
+
+    const dstPts = [{x:0,y:0},{x:outW,y:0},{x:outW,y:outH},{x:0,y:outH}];
+    const M = computeHomography(srcPts, dstPts);
+    const Minv = invert3x3(M);
+
+    const srcCanvas = document.createElement('canvas');
+    srcCanvas.width = scanImageEl.naturalWidth;
+    srcCanvas.height = scanImageEl.naturalHeight;
+    const srcCtx = srcCanvas.getContext('2d');
+    srcCtx.drawImage(scanImageEl, 0, 0);
+    const srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = outW; outCanvas.height = outH;
+    const outCtx = outCanvas.getContext('2d');
+    const outData = outCtx.createImageData(outW, outH);
+
+    for (let Y = 0; Y < outH; Y++){
+      for (let X = 0; X < outW; X++){
+        const w = Minv[6]*X + Minv[7]*Y + Minv[8];
+        const sx = (Minv[0]*X + Minv[1]*Y + Minv[2]) / w;
+        const sy = (Minv[3]*X + Minv[4]*Y + Minv[5]) / w;
+        const rgb = bilinearSample(srcData, sx, sy);
+        const di = (Y*outW+X)*4;
+        outData.data[di]=rgb[0]; outData.data[di+1]=rgb[1]; outData.data[di+2]=rgb[2]; outData.data[di+3]=255;
+      }
+    }
+    outCtx.putImageData(outData, 0, 0);
+    applyEnhance(outCtx, outW, outH, scanGrayscale.checked, Number(scanContrast.value));
+
+    const dataUrl = outCanvas.toDataURL('image/jpeg', 0.88);
+    docPages.push({ type:'image', dataUrl, rotation:0, name:'스캔_' + (docPages.length+1) });
+    renderTray();
+
+    scanFileInput.value = '';
+    scanStageWrap.style.display = 'none';
+    scanImageEl = null;
+  }
+
+  btnWarpAndAdd.addEventListener('click', ()=>{
+    if (!scanImageEl || !scanCorners){ alert('먼저 이미지를 불러와주세요.'); return; }
+    btnWarpAndAdd.disabled = true; btnWarpAndAdd.textContent = '처리 중…';
+    setTimeout(()=>{
+      try{ warpAndAddPage(); }
+      catch(err){ alert('처리 중 오류: ' + (err && err.message ? err.message : err)); }
+      finally{ btnWarpAndAdd.disabled = false; btnWarpAndAdd.textContent = '펴서 페이지에 담기'; }
+    }, 20); // 버튼 라벨이 바뀐 걸 화면에 그리고 나서 무거운 연산 시작
+  });
+
+  // ---- 기존 PDF 삽입 ----
+  scanPdfInsertInput.addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    try{
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const doc = await PDFLib.PDFDocument.load(bytes);
+      docPages.push({ type:'pdf', name:file.name, bytes, pageCount: doc.getPageCount() });
+      renderTray();
+    }catch(err){
+      alert('PDF를 읽는 중 오류: ' + (err && err.message ? err.message : err));
+    }
+    e.target.value = '';
+  });
+
+  // ---- 페이지 모음(트레이) 렌더 ----
+  function renderTray(){
+    scanTray.innerHTML = '';
+    docPages.forEach((item, idx)=>{
+      const row = document.createElement('div');
+      row.className = 'scan-tray-item';
+      if (item.type === 'image'){
+        row.innerHTML = '<img src="' + item.dataUrl + '" style="transform:rotate(' + item.rotation + 'deg)">'
+          + '<span class="name">' + escapeHtml(item.name) + '</span>'
+          + '<button data-act="rotate" title="90도 회전">↻</button>'
+          + '<button data-act="up" title="위로">↑</button>'
+          + '<button data-act="down" title="아래로">↓</button>'
+          + '<button data-act="del" title="삭제">✕</button>';
+      } else {
+        row.innerHTML = '<span class="pdf-chip-icon">📄</span>'
+          + '<span class="name">' + escapeHtml(item.name) + ' (' + item.pageCount + 'p)</span>'
+          + '<button data-act="up" title="위로">↑</button>'
+          + '<button data-act="down" title="아래로">↓</button>'
+          + '<button data-act="del" title="삭제">✕</button>';
+      }
+      row.querySelectorAll('button').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const act = btn.dataset.act;
+          if (act === 'del') docPages.splice(idx, 1);
+          else if (act === 'up' && idx > 0){ const t=docPages[idx-1]; docPages[idx-1]=docPages[idx]; docPages[idx]=t; }
+          else if (act === 'down' && idx < docPages.length-1){ const t=docPages[idx+1]; docPages[idx+1]=docPages[idx]; docPages[idx]=t; }
+          else if (act === 'rotate') item.rotation = (item.rotation + 90) % 360;
+          renderTray();
+        });
+      });
+      scanTray.appendChild(row);
+    });
+  }
+
+  // ---- PDF 생성/내보내기/저장 ----
+  function dataUrlToUint8(dataUrl){
+    const base64 = dataUrl.split(',')[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  function uint8ToBase64(bytes){
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    return btoa(binary);
+  }
+
+  function getRotatedJpegBytes(item){
+    if (!item.rotation) return Promise.resolve(dataUrlToUint8(item.dataUrl));
+    return new Promise((resolve)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const swapped = item.rotation % 180 !== 0;
+        const cw = swapped ? img.height : img.width;
+        const ch = swapped ? img.width : img.height;
+        const canvas = document.createElement('canvas');
+        canvas.width = cw; canvas.height = ch;
+        const ctx = canvas.getContext('2d');
+        ctx.translate(cw/2, ch/2);
+        ctx.rotate(item.rotation * Math.PI/180);
+        ctx.drawImage(img, -img.width/2, -img.height/2);
+        canvas.toBlob((blob)=>{
+          blob.arrayBuffer().then((buf)=> resolve(new Uint8Array(buf)));
+        }, 'image/jpeg', 0.9);
+      };
+      img.src = item.dataUrl;
+    });
+  }
+
+  async function buildPdfBytes(){
+    if (!docPages.length) return null;
+    const outDoc = await PDFLib.PDFDocument.create();
+    for (const item of docPages){
+      if (item.type === 'image'){
+        const jpegBytes = await getRotatedJpegBytes(item);
+        const embedded = await outDoc.embedJpg(jpegBytes);
+        const { width, height } = embedded;
+        const page = outDoc.addPage([width, height]);
+        page.drawImage(embedded, { x:0, y:0, width, height });
+      } else {
+        const srcDoc = await PDFLib.PDFDocument.load(item.bytes);
+        const copied = await outDoc.copyPages(srcDoc, srcDoc.getPageIndices());
+        copied.forEach(p => outDoc.addPage(p));
+      }
+    }
+    return await outDoc.save();
+  }
+
+  btnDownloadPdf.addEventListener('click', async ()=>{
+    btnDownloadPdf.disabled = true; btnDownloadPdf.textContent = '만드는 중…';
+    try{
+      const bytes = await buildPdfBytes();
+      if (!bytes){ alert('담긴 페이지가 없습니다.'); return; }
+      const blob = new Blob([bytes], { type:'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (scanOutputName.value.trim() || '문서') + '.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    }catch(err){
+      alert('PDF 생성 중 오류: ' + (err && err.message ? err.message : err));
+    }finally{
+      btnDownloadPdf.disabled = false; btnDownloadPdf.textContent = 'PC에 다운로드';
+    }
+  });
+
+  btnSaveToFolder.addEventListener('click', async ()=>{
+    if (!explorerPath.length){ alert('먼저 탐색기에서 저장할 고객/사건 폴더를 열어두세요.'); return; }
+    btnSaveToFolder.disabled = true; btnSaveToFolder.textContent = '저장 중…';
+    try{
+      const bytes = await buildPdfBytes();
+      if (!bytes){ alert('담긴 페이지가 없습니다.'); return; }
+      const base64 = uint8ToBase64(bytes);
+      const name = (scanOutputName.value.trim() || '문서') + '.pdf';
+      const res = await callGas('uploadFile', { path: explorerPath, name: name, mimeType: 'application/pdf', base64Data: base64 });
+      if (res.error){
+        alert('저장 실패: ' + res.error);
+      } else {
+        alert('"' + explorerPath.join(' / ') + '" 폴더에 저장했습니다: ' + name);
+        docPages = [];
+        renderTray();
+        closeScanModal();
+        navigateTo(explorerPath); // 방금 저장한 파일이 탐색기에 바로 보이도록 새로고침
+      }
+    }catch(err){
+      alert('저장 중 오류: ' + (err && err.message ? err.message : err));
+    }finally{
+      btnSaveToFolder.disabled = false; btnSaveToFolder.textContent = '현재 폴더에 저장';
+    }
+  });
+</script>
+</body>
+</html>

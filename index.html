@@ -528,6 +528,7 @@
             <span id="chatModelLabel">Sonnet 5</span><span class="sep">·</span><span id="chatEffortLabel">보통</span>
           </button>
           <div class="spacer"></div>
+          <button type="button" id="btnScreenCapture" class="icon-round-btn" title="다른 창(홈택스 등) 화면 캡처해서 첨부">📸</button>
           <button type="button" id="btnVoiceInput" class="icon-round-btn voice" title="음성으로 입력">🎤</button>
           <button type="button" id="btnChatSend" class="icon-round-btn send" title="보내기">➤</button>
         </div>
@@ -1503,10 +1504,11 @@ graph TD
 
   let chatMessages = []; // Claude API 형식: [{role:'user'|'assistant', content:'...'}]
   let pendingAttachments = []; // [{id,name,type:'file'|'folder',mimeType?,path?}] — 채팅에 끌어다 놓거나 첨부한 항목들 (다음 전송에 무조건 반영)
+  let pendingCaptures = []; // [{id,name,dataUrl}] — 화면캡처로 즉석에서 찍은 이미지 (드라이브에 저장 안 하고 바로 첨부)
 
   function renderAttachBar(){
     attachBar.innerHTML = '';
-    if (!pendingAttachments.length){
+    if (!pendingAttachments.length && !pendingCaptures.length){
       attachBar.style.display = 'none';
       return;
     }
@@ -1518,6 +1520,16 @@ graph TD
       chip.innerHTML = icon + ' ' + escapeHtml(item.name) + ' <span class="x" title="첨부 취소">✕</span>';
       chip.querySelector('.x').addEventListener('click', ()=>{
         pendingAttachments = pendingAttachments.filter(a => a.id !== item.id);
+        renderAttachBar();
+      });
+      attachBar.appendChild(chip);
+    });
+    pendingCaptures.forEach(cap=>{
+      const chip = document.createElement('div');
+      chip.className = 'attach-chip';
+      chip.innerHTML = '📸 ' + escapeHtml(cap.name) + ' <span class="x" title="첨부 취소">✕</span>';
+      chip.querySelector('.x').addEventListener('click', ()=>{
+        pendingCaptures = pendingCaptures.filter(c => c.id !== cap.id);
         renderAttachBar();
       });
       attachBar.appendChild(chip);
@@ -1536,6 +1548,59 @@ graph TD
     });
     renderAttachBar();
   }
+
+  // dataURL("data:image/png;base64,...")을 mimeType/base64로 분리
+  function parseDataUrl(dataUrl){
+    const m = /^data:([^;]+);base64,(.*)$/.exec(dataUrl || '');
+    if (!m) return null;
+    return { mimeType: m[1], base64: m[2] };
+  }
+
+  // ---- 화면 캡처: 다른 창(홈택스 등)을 한 장 찍어서 바로 첨부 ----
+  const btnScreenCapture = document.getElementById('btnScreenCapture');
+
+  async function captureScreen(){
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+      alert('이 브라우저는 화면 캡처를 지원하지 않습니다.');
+      return;
+    }
+    let stream = null;
+    try{
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const track = stream.getVideoTracks()[0];
+
+      let bitmapSource, width, height;
+      if ('ImageCapture' in window){
+        const capture = new ImageCapture(track);
+        const bitmap = await capture.grabFrame();
+        bitmapSource = bitmap; width = bitmap.width; height = bitmap.height;
+      } else {
+        // ImageCapture 미지원 브라우저용 대체 경로: 비디오 프레임을 잠깐 그려서 캡처
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        await video.play();
+        await new Promise(r => setTimeout(r, 200)); // 첫 프레임 안정화 대기
+        bitmapSource = video; width = video.videoWidth; height = video.videoHeight;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(bitmapSource, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/png');
+
+      pendingCaptures.push({ id: 'cap' + Date.now(), name: '화면캡처_' + (pendingCaptures.length + 1), dataUrl });
+      renderAttachBar();
+    }catch(err){
+      if (err && err.name !== 'NotAllowedError'){
+        alert('화면 캡처 중 오류: ' + (err && err.message ? err.message : err));
+      }
+    }finally{
+      if (stream) stream.getTracks().forEach(t => t.stop()); // 찍자마자 공유 즉시 종료 (계속 지켜보지 않음)
+    }
+  }
+
+  if (btnScreenCapture) btnScreenCapture.addEventListener('click', captureScreen);
+
 
   // 파일탐색기에서 채팅창으로 드래그&드롭
   chatBody.addEventListener('dragover', (e)=>{
@@ -1611,12 +1676,15 @@ graph TD
     const attachNote = attachmentsForThisMessage.length
       ? ' ' + attachmentsForThisMessage.map(a => (a.type === 'folder' ? '📁' : '📎') + a.name).join(', ')
       : '';
+    const capturesForThisMessage = pendingCaptures.slice();
+    const captureNote = capturesForThisMessage.length ? ' ' + capturesForThisMessage.map(() => '📸').join('') : '';
 
-    appendBubble('user', text + attachNote);
+    appendBubble('user', text + attachNote + captureNote);
     chatInputEl.value = '';
     chatInputEl.disabled = true;
     btnChatSend.disabled = true;
     pendingAttachments = [];
+    pendingCaptures = [];
     renderAttachBar();
 
     const thinkingBubble = appendBubble('assistant', '생각 중…');
@@ -1626,6 +1694,11 @@ graph TD
     // report-writer가 아니라 이미지·PDF 뷰어로 열려 있으면, 자동참조가 ON일 때만 그 파일을 이번 요청에 실어보냄.
     // (OFF일 때 매턴 자동전송하면 낭비이므로, 명시적으로 열어보고 싶으면 첨부 기능을 쓰거나 자동참조를 켜야 함)
     const openFileMediaBlock = autoRefMode ? await getOpenFileMediaBlock() : null;
+    // 화면캡처는 사용자가 직접 찍어서 붙인 명시적 첨부이므로 자동참조 여부와 무관하게 항상 포함
+    const captureBlocks = capturesForThisMessage
+      .map(cap => parseDataUrl(cap.dataUrl))
+      .filter(Boolean)
+      .map(p => ({ type: 'image', source: { type: 'base64', media_type: p.mimeType, data: p.base64 } }));
 
     const openFileCtx = currentOpenFile
       ? Object.assign({}, currentOpenFile, (liveContent !== null ? { liveContent } : {}))
@@ -1637,10 +1710,11 @@ graph TD
 
     // 실제 API 요청에는(이번 한 턴에 한해서만) 이미지/문서 블록을 살짝 끼워 보낸다.
     const requestMessages = chatMessages.slice();
-    if (openFileMediaBlock){
+    const extraBlocks = [].concat(openFileMediaBlock || [], captureBlocks);
+    if (extraBlocks.length){
       requestMessages[requestMessages.length - 1] = {
         role: 'user',
-        content: [{ type: 'text', text: text }, openFileMediaBlock]
+        content: [{ type: 'text', text: text }].concat(extraBlocks)
       };
     }
 

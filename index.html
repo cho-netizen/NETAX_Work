@@ -392,11 +392,7 @@
     <select id="customerSelect" class="topbar-select">
       <option value="">고객 불러오는 중…</option>
     </select>
-    <div class="layout-toggle" role="group" aria-label="레이아웃 전환">
-      <button id="btnRow" title="좌우 배치" aria-label="좌우 배치">⬓</button>
-      <button id="btnCol" title="상하 배치" aria-label="상하 배치">⬒</button>
-      <button id="btnHideExplorer" title="탐색기 생략 (채팅만 넓게)" aria-label="탐색기 생략">💬</button>
-    </div>
+    <button id="btnWorkspaceMode" class="tb-btn" title="좌우 배치 (클릭할 때마다 순환: 좌우 → 상하 → 탐색기 생략)">⬓</button>
     <div class="spacer"></div>
     <div id="selectionInline" class="selection-inline" style="display:none;">
       <span id="selectionCountText"></span>
@@ -640,37 +636,38 @@ graph TD
   const REPORT_WRITER_URL = 'https://work.netax.kr/report-writer/'; // 독립 도메인으로 이전 후 경로
 
   // ============================================================
-  // 레이아웃 전환: 좌우배치 / 상하배치 / 탐색기 생략(채팅만) — 하나의 3상태 토글
+  // 레이아웃 전환: 좌우배치 → 상하배치 → 탐색기 생략 — 버튼 하나로 순환
   // ============================================================
   const workspace = document.getElementById('workspace');
-  const btnRow = document.getElementById('btnRow');
-  const btnCol = document.getElementById('btnCol');
-  const btnHideExplorer = document.getElementById('btnHideExplorer');
+  const btnWorkspaceMode = document.getElementById('btnWorkspaceMode');
   const WORKSPACE_MODE_KEY = 'nx_workspace_mode'; // 'row' | 'col' | 'hide'
+  const WORKSPACE_MODES = ['row', 'col', 'hide'];
+  const WORKSPACE_MODE_META = {
+    row:  { icon: '⬓', title: '좌우 배치 (클릭할 때마다 순환: 좌우 → 상하 → 탐색기 생략)' },
+    col:  { icon: '⬒', title: '상하 배치 (클릭할 때마다 순환: 좌우 → 상하 → 탐색기 생략)' },
+    hide: { icon: '💬', title: '탐색기 생략 · 채팅만 (클릭할 때마다 순환: 좌우 → 상하 → 탐색기 생략)' }
+  };
 
   function applyWorkspaceMode(mode){
     workspace.classList.toggle('layout-row', mode === 'row' || mode === 'hide');
     workspace.classList.toggle('layout-col', mode === 'col');
     workspace.classList.toggle('explorer-collapsed', mode === 'hide');
-    btnRow.classList.toggle('active', mode === 'row');
-    btnCol.classList.toggle('active', mode === 'col');
-    btnHideExplorer.classList.toggle('active', mode === 'hide');
+    btnWorkspaceMode.textContent = WORKSPACE_MODE_META[mode].icon;
+    btnWorkspaceMode.title = WORKSPACE_MODE_META[mode].title;
   }
   function detectDefaultMode(){
     return window.innerWidth >= window.innerHeight ? 'row' : 'col';
-  }
-  function initWorkspaceMode(){
-    const saved = localStorage.getItem(WORKSPACE_MODE_KEY);
-    applyWorkspaceMode(saved || detectDefaultMode());
   }
   function setWorkspaceMode(mode){
     applyWorkspaceMode(mode);
     localStorage.setItem(WORKSPACE_MODE_KEY, mode);
   }
-  btnRow.addEventListener('click', () => setWorkspaceMode('row'));
-  btnCol.addEventListener('click', () => setWorkspaceMode('col'));
-  btnHideExplorer.addEventListener('click', () => setWorkspaceMode('hide'));
-  initWorkspaceMode();
+  btnWorkspaceMode.addEventListener('click', ()=>{
+    const current = localStorage.getItem(WORKSPACE_MODE_KEY) || detectDefaultMode();
+    const nextIdx = (WORKSPACE_MODES.indexOf(current) + 1) % WORKSPACE_MODES.length;
+    setWorkspaceMode(WORKSPACE_MODES[nextIdx]);
+  });
+  applyWorkspaceMode(localStorage.getItem(WORKSPACE_MODE_KEY) || detectDefaultMode());
 
   // ============================================================
   // GAS 호출 (listFolder)

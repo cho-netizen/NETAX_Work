@@ -52,6 +52,7 @@
     background:rgba(255,255,255,0.08); color:#e8e8ec; flex-shrink:0;
   }
   .tb-btn:hover{ background:rgba(255,255,255,0.16); }
+  .tb-btn.is-on{ background:var(--gold); border-color:var(--gold); color:var(--navy-deep); }
   .tb-btn .sep{ color:rgba(255,255,255,0.4); }
 
   /* ===== 상단바 그루핑 팝업 (report-writer의 popupMenu와 같은 방식) ===== */
@@ -187,6 +188,10 @@
   .layout-row .panel.explorer{ flex:1; }
   .layout-col .panel.chat{ flex:0 0 auto; min-height:300px; max-height:42%; border-bottom:1px solid var(--line); }
   .layout-col .panel.explorer{ flex:1; }
+
+  /* 탐색기 패널을 접었을 때 — 채팅만 화면 전체를 차지 (좁은 화면·작은 창에서 채팅에 집중할 때) */
+  .workspace.explorer-collapsed .panel.explorer{ display:none; }
+  .workspace.explorer-collapsed .panel.chat{ flex:1 1 100%; max-height:none; border:none; }
 
   .panel-head{
     display:flex; align-items:center; gap:8px; height:38px; padding:0 14px;
@@ -391,6 +396,7 @@
       <button id="btnRow" title="좌우 배치" aria-label="좌우 배치">⬓</button>
       <button id="btnCol" title="상하 배치" aria-label="상하 배치">⬒</button>
     </div>
+    <button id="btnToggleExplorer" class="tb-btn" title="탐색기 패널 접기/펼치기 (채팅만 넓게 보기)">🗂 탐색창</button>
     <div class="spacer"></div>
     <div id="selectionInline" class="selection-inline" style="display:none;">
       <span id="selectionCountText"></span>
@@ -539,8 +545,8 @@
         <input type="text" id="chatInputEl" placeholder="메시지를 입력하세요… (파일을 여기로 끌어다 놓을 수 있어요)" aria-label="메시지 입력">
         <div class="chat-toolbar">
           <div class="spacer"></div>
-          <button type="button" id="btnVoiceInput" class="icon-round-btn voice" title="음성으로 입력">🎤</button>
           <button type="button" id="btnChatSend" class="icon-round-btn send" title="보내기">➤</button>
+          <button type="button" id="btnVoiceInput" class="icon-round-btn voice" title="음성으로 입력">🎤</button>
         </div>
       </div>
     </div>
@@ -657,6 +663,21 @@ graph TD
   btnRow.addEventListener('click', () => { applyLayout('row'); localStorage.setItem(LAYOUT_KEY, 'row'); });
   btnCol.addEventListener('click', () => { applyLayout('col'); localStorage.setItem(LAYOUT_KEY, 'col'); });
   initLayout();
+
+  // ---- 탐색기 패널 접기/펼치기 (채팅만 넓게 보고 싶을 때, 폰·탭·작은 창 대비) ----
+  const btnToggleExplorer = document.getElementById('btnToggleExplorer');
+  const EXPLORER_COLLAPSE_KEY = 'nx_explorer_collapsed';
+
+  function applyExplorerCollapsed(collapsed){
+    workspace.classList.toggle('explorer-collapsed', collapsed);
+    btnToggleExplorer.classList.toggle('is-on', collapsed);
+  }
+  btnToggleExplorer.addEventListener('click', ()=>{
+    const collapsed = !workspace.classList.contains('explorer-collapsed');
+    applyExplorerCollapsed(collapsed);
+    localStorage.setItem(EXPLORER_COLLAPSE_KEY, collapsed ? '1' : '0');
+  });
+  applyExplorerCollapsed(localStorage.getItem(EXPLORER_COLLAPSE_KEY) === '1');
 
   // ============================================================
   // GAS 호출 (listFolder)

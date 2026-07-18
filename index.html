@@ -13,6 +13,48 @@
     --bar-bg:#20242c; --bar-fg:#e8e8ec;
     --bg:#e9eaee; --panel:#ffffff; --line:#d8dce3; --ink:#1b2430; --sub:#6b7280;
   }
+
+  /* ===== 다크모드 ===== */
+  body.dark-mode{
+    --bg:#0f1117; --panel:#1b1f29; --line:#333947; --ink:#e6e8ee; --sub:#9aa0ad;
+  }
+  body.dark-mode .topbar-select option,
+  body.dark-mode .nx-popup select option{ background:#242938; color:var(--ink); }
+  body.dark-mode .modal-panel,
+  body.dark-mode .full-editor-panel,
+  body.dark-mode .editor-frame,
+  body.dark-mode .scan-tray-item button,
+  body.dark-mode .icon-round-btn,
+  body.dark-mode .log-btn,
+  body.dark-mode .log-entry{ background:#1b1f29; }
+  body.dark-mode .panel-head,
+  body.dark-mode .chip-btn,
+  body.dark-mode .scan-tray-item,
+  body.dark-mode .editor-toolbar,
+  body.dark-mode .log-add-row,
+  body.dark-mode .calc-hint,
+  body.dark-mode .diagram-preview,
+  body.dark-mode .capture-preview-wrap{ background:#242938; }
+  body.dark-mode .scan-tray-item .pdf-chip-icon,
+  body.dark-mode .calc-hint code{ background:#2c3242; }
+  body.dark-mode .msg.ai,
+  body.dark-mode .attach-chip,
+  body.dark-mode .folder-row:hover, body.dark-mode .file-row:hover,
+  body.dark-mode .icon-round-btn:hover,
+  body.dark-mode .icon-round-btn.send:hover,
+  body.dark-mode .back-btn:hover,
+  body.dark-mode .log-btn:hover{ background:#2a2f3b; }
+  body.dark-mode .chip-btn:hover{ background:#333a4a; }
+  body.dark-mode .file-row.is-selected, body.dark-mode .folder-row.is-selected,
+  body.dark-mode .selection-inline{ background:#3a3320; }
+  body.dark-mode .capture-preview-wrap{ background:#0b0d12; }
+  body.dark-mode .diagram-input{ background:#161a24; }
+  body.dark-mode .calc-table th{ color:var(--sub); }
+  body.dark-mode .diagram-preview svg text,
+  body.dark-mode .diagram-preview svg{ filter:invert(0.92) hue-rotate(180deg); } /* mermaid는 다크에서 색반전으로 대응 */
+  body.dark-mode .explorer-status,
+  body.dark-mode .explorer-empty,
+  body.dark-mode .log-empty{ color:var(--sub); }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%;background:var(--bg);font-family:'Noto Sans KR',sans-serif;color:var(--ink);}
   body{ display:flex; flex-direction:column; overflow:hidden; }
@@ -117,7 +159,7 @@
   .modal-hint{ font-size:11px; color:var(--sub); line-height:1.5; margin-top:3px; }
   .modal-body select, .modal-body input[type="number"], .modal-body textarea{
     font-family:inherit; font-size:13px; padding:7px 9px; border:1px solid var(--line); border-radius:6px;
-    color:var(--ink); width:100%;
+    color:var(--ink); background:var(--panel); width:100%;
   }
   .modal-body textarea{ resize:vertical; }
   .modal-checkrow{ display:flex; flex-direction:column; gap:6px; margin-top:8px; font-size:12.5px; color:var(--ink); }
@@ -260,7 +302,7 @@
   }
   .chat-input-wrap input{
     flex:1; min-width:0; border:1px solid var(--line); border-radius:10px; padding:10px 12px;
-    font-family:inherit; font-size:13.5px;
+    font-family:inherit; font-size:13.5px; background:var(--panel); color:var(--ink);
   }
   .chip-btn{
     display:flex; align-items:center; gap:4px; font-family:inherit; font-size:11.5px; font-weight:600;
@@ -353,11 +395,11 @@
   }
   .log-add-row input[type="date"]{
     flex:0 0 130px; border:1px solid var(--line); border-radius:6px; padding:7px 8px;
-    font-family:inherit; font-size:12.5px;
+    font-family:inherit; font-size:12.5px; background:var(--panel); color:var(--ink);
   }
   .log-add-row input[type="text"]{
     flex:1; border:1px solid var(--line); border-radius:6px; padding:7px 10px;
-    font-family:inherit; font-size:13px;
+    font-family:inherit; font-size:13px; background:var(--panel); color:var(--ink);
   }
   .log-list{ flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; }
   .log-entry{
@@ -385,7 +427,7 @@
   .calc-table .calc-ref{ font-size:11.5px; font-weight:700; color:var(--gold); white-space:nowrap; }
   .calc-table input{
     width:100%; border:1px solid var(--line); border-radius:6px; padding:6px 8px;
-    font-family:inherit; font-size:13px; box-sizing:border-box;
+    font-family:inherit; font-size:13px; box-sizing:border-box; background:var(--panel); color:var(--ink);
   }
   .calc-table .calc-result{ font-weight:700; color:var(--navy); white-space:nowrap; text-align:right; padding-right:10px; }
   .calc-table .calc-result.is-error{ color:#a83232; font-weight:600; }
@@ -397,7 +439,7 @@
   .diagram-input{
     flex:0 0 40%; border:none; border-right:1px solid var(--line); resize:none;
     padding:14px; font-family:'Consolas','Menlo',monospace; font-size:12.5px; line-height:1.6;
-    outline:none; color:var(--ink);
+    outline:none; color:var(--ink); background:var(--panel);
   }
   .diagram-preview{
     flex:1; overflow:auto; padding:18px; background:#fafbfc; display:flex;
@@ -464,6 +506,10 @@
         <span class="modal-close" id="btnCloseSettings" title="닫기">✕</span>
       </div>
       <div class="modal-body">
+
+        <div class="modal-checkrow">
+          <label><input type="checkbox" id="settingsDarkMode"> 🌙 다크모드</label>
+        </div>
 
         <div class="modal-checkrow">
           <label><input type="checkbox" id="settingsAutoRef"> 자동참조 사용 (AI가 알아서 판단해서 지금 보고 있는 폴더/파일을 확인)</label>
@@ -686,6 +732,16 @@ graph TD
   // ============================================================
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbz9pam82WMSMKHYo6-6EtEguMbpZ0AaqHirVzwcW6ZFRsdq4WGluvhpPkYUoTE2l_bm/exec';
   const REPORT_WRITER_URL = 'https://work.netax.kr/report-writer/'; // 독립 도메인으로 이전 후 경로
+
+  // ============================================================
+  // 다크모드 (설정 모달 안 체크박스로 관리, 바꾸면 바로 적용)
+  // ============================================================
+  const DARK_MODE_KEY = 'nx_dark_mode';
+  function applyDarkMode(on){
+    document.body.classList.toggle('dark-mode', on);
+  }
+  const savedDark = localStorage.getItem(DARK_MODE_KEY);
+  applyDarkMode(savedDark === null ? window.matchMedia('(prefers-color-scheme: dark)').matches : savedDark === '1');
 
   // ============================================================
   // 레이아웃 전환: 좌우배치 → 상하배치 → 탐색기 생략 → 탐색기 띄우기 — 버튼 하나로 순환
@@ -1569,6 +1625,13 @@ graph TD
   const settingsAutoRef = document.getElementById('settingsAutoRef');
   let autoRefMode = localStorage.getItem(AUTOREF_KEY) === '1';
 
+  // 다크모드 체크박스 — 저장 버튼 안 기다리고 체크하는 즉시 바로 적용
+  const settingsDarkMode = document.getElementById('settingsDarkMode');
+  settingsDarkMode.addEventListener('change', ()=>{
+    applyDarkMode(settingsDarkMode.checked);
+    localStorage.setItem(DARK_MODE_KEY, settingsDarkMode.checked ? '1' : '0');
+  });
+
   document.getElementById('btnAttachSelected').addEventListener('click', attachSelectedFiles);
   document.getElementById('btnClearSelected').addEventListener('click', ()=>{
     selectedItems.clear();
@@ -1729,6 +1792,7 @@ graph TD
   function openSettingsModal(){
     populateSettingsForm(aiSettings);
     settingsAutoRef.checked = autoRefMode;
+    settingsDarkMode.checked = document.body.classList.contains('dark-mode');
     settingsOverlay.style.display = 'flex';
   }
   function closeSettingsModal(){

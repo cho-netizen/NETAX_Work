@@ -351,6 +351,20 @@
   .calc-table .calc-result.is-error{ color:#a83232; font-weight:600; }
   .calc-del{ background:none; border:none; color:#c3c8d1; cursor:pointer; font-size:13px; }
   .calc-del:hover{ color:#a83232; }
+
+  /* ===== 관계도/구조도 캔버스 ===== */
+  .diagram-split{ flex:1; display:flex; min-height:0; }
+  .diagram-input{
+    flex:0 0 40%; border:none; border-right:1px solid var(--line); resize:none;
+    padding:14px; font-family:'Consolas','Menlo',monospace; font-size:12.5px; line-height:1.6;
+    outline:none; color:var(--ink);
+  }
+  .diagram-preview{
+    flex:1; overflow:auto; padding:18px; background:#fafbfc; display:flex;
+    align-items:flex-start; justify-content:center;
+  }
+  .diagram-preview svg{ max-width:100%; height:auto; }
+  .diagram-preview .diagram-error{ color:#a83232; font-size:12.5px; white-space:pre-wrap; padding:10px; }
   .back-btn:hover{ border-color:var(--navy); color:var(--navy); }
 
   @media (max-width: 720px){
@@ -358,6 +372,7 @@
   }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
 </head>
 <body>
 
@@ -525,6 +540,23 @@
         <div class="spacer"></div>
         <button type="button" id="btnOpenLog" class="log-btn" title="이 폴더의 처리일지 보기">📝 처리일지</button>
         <button type="button" id="btnOpenCalc" class="log-btn" title="이 폴더의 계산 워크시트 보기">🧮 계산기</button>
+        <button type="button" id="btnOpenDiagram" class="log-btn" title="이 폴더의 관계도/구조도 보기">🕸 관계도</button>
+      </div>
+
+      <div id="diagramView" style="display:none; flex:1; flex-direction:column; min-height:0;">
+        <div class="editor-toolbar">
+          <button class="back-btn" id="btnDiagramBack">‹ 탐색기로 돌아가기</button>
+          <span class="editor-filename" id="diagramFolderLabel"></span>
+          <div class="spacer"></div>
+          <button type="button" id="btnDiagramSave" class="ghost-btn">저장</button>
+        </div>
+        <div class="diagram-split">
+          <textarea id="diagramInput" class="diagram-input" spellcheck="false" placeholder="예시:
+graph TD
+  A[아버지] --> B[자녀1]
+  A --> C[자녀2]"></textarea>
+          <div id="diagramPreview" class="diagram-preview"></div>
+        </div>
       </div>
 
       <div id="explorerView">
@@ -1126,6 +1158,100 @@
   document.getElementById('btnOpenCalc').addEventListener('click', openCalcView);
   document.getElementById('btnCalcBack').addEventListener('click', closeCalcView);
   btnCalcAddRow.addEventListener('click', ()=>{ addCalcRow(); saveCalc(); });
+
+  // ---- 관계도/구조도 캔버스 (mermaid 문법) ----
+  if (window.mermaid) mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+
+  const diagramView = document.getElementById('diagramView');
+  const diagramFolderLabel = document.getElementById('diagramFolderLabel');
+  const diagramInput = document.getElementById('diagramInput');
+  const diagramPreview = document.getElementById('diagramPreview');
+  const btnDiagramSave = document.getElementById('btnDiagramSave');
+  const DIAGRAM_FILE_NAME = '관계도.mmd';
+  const DIAGRAM_DEFAULT = 'graph TD\n  A[아버지] --> B[자녀1]\n  A --> C[자녀2]';
+
+  let diagramCurrentPath = [];
+  let diagramFileId = null;
+  let diagramRenderTimer = null;
+  let diagramRenderCounter = 0;
+
+  async function renderDiagramPreview(){
+    const code = diagramInput.value.trim();
+    if (!code){
+      diagramPreview.innerHTML = '<div class="diagram-error">왼쪽에 mermaid 문법으로 입력하면 여기에 그려집니다.</div>';
+      return;
+    }
+    if (!window.mermaid){
+      diagramPreview.innerHTML = '<div class="diagram-error">mermaid 라이브러리를 불러오지 못했습니다.</div>';
+      return;
+    }
+    try{
+      const id = 'nxDiagram' + (diagramRenderCounter++);
+      const { svg } = await mermaid.render(id, code);
+      diagramPreview.innerHTML = svg;
+    }catch(err){
+      diagramPreview.innerHTML = '<div class="diagram-error">문법 오류:\n' + escapeHtml(err && err.message ? err.message : String(err)) + '</div>';
+    }
+  }
+
+  diagramInput.addEventListener('input', ()=>{
+    clearTimeout(diagramRenderTimer);
+    diagramRenderTimer = setTimeout(renderDiagramPreview, 500); // 타이핑 잠깐 멈추면 다시 그림
+  });
+  diagramInput.addEventListener('change', saveDiagram);
+
+  async function saveDiagram(){
+    try{
+      const payload = {
+        path: diagramCurrentPath,
+        name: DIAGRAM_FILE_NAME,
+        mimeType: 'text/plain',
+        base64Data: utf8ToBase64(diagramInput.value)
+      };
+      if (diagramFileId) payload.fileId = diagramFileId;
+      const res = await callGas('uploadFile', payload);
+      if (res.error){ alert('관계도 저장 실패: ' + res.error); return; }
+      if (!diagramFileId) diagramFileId = res.id;
+    }catch(err){
+      alert('관계도 저장 중 오류: ' + (err && err.message ? err.message : err));
+    }
+  }
+
+  async function openDiagramView(){
+    diagramCurrentPath = explorerPath.slice();
+    explorerView.style.display = 'none';
+    explorerPanelHead.style.display = 'none';
+    diagramView.style.display = 'flex';
+    diagramFolderLabel.textContent = diagramCurrentPath.join(' / ') + ' 의 관계도';
+
+    try{
+      const data = await listFolder(diagramCurrentPath);
+      const existing = data.files.find(f => f.name === DIAGRAM_FILE_NAME);
+      if (existing){
+        diagramFileId = existing.id;
+        const fileData = await callGas('readFile', { fileId: existing.id });
+        diagramInput.value = fileData.content || '';
+      } else {
+        diagramFileId = null;
+        diagramInput.value = DIAGRAM_DEFAULT; // 빈 상태면 예시로 시작해서 문법 감 잡기 쉽게
+      }
+    }catch(err){
+      diagramFileId = null;
+      diagramInput.value = DIAGRAM_DEFAULT;
+      console.warn('관계도 로드 실패, 예시로 시작', err);
+    }
+    renderDiagramPreview();
+  }
+
+  function closeDiagramView(){
+    diagramView.style.display = 'none';
+    explorerView.style.display = 'block';
+    explorerPanelHead.style.display = 'flex';
+  }
+
+  document.getElementById('btnOpenDiagram').addEventListener('click', openDiagramView);
+  document.getElementById('btnDiagramBack').addEventListener('click', ()=>{ saveDiagram(); closeDiagramView(); });
+  btnDiagramSave.addEventListener('click', saveDiagram);
 
   // ---- report-writer(iframe)와의 실시간 통신 (postMessage) ----
   let msgReqCounter = 0;

@@ -1078,6 +1078,7 @@ graph TD
     calcRows.forEach((row, idx)=>{
       const ref = 'R' + (idx + 1);
       const tr = document.createElement('tr');
+      tr.dataset.rowId = row.id;
 
       const tdRef = document.createElement('td');
       tdRef.className = 'calc-ref';
@@ -1088,7 +1089,7 @@ graph TD
       labelInput.type = 'text';
       labelInput.placeholder = '항목명';
       labelInput.value = row.label || '';
-      labelInput.addEventListener('input', ()=>{ row.label = labelInput.value; });
+      labelInput.addEventListener('input', ()=>{ row.label = labelInput.value; }); // 항목명은 계산에 안 쓰이므로 다시 그릴 필요 없음
       labelInput.addEventListener('change', saveCalc);
       tdLabel.appendChild(labelInput);
 
@@ -1097,7 +1098,9 @@ graph TD
       formulaInput.type = 'text';
       formulaInput.placeholder = '예: 500000000 또는 =R1*0.06';
       formulaInput.value = row.formula || '';
-      formulaInput.addEventListener('input', ()=>{ row.formula = formulaInput.value; renderCalcRows(); });
+      // 타이핑할 때마다 표 전체를 새로 그리면 입력창 자체가 교체되어 커서(포커스)가 날아가므로,
+      // 결과 값만 가볍게 갱신하고 입력창(DOM)은 그대로 둔다.
+      formulaInput.addEventListener('input', ()=>{ row.formula = formulaInput.value; updateCalcResults(); });
       formulaInput.addEventListener('change', saveCalc);
       tdFormula.appendChild(formulaInput);
 
@@ -1119,6 +1122,18 @@ graph TD
 
       tr.appendChild(tdRef); tr.appendChild(tdLabel); tr.appendChild(tdFormula); tr.appendChild(tdResult); tr.appendChild(tdDel);
       calcRowsBody.appendChild(tr);
+    });
+  }
+
+  // 행 구조(입력창)는 그대로 두고, 계산 결과만 다시 계산해서 결과 칸만 갱신 (타이핑 중 커서 유지용)
+  function updateCalcResults(){
+    evalCalcRows();
+    calcRows.forEach(row=>{
+      const tr = calcRowsBody.querySelector('tr[data-row-id="' + row.id + '"]');
+      if (!tr) return;
+      const tdResult = tr.children[3];
+      tdResult.className = 'calc-result' + (Number.isFinite(row.result) ? '' : ' is-error');
+      tdResult.textContent = Number.isFinite(row.result) ? row.result.toLocaleString('ko-KR') : '오류';
     });
   }
 

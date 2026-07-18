@@ -23,6 +23,7 @@
     padding:8px 10px; background:var(--navy); color:#fff;
     border-bottom:3px solid var(--gold); flex-shrink:0;
     row-gap:6px; /* 좁은 화면에서 줄바꿈될 때 줄 사이 간격 */
+    position:relative; z-index:95; /* "띄우기" 배경(z-index 90)보다 위에 있어야 버튼이 항상 눌림 */
   }
   .topbar-item{ position:relative; flex-shrink:0; }
   .spacer{ flex:1; min-width:8px; }

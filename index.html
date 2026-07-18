@@ -1235,9 +1235,18 @@ graph TD
       const res = await callGas('uploadFile', payload);
       if (res.error){ alert('관계도 저장 실패: ' + res.error); return; }
       if (!diagramFileId) diagramFileId = res.id;
+      flashSavedLabel(btnDiagramSave, '저장');
     }catch(err){
       alert('관계도 저장 중 오류: ' + (err && err.message ? err.message : err));
     }
+  }
+
+  // 저장 성공 시 버튼에 잠깐 "✓ 저장됨"을 보여줬다가 원래 글자로 되돌림 (조용해서 불안한 것 방지)
+  function flashSavedLabel(btn, originalText){
+    if (!btn) return;
+    btn.textContent = '✓ 저장됨';
+    clearTimeout(btn._flashTimer);
+    btn._flashTimer = setTimeout(()=>{ btn.textContent = originalText; }, 1200);
   }
 
   async function openDiagramView(){

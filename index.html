@@ -572,6 +572,8 @@ graph TD
           <button class="back-btn" id="btnCaptureCancel">‹ 취소</button>
           <span class="editor-filename">화면 캡처 확인</span>
           <div class="spacer"></div>
+          <button type="button" id="btnCaptureUndo" class="ghost-btn" style="display:none;">✕ 첨부 취소</button>
+          <button type="button" id="btnCaptureToScan" class="ghost-btn">📷 스캔 도구로 보내기</button>
           <button type="button" id="btnCaptureRetake" class="ghost-btn">🔄 다시 찍기</button>
           <button type="button" id="btnCaptureConfirm" class="save-btn">✓ 채팅에 첨부</button>
         </div>
@@ -1620,10 +1622,17 @@ graph TD
 
   if (btnScreenCapture) btnScreenCapture.addEventListener('click', captureScreen);
 
-  // ---- 화면캡처 확인 뷰 (오른쪽 패널에 크게 보여주고 첨부/재촬영/취소 선택) ----
+  // ---- 화면캡처 확인 뷰 (오른쪽 패널에 크게 보여주고 첨부/재촬영/취소/스캔연결 선택) ----
   const captureView = document.getElementById('captureView');
   const capturePreviewImg = document.getElementById('capturePreviewImg');
+  const btnCaptureCancel = document.getElementById('btnCaptureCancel');
+  const btnCaptureUndo = document.getElementById('btnCaptureUndo');
+  const btnCaptureToScan = document.getElementById('btnCaptureToScan');
+  const btnCaptureRetake = document.getElementById('btnCaptureRetake');
+  const btnCaptureConfirm = document.getElementById('btnCaptureConfirm');
+
   let pendingCaptureDataUrl = null;
+  let pendingCaptureAutoId = null; // 자동참조 ON이라 즉시 첨부해뒀을 때, 그 pendingCaptures 항목의 id (취소 시 되돌리기용)
 
   function openCaptureView(dataUrl){
     pendingCaptureDataUrl = dataUrl;
@@ -1631,6 +1640,29 @@ graph TD
     explorerView.style.display = 'none';
     explorerPanelHead.style.display = 'none';
     captureView.style.display = 'flex';
+
+    if (autoRefMode){
+      // 자동참조 ON: 확인 절차 없이 바로 첨부해두고, 미리보기는 "확인용"으로만 보여줌
+      pendingCaptureAutoId = 'cap' + Date.now();
+      pendingCaptures.push({ id: pendingCaptureAutoId, name: '화면캡처_' + pendingCaptures.length, dataUrl });
+      renderAttachBar();
+      btnCaptureCancel.textContent = '✓ 확인';
+      btnCaptureUndo.style.display = '';
+      btnCaptureConfirm.style.display = 'none';
+    } else {
+      pendingCaptureAutoId = null;
+      btnCaptureCancel.textContent = '‹ 취소';
+      btnCaptureUndo.style.display = 'none';
+      btnCaptureConfirm.style.display = '';
+    }
+  }
+
+  function removeAutoAddedCapture(){
+    if (pendingCaptureAutoId){
+      pendingCaptures = pendingCaptures.filter(c => c.id !== pendingCaptureAutoId);
+      renderAttachBar();
+      pendingCaptureAutoId = null;
+    }
   }
 
   function closeCaptureView(){
@@ -1640,17 +1672,30 @@ graph TD
     pendingCaptureDataUrl = null;
   }
 
-  document.getElementById('btnCaptureCancel').addEventListener('click', closeCaptureView);
-  document.getElementById('btnCaptureRetake').addEventListener('click', ()=>{
+  btnCaptureCancel.addEventListener('click', closeCaptureView); // 자동첨부 모드에선 "확인"이라 그냥 닫기만, 수동 모드에선 첨부 안 하고 닫기(원래 첨부 안 된 상태이므로 별도 취소 불필요)
+  btnCaptureUndo.addEventListener('click', ()=>{ removeAutoAddedCapture(); closeCaptureView(); });
+  btnCaptureRetake.addEventListener('click', ()=>{
+    removeAutoAddedCapture(); // 다시 찍기 전에, 자동으로 첨부됐던 이전 캡처는 제거
     closeCaptureView();
     captureScreen();
   });
-  document.getElementById('btnCaptureConfirm').addEventListener('click', ()=>{
+  btnCaptureConfirm.addEventListener('click', ()=>{
     if (pendingCaptureDataUrl){
       pendingCaptures.push({ id: 'cap' + Date.now(), name: '화면캡처_' + (pendingCaptures.length + 1), dataUrl: pendingCaptureDataUrl });
       renderAttachBar();
     }
     closeCaptureView();
+  });
+  btnCaptureToScan.addEventListener('click', ()=>{
+    if (!pendingCaptureDataUrl) return;
+    removeAutoAddedCapture(); // 채팅 첨부가 아니라 스캔 도구로 보내는 거라, 자동으로 붙었던 첨부는 제거
+    const img = new Image();
+    img.onload = ()=>{
+      closeCaptureView();
+      openScanModal();
+      setupScanStage(img); // 스캔 도구의 "귀퉁이 잡아서 펴기" 단계로 바로 이어짐
+    };
+    img.src = pendingCaptureDataUrl;
   });
 
 

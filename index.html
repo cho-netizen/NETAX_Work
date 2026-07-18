@@ -283,6 +283,8 @@
     border:1px solid var(--navy); background:var(--navy); color:#fff;
   }
   .selection-inline button.ghost{ background:none; color:var(--sub); border-color:var(--line); }
+  .selection-inline button.danger{ background:#a83232; border-color:#a83232; }
+  .selection-inline button.danger:hover{ background:#8f2929; }
 
   /* ===== 탐색기 상태 표시 ===== */
   .explorer-status{ padding:16px 14px; font-size:13px; color:var(--sub); }
@@ -395,6 +397,7 @@
     <div id="selectionInline" class="selection-inline" style="display:none;">
       <span id="selectionCountText"></span>
       <button type="button" id="btnAttachSelected">첨부</button>
+      <button type="button" id="btnDeleteSelected" class="danger">🗑 삭제</button>
       <button type="button" id="btnClearSelected" class="ghost">취소</button>
     </div>
     <button type="button" id="btnAutoRef" class="autoref-toggle" title="자동참조 모드: AI가 알아서 폴더/파일을 읽을지, 명시적으로 요청했을 때만 읽을지"><span class="dot"></span>수동참조</button>
@@ -1427,6 +1430,27 @@ graph TD
   document.getElementById('btnClearSelected').addEventListener('click', ()=>{
     selectedItems.clear();
     refreshSelectionUi();
+  });
+  document.getElementById('btnDeleteSelected').addEventListener('click', async ()=>{
+    const items = Array.from(selectedItems.values());
+    if (!items.length) return;
+    const names = items.map(i => (i.type === 'folder' ? '📁 ' : '📄 ') + i.name).join('\n');
+    const ok = confirm('다음 ' + items.length + '개 항목을 휴지통으로 이동할까요? (구글드라이브 휴지통에서 복구 가능)\n\n' + names);
+    if (!ok) return;
+
+    const failed = [];
+    for (const item of items){
+      try{
+        const res = await callGas('deleteItem', { id: item.id, type: item.type });
+        if (res.error) failed.push(item.name + ' (' + res.error + ')');
+      }catch(err){
+        failed.push(item.name + ' (' + (err && err.message ? err.message : err) + ')');
+      }
+    }
+    selectedItems.clear();
+    refreshSelectionUi();
+    navigateTo(explorerPath); // 삭제 결과가 바로 반영되도록 목록 새로고침
+    if (failed.length) alert('일부 삭제 실패:\n' + failed.join('\n'));
   });
 
   // ============================================================

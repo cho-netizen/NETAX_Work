@@ -220,14 +220,13 @@
   .apply-edit-btn:hover{ background:var(--gold-light); }
   .apply-edit-btn:disabled{ background:#cfd4dc; color:var(--sub); cursor:default; }
   .chat-input-wrap{
-    display:flex; flex-direction:column; gap:6px; padding:10px 12px;
+    display:flex; align-items:center; gap:8px; padding:10px 12px;
     border-top:1px solid var(--line); flex-shrink:0;
   }
   .chat-input-wrap input{
-    border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+    flex:1; min-width:0; border:1px solid var(--line); border-radius:10px; padding:10px 12px;
     font-family:inherit; font-size:13.5px;
   }
-  .chat-toolbar{ display:flex; align-items:center; gap:8px; }
   .chip-btn{
     display:flex; align-items:center; gap:4px; font-family:inherit; font-size:11.5px; font-weight:600;
     cursor:pointer; border:1px solid var(--line); border-radius:14px; padding:4px 10px;
@@ -533,17 +532,12 @@
 
   <div class="workspace" id="workspace">
     <div class="panel chat">
-      <div class="chat-body" id="chatBody">
-        <div class="msg ai">안녕하세요. 우측 탐색기에서 보고 계신 위치나 열어두신 파일에 대해 물어보시면 답변해드립니다. (자동참조 토글로 "알아서 읽기" 여부를 바꿀 수 있어요, 또는 우측 파일을 여기로 끌어다 놓으셔도 됩니다)</div>
-      </div>
+      <div class="chat-body" id="chatBody"></div>
       <div class="attach-bar" id="attachBar" style="display:none;"></div>
       <div class="chat-input-wrap">
-        <input type="text" id="chatInputEl" placeholder="메시지를 입력하세요… (파일을 여기로 끌어다 놓을 수 있어요)" aria-label="메시지 입력">
-        <div class="chat-toolbar">
-          <div class="spacer"></div>
-          <button type="button" id="btnChatSend" class="icon-round-btn send" title="보내기">➤</button>
-          <button type="button" id="btnVoiceInput" class="icon-round-btn voice" title="음성으로 입력">🎤</button>
-        </div>
+        <input type="text" id="chatInputEl" placeholder="메시지 입력" aria-label="메시지 입력">
+        <button type="button" id="btnChatSend" class="icon-round-btn send" title="보내기">➤</button>
+        <button type="button" id="btnVoiceInput" class="icon-round-btn voice" title="음성으로 입력">🎤</button>
       </div>
     </div>
 
@@ -656,7 +650,7 @@ graph TD
     btnWorkspaceMode.title = WORKSPACE_MODE_META[mode].title;
   }
   function detectDefaultMode(){
-    return window.innerWidth >= window.innerHeight ? 'row' : 'col';
+    return 'hide'; // 처음 열었을 때는 채팅만 보이는 "생략" 상태로 시작
   }
   function setWorkspaceMode(mode){
     applyWorkspaceMode(mode);
@@ -668,6 +662,14 @@ graph TD
     setWorkspaceMode(WORKSPACE_MODES[nextIdx]);
   });
   applyWorkspaceMode(localStorage.getItem(WORKSPACE_MODE_KEY) || detectDefaultMode());
+
+  // 오른쪽 패널(탐색기 자리) 안에 뭔가를 보여줘야 하는데 지금 "생략" 모드라면,
+  // 보여줄 자리 자체가 꺼져있어 아무것도 안 보이게 되므로 자동으로 좌우배치로 되돌린다.
+  function ensureExplorerVisible(){
+    if (workspace.classList.contains('explorer-collapsed')){
+      setWorkspaceMode('row');
+    }
+  }
 
   // ============================================================
   // GAS 호출 (listFolder)
@@ -1002,6 +1004,7 @@ graph TD
   }
 
   async function openLogView(){
+    ensureExplorerVisible();
     logCurrentPath = explorerPath.slice();
     explorerView.style.display = 'none';
     explorerPanelHead.style.display = 'none';
@@ -1197,6 +1200,7 @@ graph TD
   }
 
   async function openCalcView(){
+    ensureExplorerVisible();
     calcCurrentPath = explorerPath.slice();
     explorerView.style.display = 'none';
     explorerPanelHead.style.display = 'none';
@@ -1303,6 +1307,7 @@ graph TD
   }
 
   async function openDiagramView(){
+    ensureExplorerVisible();
     diagramCurrentPath = explorerPath.slice();
     explorerView.style.display = 'none';
     explorerPanelHead.style.display = 'none';
@@ -1777,6 +1782,7 @@ graph TD
   let pendingCaptureAutoId = null; // 자동참조 ON이라 즉시 첨부해뒀을 때, 그 pendingCaptures 항목의 id (취소 시 되돌리기용)
 
   function openCaptureView(dataUrl){
+    ensureExplorerVisible();
     pendingCaptureDataUrl = dataUrl;
     capturePreviewImg.src = dataUrl;
     explorerView.style.display = 'none';

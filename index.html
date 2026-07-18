@@ -1016,6 +1016,7 @@ graph TD
     logView.style.display = 'none';
     explorerView.style.display = 'block';
     explorerPanelHead.style.display = 'flex';
+    navigateTo(logCurrentPath); // 방금 저장한 처리일지.json이 목록에 바로 보이도록 새로고침
   }
 
   document.getElementById('btnOpenLog').addEventListener('click', openLogView);
@@ -1210,6 +1211,7 @@ graph TD
     calcView.style.display = 'none';
     explorerView.style.display = 'block';
     explorerPanelHead.style.display = 'flex';
+    navigateTo(calcCurrentPath); // 방금 저장한 계산기.json이 목록에 바로 보이도록 새로고침
   }
 
   document.getElementById('btnOpenCalc').addEventListener('click', openCalcView);
@@ -1313,6 +1315,7 @@ graph TD
     diagramView.style.display = 'none';
     explorerView.style.display = 'block';
     explorerPanelHead.style.display = 'flex';
+    navigateTo(diagramCurrentPath); // 방금 저장한 관계도.mmd가 목록에 바로 보이도록 새로고침
   }
 
   document.getElementById('btnOpenDiagram').addEventListener('click', openDiagramView);

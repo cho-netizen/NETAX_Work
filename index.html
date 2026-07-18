@@ -567,6 +567,7 @@
           <button class="back-btn" id="btnDiagramBack" title="닫기">✕</button>
           <span class="editor-filename" id="diagramFolderLabel"></span>
           <div class="spacer"></div>
+          <button type="button" id="btnDiagramRef" class="ghost-btn">📎 참조</button>
           <button type="button" id="btnDiagramSave" class="ghost-btn">저장</button>
         </div>
         <div class="diagram-split">
@@ -612,6 +613,7 @@ graph TD
           <button class="back-btn" id="btnCalcBack" title="닫기">✕</button>
           <span class="editor-filename" id="calcFolderLabel"></span>
           <div class="spacer"></div>
+          <button type="button" id="btnCalcRef" class="ghost-btn">📎 참조</button>
           <button type="button" id="btnCalcAddRow" class="ghost-btn">+ 행 추가</button>
         </div>
         <div class="calc-hint">"값/계산식" 칸에 숫자를 직접 넣거나, <code>=[1]*0.06</code>처럼 위쪽 행(<code>[1]</code>, <code>[2]</code>…)을 참조하는 계산식을 넣을 수 있습니다. 영문자를 안 쓰는 문법이라 한/영 전환 걱정 없이 바로 입력하시면 됩니다.</div>
@@ -627,6 +629,8 @@ graph TD
         <div class="editor-toolbar">
           <button class="back-btn" id="btnLogBack" title="닫기">✕</button>
           <span class="editor-filename" id="logFolderLabel"></span>
+          <div class="spacer"></div>
+          <button type="button" id="btnLogRef" class="ghost-btn">📎 참조</button>
         </div>
         <div class="log-add-row">
           <input type="date" id="logDateInput">
@@ -1082,6 +1086,11 @@ graph TD
 
   document.getElementById('btnOpenLog').addEventListener('click', openLogView);
   document.getElementById('btnLogBack').addEventListener('click', closeLogView);
+  document.getElementById('btnLogRef').addEventListener('click', ()=>{
+    const sorted = logEntries.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const text = sorted.map(e => (e.date || '') + ' — ' + (e.text || '')).join('\n');
+    addTextAttachment('처리일지 · ' + logCurrentPath.join('/'), text);
+  });
 
   btnLogAdd.addEventListener('click', ()=>{
     const text = logTextInput.value.trim();
@@ -1275,6 +1284,15 @@ graph TD
   document.getElementById('btnOpenCalc').addEventListener('click', openCalcView);
   document.getElementById('btnCalcBack').addEventListener('click', closeCalcView);
   btnCalcAddRow.addEventListener('click', ()=>{ addCalcRow(); saveCalc(); });
+  document.getElementById('btnCalcRef').addEventListener('click', ()=>{
+    evalCalcRows();
+    const text = calcRows.map((r, idx) => {
+      const ref = '[' + (idx + 1) + ']';
+      const result = Number.isFinite(r.result) ? r.result.toLocaleString('ko-KR') : '오류';
+      return ref + ' ' + (r.label || '(이름없음)') + ': ' + (r.formula || '') + ' = ' + result;
+    }).join('\n');
+    addTextAttachment('계산기 · ' + calcCurrentPath.join('/'), text);
+  });
 
   // ---- 관계도/구조도 캔버스 (mermaid 문법) ----
   if (window.mermaid) mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
@@ -1379,6 +1397,9 @@ graph TD
   document.getElementById('btnOpenDiagram').addEventListener('click', openDiagramView);
   document.getElementById('btnDiagramBack').addEventListener('click', ()=>{ saveDiagram(); closeDiagramView(); });
   btnDiagramSave.addEventListener('click', saveDiagram);
+  document.getElementById('btnDiagramRef').addEventListener('click', ()=>{
+    addTextAttachment('관계도 · ' + diagramCurrentPath.join('/'), diagramInput.value);
+  });
 
   // ---- report-writer(iframe)와의 실시간 통신 (postMessage) ----
   let msgReqCounter = 0;
@@ -1710,10 +1731,11 @@ graph TD
   let chatMessages = []; // Claude API 형식: [{role:'user'|'assistant', content:'...'}]
   let pendingAttachments = []; // [{id,name,type:'file'|'folder',mimeType?,path?}] — 채팅에 끌어다 놓거나 첨부한 항목들 (다음 전송에 무조건 반영)
   let pendingCaptures = []; // [{id,name,dataUrl}] — 화면캡처로 즉석에서 찍은 이미지 (드라이브에 저장 안 하고 바로 첨부)
+  let pendingTextAttachments = []; // [{id,name,text}] — 처리일지/계산기/관계도 등에서 "지금 화면 그대로" 참조 버튼으로 넘긴 것 (저장 전 상태 포함)
 
   function renderAttachBar(){
     attachBar.innerHTML = '';
-    if (!pendingAttachments.length && !pendingCaptures.length){
+    if (!pendingAttachments.length && !pendingCaptures.length && !pendingTextAttachments.length){
       attachBar.style.display = 'none';
       return;
     }
@@ -1729,6 +1751,16 @@ graph TD
       });
       attachBar.appendChild(chip);
     });
+    pendingTextAttachments.forEach(item=>{
+      const chip = document.createElement('div');
+      chip.className = 'attach-chip';
+      chip.innerHTML = '🧾 ' + escapeHtml(item.name) + ' <span class="x" title="첨부 취소">✕</span>';
+      chip.querySelector('.x').addEventListener('click', ()=>{
+        pendingTextAttachments = pendingTextAttachments.filter(a => a.id !== item.id);
+        renderAttachBar();
+      });
+      attachBar.appendChild(chip);
+    });
     pendingCaptures.forEach(cap=>{
       const chip = document.createElement('div');
       chip.className = 'attach-chip';
@@ -1739,6 +1771,13 @@ graph TD
       });
       attachBar.appendChild(chip);
     });
+  }
+
+  // 처리일지/계산기/관계도 등에서 "지금 이 내용 그대로" 버튼을 눌렀을 때 쓰는 공용 함수
+  function addTextAttachment(name, text){
+    if (!text || !text.trim()) { alert('참조할 내용이 비어 있습니다.'); return; }
+    pendingTextAttachments.push({ id: 'txt' + Date.now(), name, text });
+    renderAttachBar();
   }
 
   function addAttachment(item){
@@ -1958,13 +1997,18 @@ graph TD
       : '';
     const capturesForThisMessage = pendingCaptures.slice();
     const captureNote = capturesForThisMessage.length ? ' ' + capturesForThisMessage.map(() => '📸').join('') : '';
+    const textAttachmentsForThisMessage = pendingTextAttachments.slice();
+    const textAttachNote = textAttachmentsForThisMessage.length
+      ? ' ' + textAttachmentsForThisMessage.map(t => '🧾' + t.name).join(', ')
+      : '';
 
-    appendBubble('user', text + attachNote + captureNote);
+    appendBubble('user', text + attachNote + captureNote + textAttachNote);
     chatInputEl.value = '';
     chatInputEl.disabled = true;
     btnChatSend.disabled = true;
     pendingAttachments = [];
     pendingCaptures = [];
+    pendingTextAttachments = [];
     renderAttachBar();
 
     const thinkingBubble = appendBubble('assistant', '생각 중…');
@@ -2007,7 +2051,8 @@ graph TD
           context: {
             currentPath: explorerPath,
             openFile: openFileCtx,
-            attachedItems: attachmentsForThisMessage
+            attachedItems: attachmentsForThisMessage,
+            attachedTexts: textAttachmentsForThisMessage
           },
           autoRef: autoRefMode
         }, buildAiSettingsPayload()))

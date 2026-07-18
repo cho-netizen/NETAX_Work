@@ -122,16 +122,22 @@
   /* 넓은 화면: 도구 버튼 각각 다 보이고, 도구모음 버튼은 숨김 / 좁은 화면: 반대 */
   .tool-buttons-wide{ display:contents; }
   .tool-menu-narrow{ display:none; }
+  .settings-label-narrow{ display:none; } /* 이제 폰에서는 텍스트 없이 아이콘만 쓰므로 이 라벨은 항상 숨김 */
   @media (max-width: 720px){
     .tool-buttons-wide{ display:none; }
     .tool-menu-narrow{ display:block; }
+    .topbar .spacer{ flex:0 0 8px; min-width:0; } /* 좁은 화면에서 여백이 줄버튼을 밀어내던 것 방지 */
+    /* 줄바꿈된 줄에서 남는 버튼들(창모드/도구/설정)이 빈 공간 없이 폭을 균등하게 채움 */
+    #btnWorkspaceMode, .tool-menu-narrow, #btnOpenSettings{ flex:1 1 0; display:flex; }
+    .tool-menu-narrow #btnToolMenu{ width:100%; justify-content:center; }
+    .tb-btn{ justify-content:center; }
   }
 
-  /* 폰 크기: 설정 버튼의 모델·강도 표시 대신 그냥 "설정"으로 축약 */
-  .settings-label-narrow{ display:none; }
+  /* 폰 크기: 도구·설정 버튼을 아이콘만 남김 */
   @media (max-width: 480px){
-    .settings-label-wide{ display:none; }
-    .settings-label-narrow{ display:inline; }
+    .tool-menu-label,
+    .settings-label-wide,
+    .settings-label-narrow{ display:none; }
   }
 
   /* ===== AI 설정 모달 ===== */
@@ -486,7 +492,7 @@
       <button id="btnOpenFullEditor" class="tb-btn" title="전체화면으로 직접 편집 (AI 개입 없이)">🖋 편집</button>
     </div>
     <div class="topbar-item tool-menu-narrow">
-      <button type="button" id="btnToolMenu" class="tb-btn" title="도구 모음">🛠 도구</button>
+      <button type="button" id="btnToolMenu" class="tb-btn" title="도구 모음">🛠 <span class="tool-menu-label">도구</span></button>
       <div id="toolMenuPopup" class="nx-popup">
         <button type="button" class="tool-menu-item" id="menuOpenLog">📝 처리일지</button>
         <button type="button" class="tool-menu-item" id="menuOpenCalc">🧮 계산기</button>

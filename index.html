@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231b2a41'/%3E%3Ctext x='32' y='45' font-family='Georgia,serif' font-size='34' font-weight='700' fill='%23c9a227' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E">
-<title>이음세무컨설팅 NETAX  | 작업실</title>
+<title>NX 작업실 — 레이아웃 프로토타입</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -169,6 +169,16 @@
   }
   .modal-body textarea{ resize:vertical; }
   .modal-checkrow{ display:flex; flex-direction:column; gap:6px; margin-top:8px; font-size:12.5px; color:var(--ink); }
+
+  .voice-command-list{ display:flex; flex-direction:column; gap:6px; margin-top:6px; max-height:220px; overflow-y:auto; }
+  .voice-command-row{
+    display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:8px;
+  }
+  .voice-command-row .vc-label{ flex:0 0 110px; font-size:12px; color:var(--sub); }
+  .voice-command-row input[type="text"]{
+    flex:1; min-width:0; border:1px solid var(--line); border-radius:6px; padding:6px 8px;
+    font-family:inherit; font-size:12.5px; background:var(--panel); color:var(--ink);
+  }
   .modal-checkrow label{ display:flex; align-items:center; gap:6px; cursor:pointer; }
   .modal-foot{
     display:flex; justify-content:flex-end; gap:8px; padding:12px 18px;
@@ -522,6 +532,11 @@
         </div>
         <div class="modal-hint">꺼두면, AI는 각 창의 "📎 참조" 버튼으로 직접 첨부했거나 "이 파일 참고해서"처럼 명시적으로 요청했을 때만 읽습니다.</div>
 
+        <label class="modal-label">🗣 음성명령 (AI 안 거치고 바로 처리)</label>
+        <div class="modal-hint">체크를 끄면 그 명령은 꺼집니다. 문구는 쉼표로 구분해서 자유롭게 고치세요 (말한 내용에 이 문구가 포함되면 반응합니다).</div>
+        <div id="voiceCommandList" class="voice-command-list"></div>
+        <button type="button" id="btnResetVoiceCommands" class="ghost-btn" style="margin-top:6px; align-self:flex-start;">기본값으로 복원</button>
+
         <label class="modal-label">모델</label>
         <select id="settingsModel">
           <option value="claude-sonnet-5">Claude Sonnet 5</option>
@@ -859,6 +874,7 @@ graph TD
   // key: id, value: { id, name, type:'file'|'folder', mimeType?, path? }
   let selectedItems = new Map();
   let lastRenderedFiles = []; // 현재 화면에 그려진 파일 목록 (id로 다시 찾기 위함)
+  let lastRenderedFolders = []; // 현재 화면에 그려진 하위 폴더 목록 (음성명령 "아래로" 판단용)
   const selectionInline = document.getElementById('selectionInline');
   const selectionCountText = document.getElementById('selectionCountText');
   const btnRenameSelected = document.getElementById('btnRenameSelected');
@@ -955,6 +971,7 @@ graph TD
     explorerBody.innerHTML = '';
     selectedItems.clear(); // 새 폴더로 이동하면 이전 화면의 선택은 의미 없으므로 초기화
     lastRenderedFiles = data.files;
+    lastRenderedFolders = data.folders;
 
     // 참 루트(구글드라이브 전체)에 도달하기 전까지는 ".." 상위 폴더 이동 허용
     if (explorerPath.length > 0){
@@ -1799,6 +1816,7 @@ graph TD
     populateSettingsForm(aiSettings);
     settingsAutoRef.checked = autoRefMode;
     settingsDarkMode.checked = document.body.classList.contains('dark-mode');
+    renderVoiceCommandSettings();
     settingsOverlay.style.display = 'flex';
   }
   function closeSettingsModal(){
@@ -1822,6 +1840,8 @@ graph TD
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings));
     autoRefMode = settingsAutoRef.checked;
     localStorage.setItem(AUTOREF_KEY, autoRefMode ? '1' : '0');
+    readVoiceCommandSettingsFromUi();
+    localStorage.setItem(VOICE_COMMANDS_KEY, JSON.stringify(voiceCommands));
     closeSettingsModal();
     updateChatModelBadge();
   });
@@ -2108,16 +2128,33 @@ graph TD
   // "편집기에 적용하기" 버튼을 붙여서 렌더링 (없으면 그냥 평범한 텍스트)
   const EDIT_START = '<<<EDIT_DOCUMENT>>>';
   const EDIT_END = '<<<END_EDIT_DOCUMENT>>>';
+  // AI 응답 안에 <<<NAVIGATE_TO>>>["고객명","사건명"]<<<END_NAVIGATE_TO>>> 형태가 있으면
+  // 확인 버튼 없이 바로 그 폴더로 이동시킨다 (문서 수정과 달리 이동은 되돌리기 쉬워서 즉시 적용)
+  const NAV_START = '<<<NAVIGATE_TO>>>';
+  const NAV_END = '<<<END_NAVIGATE_TO>>>';
 
   function renderAssistantReply(bubbleEl, replyText){
-    const startIdx = replyText.indexOf(EDIT_START);
-    const endIdx = replyText.indexOf(EDIT_END);
+    let text = replyText;
+
+    const navStart = text.indexOf(NAV_START);
+    const navEnd = text.indexOf(NAV_END);
+    if (navStart !== -1 && navEnd !== -1 && navEnd > navStart){
+      const pathJson = text.slice(navStart + NAV_START.length, navEnd).trim();
+      text = (text.slice(0, navStart) + text.slice(navEnd + NAV_END.length)).trim();
+      try{
+        const path = JSON.parse(pathJson);
+        if (Array.isArray(path)) navigateTo(path);
+      }catch(err){ console.warn('NAVIGATE_TO 파싱 실패', err); }
+    }
+
+    const startIdx = text.indexOf(EDIT_START);
+    const endIdx = text.indexOf(EDIT_END);
     bubbleEl.innerHTML = '';
 
     if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx && isReportWriterOpen){
-      const before = replyText.slice(0, startIdx).trim();
-      const newContent = replyText.slice(startIdx + EDIT_START.length, endIdx).trim();
-      const after = replyText.slice(endIdx + EDIT_END.length).trim();
+      const before = text.slice(0, startIdx).trim();
+      const newContent = text.slice(startIdx + EDIT_START.length, endIdx).trim();
+      const after = text.slice(endIdx + EDIT_END.length).trim();
 
       const textPart = document.createElement('div');
       textPart.textContent = [before, after].filter(Boolean).join('\n\n') || '편집기에 열려 있는 문서에 대한 수정안을 준비했습니다.';
@@ -2133,7 +2170,7 @@ graph TD
       });
       bubbleEl.appendChild(applyBtn);
     } else {
-      bubbleEl.textContent = replyText;
+      bubbleEl.textContent = text;
     }
   }
 
@@ -2241,6 +2278,128 @@ graph TD
     }
   });
 
+  // ---- 즉석 음성명령: 흔한 패턴이면 AI를 거치지 않고 바로 처리 (빠르고 비용도 안 듦) ----
+  // 문구(phrases)와 켜짐여부(enabled)는 설정 모달에서 사용자가 직접 확인·추가·제거할 수 있다.
+  const VOICE_COMMANDS_KEY = 'nx_voice_commands';
+  const DEFAULT_VOICE_COMMANDS = [
+    { id: 'up', label: '상위 폴더로', action: 'up', enabled: true, phrases: ['위로', '뒤로', '뒤로가기', '상위폴더로'] },
+    { id: 'down', label: '하위 폴더로 (1개뿐일 때만)', action: 'down', enabled: true, phrases: ['아래로', '들어가', '하위폴더로'] },
+    { id: 'home', label: '고객 목록으로', action: 'home', enabled: true, phrases: ['처음으로', '고객목록', '고객목록으로'] },
+    { id: 'openLog', label: '경과지 열기', action: 'openLog', enabled: true, phrases: ['경과지열어', '경과지켜', '경과지보여'] },
+    { id: 'openCalc', label: '계산기 열기', action: 'openCalc', enabled: true, phrases: ['계산기열어', '계산기켜', '계산기보여'] },
+    { id: 'openDiagram', label: '관계도 열기', action: 'openDiagram', enabled: true, phrases: ['관계도열어', '관계도켜', '관계도보여'] },
+    { id: 'openScan', label: '스캔 열기', action: 'openScan', enabled: true, phrases: ['스캔열어', '스캔켜', '스캔시작'] },
+    { id: 'capture', label: '화면 캡처', action: 'capture', enabled: true, phrases: ['화면캡처', '캡처해줘', '캡처시작'] },
+    { id: 'openSettings', label: '설정 열기', action: 'openSettings', enabled: true, phrases: ['설정열어', '설정보여'] },
+    { id: 'openFullEditor', label: '전체화면 편집', action: 'openFullEditor', enabled: true, phrases: ['전체화면편집', '전체화면열어'] },
+    { id: 'hideExplorer', label: '탐색창 접기', action: 'hideExplorer', enabled: true, phrases: ['탐색창접어', '탐색창숨겨', '탐색창생략'] },
+    { id: 'showExplorer', label: '탐색창 펼치기', action: 'showExplorer', enabled: true, phrases: ['탐색창보여', '탐색창펼쳐'] },
+    { id: 'darkOn', label: '다크모드 켜기', action: 'darkOn', enabled: true, phrases: ['다크모드켜', '다크모드시작'] },
+    { id: 'darkOff', label: '다크모드 끄기', action: 'darkOff', enabled: true, phrases: ['다크모드꺼', '다크모드해제'] },
+    { id: 'save', label: '저장', action: 'save', enabled: true, phrases: ['저장해줘', '저장해'] }
+  ];
+
+  function loadVoiceCommands(){
+    let saved = null;
+    try{ saved = JSON.parse(localStorage.getItem(VOICE_COMMANDS_KEY) || 'null'); }catch(err){ saved = null; }
+    if (!Array.isArray(saved)) return DEFAULT_VOICE_COMMANDS.map(c => Object.assign({}, c));
+    // 저장된 목록을 기본으로 하되, 새 버전에서 추가된 기본 명령이 있으면 뒤에 채워넣음(id 기준)
+    const savedIds = new Set(saved.map(c => c.id));
+    const merged = saved.slice();
+    DEFAULT_VOICE_COMMANDS.forEach(def => { if (!savedIds.has(def.id)) merged.push(Object.assign({}, def)); });
+    return merged;
+  }
+  let voiceCommands = loadVoiceCommands();
+
+  function renderVoiceCommandSettings(){
+    const wrap = document.getElementById('voiceCommandList');
+    wrap.innerHTML = '';
+    voiceCommands.forEach((cmd, idx)=>{
+      const row = document.createElement('div');
+      row.className = 'voice-command-row';
+      row.innerHTML =
+        '<input type="checkbox" data-idx="' + idx + '" class="vc-enabled"' + (cmd.enabled ? ' checked' : '') + '>' +
+        '<span class="vc-label">' + escapeHtml(cmd.label) + '</span>' +
+        '<input type="text" data-idx="' + idx + '" class="vc-phrases" value="' + escapeHtml(cmd.phrases.join(', ')) + '">';
+      wrap.appendChild(row);
+    });
+  }
+
+  function readVoiceCommandSettingsFromUi(){
+    document.querySelectorAll('.vc-enabled').forEach(el=>{
+      voiceCommands[Number(el.dataset.idx)].enabled = el.checked;
+    });
+    document.querySelectorAll('.vc-phrases').forEach(el=>{
+      voiceCommands[Number(el.dataset.idx)].phrases = el.value.split(',').map(s => s.trim()).filter(Boolean);
+    });
+  }
+
+  document.getElementById('btnResetVoiceCommands').addEventListener('click', ()=>{
+    voiceCommands = DEFAULT_VOICE_COMMANDS.map(c => Object.assign({}, c));
+    renderVoiceCommandSettings();
+  });
+
+  // 명령별 실제 동작 — 처리했으면 확인 메시지를, 애매해서 AI에게 넘겨야 하면 null을 반환
+  function runVoiceAction(action){
+    switch(action){
+      case 'up':
+        if (explorerPath.length > 0){ navigateTo(explorerPath.slice(0, -1)); return '상위 폴더로 이동했습니다.'; }
+        return '이미 최상위 폴더입니다.';
+      case 'down':
+        if (lastRenderedFolders.length === 1){
+          navigateTo(explorerPath.concat([lastRenderedFolders[0].name]));
+          return lastRenderedFolders[0].name + ' 폴더로 이동했습니다.';
+        }
+        return null; // 여러 개거나 없으면 애매하니 AI에게
+      case 'home':
+        navigateTo(basePath);
+        return '고객 목록으로 이동했습니다.';
+      case 'openLog': openLogView(); return '경과지 열었습니다.';
+      case 'openCalc': openCalcView(); return '계산기 열었습니다.';
+      case 'openDiagram': openDiagramView(); return '관계도 열었습니다.';
+      case 'openScan': openScanModal(); return '스캔 열었습니다.';
+      case 'capture': captureScreen(); return '화면 캡처를 시작합니다.';
+      case 'openSettings': openSettingsModal(); return '설정 열었습니다.';
+      case 'openFullEditor': openFullEditor(); return '전체화면 편집 열었습니다.';
+      case 'hideExplorer': setWorkspaceMode('hide'); return '탐색창을 접었습니다.';
+      case 'showExplorer': setWorkspaceMode('row'); return '탐색창을 펼쳤습니다.';
+      case 'darkOn': applyDarkMode(true); localStorage.setItem(DARK_MODE_KEY, '1'); return '다크모드를 켰습니다.';
+      case 'darkOff': applyDarkMode(false); localStorage.setItem(DARK_MODE_KEY, '0'); return '다크모드를 껐습니다.';
+      case 'save':
+        if (calcView.style.display !== 'none'){ saveCalc(); return '계산기를 저장했습니다.'; }
+        if (diagramView.style.display !== 'none'){ saveDiagram(); return '관계도를 저장했습니다.'; }
+        if (logView.style.display !== 'none'){ return '경과지는 추가할 때 자동으로 저장됩니다.'; }
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  // 처리했으면 확인 메시지(문자열)를, 애매해서 AI에게 넘겨야 하면 null을 반환한다.
+  function tryInstantVoiceCommand(text){
+    const t = text.replace(/\s+/g, ''); // 음성인식이 띄어쓰기를 제멋대로 넣는 경우가 많아 비교 전 제거
+
+    for (const cmd of voiceCommands){
+      if (!cmd.enabled) continue;
+      const hit = cmd.phrases.some(p => p && t.includes(p.replace(/\s+/g, '')));
+      if (hit){
+        const result = runVoiceAction(cmd.action);
+        if (result !== null) return result; // null이면(애매함) 다른 후보나 AI로 계속 넘어감
+      }
+    }
+
+    // 지금 화면에 보이는 하위 폴더 이름이 언급되면 그 폴더로 바로 이동 (동적으로 결정되므로 목록 편집 대상이 아님)
+    if (/열어|가줘|이동|들어가/.test(t)){
+      const matched = lastRenderedFolders.find(f => t.includes(f.name.replace(/\s+/g, '')));
+      if (matched){
+        navigateTo(explorerPath.concat([matched.name]));
+        return matched.name + ' 폴더로 이동했습니다.';
+      }
+    }
+
+    return null; // 못 알아들은 패턴은 그대로 AI에게 넘김
+  }
+
   // ---- 음성채팅 (마이크 버튼) — 말하면 자동 전송, AI 답변은 소리로 읽어줌 ----
   const btnVoiceInput = document.getElementById('btnVoiceInput');
   const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2253,10 +2412,16 @@ graph TD
   function speakReply(text){
     if (!hasSpeechSynthesis || !text) return;
     let spoken = text;
-    const s = text.indexOf(EDIT_START), en = text.indexOf(EDIT_END);
+
+    const ns = spoken.indexOf(NAV_START), ne = spoken.indexOf(NAV_END);
+    if (ns !== -1 && ne !== -1 && ne > ns){
+      spoken = (spoken.slice(0, ns) + spoken.slice(ne + NAV_END.length)).trim();
+    }
+
+    const s = spoken.indexOf(EDIT_START), en = spoken.indexOf(EDIT_END);
     if (s !== -1 && en !== -1 && en > s){
-      const before = text.slice(0, s).trim();
-      const after = text.slice(en + EDIT_END.length).trim();
+      const before = spoken.slice(0, s).trim();
+      const after = spoken.slice(en + EDIT_END.length).trim();
       spoken = [before, after].filter(Boolean).join(' ') || '문서 수정안을 준비했습니다. 편집기에 적용하기 버튼을 눌러주세요.';
     }
     if (!spoken) return;
@@ -2296,6 +2461,15 @@ graph TD
       voiceRecognition.onresult = (e)=>{
         const transcript = e.results[0][0].transcript.trim();
         if (!transcript) return;
+
+        const instantReply = tryInstantVoiceCommand(transcript);
+        if (instantReply !== null){
+          appendBubble('user', transcript);
+          appendBubble('assistant', '⚡ ' + instantReply);
+          speakReply(instantReply);
+          return; // 흔한 패턴이면 AI 호출 없이 여기서 끝
+        }
+
         chatInputEl.value = transcript;
         voiceTriggeredSend = true;
         sendChatMessage(); // 음성채팅은 말이 끝나면 바로 전송 (엔터/버튼 없이)

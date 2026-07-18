@@ -2290,6 +2290,8 @@ graph TD
         isVoiceRecording = true;
         btnVoiceInput.classList.add('recording');
         btnVoiceInput.textContent = '●';
+        chatInputEl.disabled = true; // 음성 인식 중엔 타이핑과 섞여서 덮어써지는 사고를 막기 위해 잠금
+        chatInputEl.placeholder = '음성 인식 중…';
       };
       voiceRecognition.onresult = (e)=>{
         const transcript = e.results[0][0].transcript.trim();
@@ -2307,6 +2309,9 @@ graph TD
         isVoiceRecording = false;
         btnVoiceInput.classList.remove('recording');
         btnVoiceInput.textContent = '🎤';
+        chatInputEl.placeholder = '메시지 입력';
+        // 방금 인식된 말이 바로 전송 중이면(버튼이 잠겨있으면) 여기서 섣불리 풀지 않고 sendChatMessage 쪽에서 풀리게 둔다
+        if (!btnChatSend.disabled) chatInputEl.disabled = false;
       };
       voiceRecognition.start();
     });

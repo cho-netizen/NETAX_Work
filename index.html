@@ -285,6 +285,7 @@
   .selection-inline button.ghost{ background:none; color:var(--sub); border-color:var(--line); }
   .selection-inline button.danger{ background:#a83232; border-color:#a83232; }
   .selection-inline button.danger:hover{ background:#8f2929; }
+  .selection-inline button:disabled{ opacity:0.35; cursor:not-allowed; }
 
   /* ===== 탐색기 상태 표시 ===== */
   .explorer-status{ padding:16px 14px; font-size:13px; color:var(--sub); }
@@ -397,6 +398,8 @@
     <div id="selectionInline" class="selection-inline" style="display:none;">
       <span id="selectionCountText"></span>
       <button type="button" id="btnAttachSelected">첨부</button>
+      <button type="button" id="btnRenameSelected" class="ghost">✏️ 이름바꾸기</button>
+      <button type="button" id="btnShareSelected" class="ghost">📤 공유</button>
       <button type="button" id="btnDeleteSelected" class="danger">🗑 삭제</button>
       <button type="button" id="btnClearSelected" class="ghost">취소</button>
     </div>
@@ -704,6 +707,8 @@ graph TD
   let lastRenderedFiles = []; // 현재 화면에 그려진 파일 목록 (id로 다시 찾기 위함)
   const selectionInline = document.getElementById('selectionInline');
   const selectionCountText = document.getElementById('selectionCountText');
+  const btnRenameSelected = document.getElementById('btnRenameSelected');
+  const btnShareSelected = document.getElementById('btnShareSelected');
 
   function setSelectOptions(selectEl, names, placeholderIfEmpty){
     selectEl.innerHTML = '';
@@ -765,6 +770,11 @@ graph TD
     selectionCountText.textContent = selectedItems.size + '개 선택됨';
     selectionInline.style.display = 'flex';
     btnAutoRef.style.display = 'none'; // 자동참조 버튼 자리를 선택 상태로 대체 (레이아웃이 안 밀리게)
+
+    const items = Array.from(selectedItems.values());
+    const single = items.length === 1 ? items[0] : null;
+    btnRenameSelected.disabled = !single; // 이름바꾸기는 한 개 선택했을 때만 의미 있음
+    btnShareSelected.disabled = !single || single.type === 'folder'; // 공유는 파일 한 개일 때만 (폴더 공유는 미지원)
   }
 
   // 체크박스 상태와 선택바를 다시 그림 (파일 목록 자체를 새로 그리지 않고 표시만 갱신)
@@ -1451,6 +1461,65 @@ graph TD
     refreshSelectionUi();
     navigateTo(explorerPath); // 삭제 결과가 바로 반영되도록 목록 새로고침
     if (failed.length) alert('일부 삭제 실패:\n' + failed.join('\n'));
+  });
+
+  btnRenameSelected.addEventListener('click', async ()=>{
+    const items = Array.from(selectedItems.values());
+    if (items.length !== 1) return;
+    const item = items[0];
+    const newName = prompt('새 이름을 입력하세요', item.name);
+    if (!newName || newName.trim() === '' || newName.trim() === item.name) return;
+    try{
+      const res = await callGas('renameItem', { id: item.id, type: item.type, newName: newName.trim() });
+      if (res.error){ alert('이름 변경 실패: ' + res.error); return; }
+      selectedItems.clear();
+      refreshSelectionUi();
+      navigateTo(explorerPath); // 바뀐 이름이 목록에 바로 보이도록 새로고침
+    }catch(err){
+      alert('이름 변경 중 오류: ' + (err && err.message ? err.message : err));
+    }
+  });
+
+  // 공유 — 퀵쉐어(윈도우/안드로이드 OS 기능)는 웹사이트가 직접 지정할 수 없어서,
+  // 대신 브라우저 표준 "공유하기"(Web Share API)를 띄운다. OS/기기가 지원하면 그 공유창 안에
+  // 퀵쉐어·에어드롭 등이 옵션으로 나타날 수 있음 (지원 여부는 기기·브라우저에 따라 다름).
+  btnShareSelected.addEventListener('click', async ()=>{
+    const items = Array.from(selectedItems.values());
+    if (items.length !== 1 || items[0].type === 'folder') return;
+    const item = items[0];
+
+    try{
+      const data = await callGas('readFile', { fileId: item.id });
+      if (data.error){ alert('공유용으로 파일을 불러오지 못했습니다: ' + data.error); return; }
+
+      let blob;
+      if (data.kind === 'binary' && data.base64){
+        const bin = atob(data.base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        blob = new Blob([bytes], { type: data.mimeType || 'application/octet-stream' });
+      } else {
+        blob = new Blob([data.content || ''], { type: data.mimeType || 'text/plain' });
+      }
+      const file = new File([blob], data.name || item.name, { type: blob.type });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })){
+        await navigator.share({ files: [file], title: file.name });
+      } else if (navigator.share){
+        // 파일 공유 미지원 브라우저: 최소한 이름/링크라도 공유 시도
+        await navigator.share({ title: item.name, text: item.name });
+      } else {
+        alert('이 브라우저/기기는 공유 기능을 지원하지 않습니다. 대신 파일을 다운로드해서 직접 퀵쉐어로 보내주세요.');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = data.name || item.name; a.click();
+        URL.revokeObjectURL(url);
+      }
+    }catch(err){
+      if (err && err.name !== 'AbortError'){ // 사용자가 공유창을 그냥 닫은 경우는 에러로 안 띄움
+        alert('공유 중 오류: ' + (err && err.message ? err.message : err));
+      }
+    }
   });
 
   // ============================================================

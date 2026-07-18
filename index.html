@@ -603,7 +603,7 @@ graph TD
           <div class="spacer"></div>
           <button type="button" id="btnCalcAddRow" class="ghost-btn">+ 행 추가</button>
         </div>
-        <div class="calc-hint">"값/계산식" 칸에 숫자를 직접 넣거나, <code>=R1*0.06</code>처럼 위쪽 행(R1, R2…)을 참조하는 계산식을 넣을 수 있습니다.</div>
+        <div class="calc-hint">"값/계산식" 칸에 숫자를 직접 넣거나, <code>=[1]*0.06</code>처럼 위쪽 행(<code>[1]</code>, <code>[2]</code>…)을 참조하는 계산식을 넣을 수 있습니다. 영문자를 안 쓰는 문법이라 한/영 전환 걱정 없이 바로 입력하시면 됩니다.</div>
         <div class="calc-table-wrap">
           <table class="calc-table">
             <thead><tr><th>#</th><th>항목</th><th>값 / 계산식</th><th>결과</th><th></th></tr></thead>
@@ -1049,15 +1049,15 @@ graph TD
   let calcFileId = null;
 
   function evalCalcRows(){
-    const results = {}; // R1, R2... -> 숫자 결과
+    const results = {}; // 1, 2, 3... -> 숫자 결과 (참조 문법: [1], [2]...)
     calcRows.forEach((row, idx)=>{
-      const ref = 'R' + (idx + 1);
+      const ref = String(idx + 1);
       const raw = (row.formula || '').trim();
       let val = NaN;
       if (raw.startsWith('=')){
-        let expr = raw.slice(1).replace(/R(\d+)/g, (m, n) => {
-          const key = 'R' + n;
-          return (key in results) ? String(results[key]) : '0';
+        // [1], [2]처럼 대괄호+숫자로 참조 — 영문자를 아예 안 써서 한영전환·대소문자 신경 쓸 필요가 없음
+        let expr = raw.slice(1).replace(/\[(\d+)\]/g, (m, n) => {
+          return (n in results) ? String(results[n]) : '0';
         }).replace(/%/g, '/100');
         if (/^[0-9+\-*/().\s]+$/.test(expr) && expr.trim()){
           try { val = Function('"use strict"; return (' + expr + ')')(); }
@@ -1076,7 +1076,7 @@ graph TD
     evalCalcRows();
     calcRowsBody.innerHTML = '';
     calcRows.forEach((row, idx)=>{
-      const ref = 'R' + (idx + 1);
+      const ref = '[' + (idx + 1) + ']';
       const tr = document.createElement('tr');
       tr.dataset.rowId = row.id;
 
@@ -1091,17 +1091,19 @@ graph TD
       labelInput.value = row.label || '';
       labelInput.addEventListener('input', ()=>{ row.label = labelInput.value; }); // 항목명은 계산에 안 쓰이므로 다시 그릴 필요 없음
       labelInput.addEventListener('change', saveCalc);
+      labelInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter'){ e.preventDefault(); insertCalcRowAfter(row.id, 'label'); } });
       tdLabel.appendChild(labelInput);
 
       const tdFormula = document.createElement('td');
       const formulaInput = document.createElement('input');
       formulaInput.type = 'text';
-      formulaInput.placeholder = '예: 500000000 또는 =R1*0.06';
+      formulaInput.placeholder = '예: 500000000 또는 =[1]*0.06';
       formulaInput.value = row.formula || '';
       // 타이핑할 때마다 표 전체를 새로 그리면 입력창 자체가 교체되어 커서(포커스)가 날아가므로,
       // 결과 값만 가볍게 갱신하고 입력창(DOM)은 그대로 둔다.
       formulaInput.addEventListener('input', ()=>{ row.formula = formulaInput.value; updateCalcResults(); });
       formulaInput.addEventListener('change', saveCalc);
+      formulaInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter'){ e.preventDefault(); insertCalcRowAfter(row.id, 'formula'); } });
       tdFormula.appendChild(formulaInput);
 
       const tdResult = document.createElement('td');
@@ -1134,6 +1136,23 @@ graph TD
       const tdResult = tr.children[3];
       tdResult.className = 'calc-result' + (Number.isFinite(row.result) ? '' : ' is-error');
       tdResult.textContent = Number.isFinite(row.result) ? row.result.toLocaleString('ko-KR') : '오류';
+    });
+  }
+
+  // 엔터 입력 시 그 행 바로 아래에 새 행을 끼워넣고, 엔터 누른 칸과 같은 종류(항목명/계산식) 칸으로 커서를 옮김
+  function insertCalcRowAfter(afterRowId, field){
+    const idx = calcRows.findIndex(r => r.id === afterRowId);
+    const newRow = { id: 'c' + Date.now() + Math.random().toString(36).slice(2, 6), label: '', formula: '' };
+    calcRows.splice(idx + 1, 0, newRow);
+    renderCalcRows();
+    saveCalc();
+    requestAnimationFrame(()=>{
+      const newTr = calcRowsBody.querySelector('tr[data-row-id="' + newRow.id + '"]');
+      if (!newTr) return;
+      // 열 순서: [0]번호 [1]항목명 [2]계산식 [3]결과 [4]삭제
+      const targetTd = field === 'formula' ? newTr.children[2] : newTr.children[1];
+      const targetInput = targetTd && targetTd.querySelector('input');
+      if (targetInput) targetInput.focus();
     });
   }
 

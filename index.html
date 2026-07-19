@@ -765,7 +765,7 @@
 
         <div class="scan-section">
           <div class="scan-section-title">① 스캔 (귀퉁이를 드래그해서 원근 보정)</div>
-          <input type="file" id="scanFileInput" accept="image/*">
+          <input type="file" id="scanFileInput" accept="image/*" capture="environment">
           <div id="scanStageWrap" class="scan-stage-wrap" style="display:none;">
             <div id="scanStage" class="scan-stage">
               <canvas id="scanPreviewCanvas"></canvas>
@@ -3524,7 +3524,13 @@ graph TD
   let scanCorners = null;      // {tl,tr,br,bl} — 화면 표시 좌표계 기준
   let docPages = [];           // 페이지 모음: {type:'image', dataUrl, rotation, name} | {type:'pdf', name, bytes, pageCount}
 
-  function openScanModal(){ scanOverlay.style.display = 'flex'; }
+  // 스캔모드를 열면 "① 스캔" 섹션까지 따로 안 눌러도 되도록, 모달을 띄우는 동시에
+  // 카메라(scanFileInput, capture="environment")를 바로 실행한다 — 촬영을 취소하면
+  // 그냥 모달만 열린 상태로 남고, "② 페이지 모음"에서 기존 PDF 추가 등은 그대로 쓸 수 있다.
+  function openScanModal(){
+    scanOverlay.style.display = 'flex';
+    scanFileInput.click();
+  }
   function closeScanModal(){ scanOverlay.style.display = 'none'; }
   document.getElementById('btnOpenScan').addEventListener('click', openScanModal);
 

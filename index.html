@@ -171,8 +171,16 @@
   body.stage-compact #topbarActionCluster > *{ flex:1 1 0; min-width:0; display:flex; }
   body.stage-compact .tool-group-narrow > .tb-btn{ width:100%; justify-content:center; }
   body.stage-compact .tb-btn{ justify-content:center; min-width:0; padding-left:6px; padding-right:6px; }
-  /* compact에서 하단으로 내려간 팝업은 버튼 아래(화면 밖)가 아니라 버튼 위로 열려야 함 */
-  body.stage-compact #topbarActionCluster .nx-popup{ top:auto; bottom:calc(100% + 6px); }
+  /* compact(폰) 단계의 팝업은 "그 버튼 기준"이 아니라 "화면 기준"으로 연다 — 버튼 기준으로 열면
+     화면 오른쪽에 가까운 버튼(도구2·설정 등)을 눌렀을 때 220px짜리 팝업이 화면 밖으로 밀려나
+     안 보이게 되는 문제가 있었다(클릭은 되는데 뜬 메뉴가 안 보여서 "안 눌리는 것처럼" 보임).
+     position:fixed로 바꾸고 좌우를 화면 여백 기준으로 고정하면 어떤 버튼을 눌러도 항상
+     화면 안에 온전히 들어온다. */
+  body.stage-compact #topbarActionCluster .nx-popup{
+    position:fixed; left:10px; right:10px; top:auto;
+    bottom:calc(var(--bottombar-h, 64px) + 6px);
+    min-width:0; width:auto; max-height:60vh; overflow-y:auto;
+  }
   /* 고정바가 화면 아래 떠있는 만큼, 그 뒤에 깔리는 본문(워크스페이스)에 여백을 줘서
      채팅 입력창 등이 안 가리게 한다 — 높이는 JS가 실측해서 --bottombar-h로 넣어준다. */
   body.stage-compact .workspace{ padding-bottom: var(--bottombar-h, 0px); transition: padding-bottom 0.18s ease; }

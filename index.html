@@ -763,6 +763,12 @@
         <label class="modal-label">시스템 프롬프트 (비워두면 기본 프롬프트 사용)</label>
         <textarea id="settingsSystemPrompt" rows="3" placeholder="예: 너는 이음세무컨설팅의 개인 업무 보조 AI다..."></textarea>
 
+        <label class="modal-label">🔗 바로가기</label>
+        <div class="modal-checkrow">
+          <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="ghost-btn" style="text-decoration:none; display:inline-block;">Claude 콘솔 열기 ↗</a>
+          <a href="https://aistudio.google.com" target="_blank" rel="noopener" class="ghost-btn" style="text-decoration:none; display:inline-block;">Google AI Studio 열기 ↗</a>
+        </div>
+
       </div>
       <div class="modal-foot">
         <button id="btnResetSettings" class="ghost-btn">기본값으로</button>
@@ -2446,12 +2452,12 @@ graph TD
     }
 
     // compact일 때 #topbarActionCluster가 화면 아래 고정으로 떠 있는 만큼, 그 높이를 실측해서
-    // .workspace의 padding-bottom으로 넣어줘야 채팅 입력창을 가리지 않는다. +8px는 입력창 위쪽
-    // 여백(패딩 8px)과 똑같은 만큼을 아래쪽에도 줘서, 입력창이 하단바에 바로 붙어 보이지 않게
-    // 하기 위한 여유분이다.
+    // .workspace의 padding-bottom으로 정확히 그만큼만 넣어준다. 여기에 여유분을 더 얹으면
+    // 입력창 자체의 패딩(위/아래 8px)과 겹쳐서 간격이 필요 이상으로 벌어지므로,
+    // 버퍼 없이 실측값 그대로 쓴다.
     function updateBottombarHeightVar(){
       if (bodyEl.classList.contains('stage-compact') && !bodyEl.classList.contains('bottombar-hidden')){
-        document.documentElement.style.setProperty('--bottombar-h', (cluster.getBoundingClientRect().height + 8) + 'px');
+        document.documentElement.style.setProperty('--bottombar-h', cluster.getBoundingClientRect().height + 'px');
       } else {
         document.documentElement.style.setProperty('--bottombar-h', '0px');
       }

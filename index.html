@@ -164,7 +164,9 @@
   body.stage-compact #btnWorkspaceMode,
   body.stage-compact #btnModeAutoRef,
   body.stage-compact #btnModeWebSearch,
-  body.stage-compact #btnModeWebFetch{ display:inline-flex; }
+  body.stage-compact #btnModeWebFetch{
+    display:inline-flex; flex:1 1 0; min-width:0; justify-content:center;
+  }
   body.stage-compact .topbar .spacer{ flex:0 0 8px; min-width:0; }
 
   /* 상단 모드버튼 4개(탐색작업창·자동참조·웹서치·가져오기)의 글자 라벨은 화면에 여유가 있을

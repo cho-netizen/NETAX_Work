@@ -2572,7 +2572,9 @@ graph TD
       // 순수 CSS 클래스 토글이라 다른 변수에 의존하지 않는다(음성모드 쪽은 아직 스크립트
       // 뒤쪽에서 초기화되기 전일 수 있어서, 직접 호출하지 않고 상태가 "바뀔 때만" 커스텀
       // 이벤트로 알려준다 — 음성모드 섹션이 자기 준비가 끝난 뒤 그 이벤트를 받아 처리함).
-      const flip = (stage === 'compact') && window.innerWidth <= FLIP_MODE_MAX_WIDTH;
+      // 플립모드는 "키보드가 없다고 가정해도 되는" 터치기기(폰)만 대상으로 한다 — 마우스가
+      // 있는 PC는 창을 아무리 좁혀도 키보드를 쓸 수 있으니 강제 음성전용으로 몰아넣으면 안 된다.
+      const flip = !isPointerFine && (stage === 'compact') && window.innerWidth <= FLIP_MODE_MAX_WIDTH;
       bodyEl.classList.toggle('flip-mode', flip);
       if (flip !== wasFlip){
         wasFlip = flip;

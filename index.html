@@ -55,6 +55,9 @@
   body.dark-mode .explorer-status,
   body.dark-mode .explorer-empty,
   body.dark-mode .log-empty{ color:var(--sub); }
+  body.dark-mode .due-badge{ background:#2c3242; color:var(--sub); }
+  body.dark-mode .due-badge.due-today{ background:#4a3d10; color:#e8c86a; }
+  body.dark-mode .due-badge.overdue{ background:#4a1f1f; color:#e58a8a; }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%;background:var(--bg);font-family:'Noto Sans KR',sans-serif;color:var(--ink);}
   body{ display:flex; flex-direction:column; overflow:hidden; }
@@ -417,14 +420,14 @@
   }
   .log-btn:hover{ background:#f0f2f6; color:var(--navy); }
   .log-add-row{
-    display:flex; gap:8px; padding:12px; border-bottom:1px solid var(--line); flex-shrink:0; background:#f9fafb;
+    display:flex; gap:8px; padding:12px; border-bottom:1px solid var(--line); flex-shrink:0; background:#f9fafb; flex-wrap:wrap;
   }
   .log-add-row input[type="date"]{
     flex:0 0 130px; border:1px solid var(--line); border-radius:6px; padding:7px 8px;
     font-family:inherit; font-size:12.5px; background:var(--panel); color:var(--ink);
   }
   .log-add-row input[type="text"]{
-    flex:1; border:1px solid var(--line); border-radius:6px; padding:7px 10px;
+    flex:1 1 160px; border:1px solid var(--line); border-radius:6px; padding:7px 10px;
     font-family:inherit; font-size:13px; background:var(--panel); color:var(--ink);
   }
   .log-list{ flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; }
@@ -432,13 +435,21 @@
     display:flex; gap:12px; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
     background:#fff; position:relative;
   }
-  .log-entry .log-date{ flex:0 0 84px; font-size:11.5px; font-weight:700; color:var(--gold); white-space:nowrap; }
+  .log-entry .log-date{ flex:0 0 84px; font-size:11.5px; font-weight:700; color:var(--gold); white-space:nowrap; display:flex; flex-direction:column; gap:4px; }
+  .due-badge{ display:inline-block; font-size:10.5px; font-weight:700; color:var(--sub); background:#eef0f4; border-radius:4px; padding:2px 5px; white-space:nowrap; width:fit-content; }
+  .due-badge.due-today{ color:#8a6300; background:#fdf1c8; }
+  .due-badge.overdue{ color:#a83232; background:#fbe3e3; }
   .log-entry .log-text{ flex:1; font-size:13px; color:var(--ink); line-height:1.5; white-space:pre-wrap; }
   .log-entry .log-del{
     flex:0 0 auto; background:none; border:none; color:var(--sub); cursor:pointer; font-size:16px; font-weight:800; padding:0 4px;
   }
   .log-entry .log-del:hover{ color:#a83232; }
   .log-empty{ padding:16px 14px; font-size:12.5px; color:var(--sub); }
+  .dash-section-head{ font-size:12px; font-weight:700; color:var(--sub); padding:10px 4px 2px; text-transform:uppercase; letter-spacing:0.3px; }
+  .dash-path{ font-size:11px; font-weight:700; color:var(--gold); }
+  .dash-row:hover{ background:#f5f2e8; }
+  body.dark-mode .dash-row:hover{ background:#2a2f3b; }
+  .chat-history-hint{ text-align:center; font-size:11.5px; color:var(--sub); padding:6px 0 12px; }
 
   /* ===== 계산기 워크시트 ===== */
   .calc-hint{ font-size:11.5px; color:var(--sub); padding:8px 14px; border-bottom:1px solid var(--line); background:#f9fafb; }
@@ -507,6 +518,8 @@
       <button type="button" id="btnOpenLog" class="tb-btn" title="이 폴더의 경과지 보기">📝 경과지</button>
       <button type="button" id="btnOpenCalc" class="tb-btn" title="이 폴더의 계산 워크시트 보기">🧮 계산기</button>
       <button type="button" id="btnOpenTrash" class="tb-btn" title="이 폴더에서 최근 삭제한 항목 복원">🗑 휴지통</button>
+      <button type="button" id="btnOpenDashboard" class="tb-btn" title="모든 폴더의 처리일지·마감일을 한눈에">📊 대시보드</button>
+      <button type="button" id="btnOpenSearch" class="tb-btn" title="파일·폴더 이름 검색">🔍 검색</button>
       <button type="button" id="btnOpenDiagram" class="tb-btn" title="이 폴더의 관계도/구조도 보기">🕸 관계도</button>
       <button id="btnOpenScan" class="tb-btn" title="문서 스캔 · PDF 조립">📷 스캔</button>
       <button type="button" id="btnScreenCapture" class="tb-btn" title="다른 창(홈택스 등) 화면 캡처해서 첨부">📸 캡처</button>
@@ -518,6 +531,8 @@
         <button type="button" class="tool-menu-item" id="menuOpenLog">📝 경과지</button>
         <button type="button" class="tool-menu-item" id="menuOpenCalc">🧮 계산기</button>
         <button type="button" class="tool-menu-item" id="menuOpenTrash">🗑 휴지통</button>
+        <button type="button" class="tool-menu-item" id="menuOpenDashboard">📊 대시보드</button>
+        <button type="button" class="tool-menu-item" id="menuOpenSearch">🔍 검색</button>
         <button type="button" class="tool-menu-item" id="menuOpenDiagram">🕸 관계도</button>
         <button type="button" class="tool-menu-item" id="menuOpenScan">📷 스캔</button>
         <button type="button" class="tool-menu-item" id="menuScreenCapture">📸 캡처</button>
@@ -666,6 +681,7 @@
       </div>
       <div class="modal-foot scan-export-foot">
         <input type="text" id="scanOutputName" placeholder="파일 이름 (예: 계약서_스캔)" class="scan-name-input">
+        <button id="btnScanSummarize" class="ghost-btn">🔎 AI 요약</button>
         <button id="btnDownloadPdf" class="ghost-btn">PC에 다운로드</button>
         <button id="btnSaveToFolder" class="save-btn">현재 폴더에 저장</button>
       </div>
@@ -757,6 +773,11 @@ graph TD
           <span class="save-status" id="calcSaveStatus"></span>
           <div class="spacer"></div>
           <button type="button" id="btnCalcRef" class="ghost-btn">📎 참조</button>
+          <button type="button" id="btnCalcCopyTable" class="ghost-btn" title="마크다운 표로 복사(보고서에 붙여넣기용)">📋 표복사</button>
+          <div class="tool-menu-narrow" style="position:relative;">
+            <button type="button" id="btnCalcTemplate" class="ghost-btn">🧾 템플릿</button>
+            <div id="calcTemplatePopup" class="nx-popup"></div>
+          </div>
           <button type="button" id="btnCalcAddRow" class="ghost-btn">+ 행 추가</button>
         </div>
         <div class="calc-hint">"값/계산식" 칸에 숫자를 직접 넣거나, <code>=[1]*0.06</code>처럼 위쪽 행(<code>[1]</code>, <code>[2]</code>…)을 참조하는 계산식을 넣을 수 있습니다. 영문자를 안 쓰는 문법이라 한/영 전환 걱정 없이 바로 입력하시면 됩니다.</div>
@@ -777,6 +798,23 @@ graph TD
         <div id="trashList" class="log-list"></div>
       </div>
 
+      <div id="dashboardView" style="display:none; flex:1; flex-direction:column; min-height:0;">
+        <div class="editor-toolbar">
+          <button class="back-btn" id="btnDashboardBack" title="닫기">✕</button>
+          <span class="editor-filename">전체 처리일지 · 마감 대시보드</span>
+        </div>
+        <div id="dashboardList" class="log-list"></div>
+      </div>
+
+      <div id="searchView" style="display:none; flex:1; flex-direction:column; min-height:0;">
+        <div class="editor-toolbar">
+          <button class="back-btn" id="btnSearchBack" title="닫기">✕</button>
+          <input type="text" id="searchInput" placeholder="파일·폴더 이름으로 검색…" style="flex:1; border:1px solid var(--line); border-radius:6px; padding:6px 10px; font-family:inherit; font-size:13px; background:var(--panel); color:var(--ink);">
+          <button type="button" id="btnSearchGo" class="ghost-btn">🔍 검색</button>
+        </div>
+        <div id="searchResultList" class="log-list"></div>
+      </div>
+
       <div id="logView" style="display:none; flex:1; flex-direction:column; min-height:0;">
         <div class="editor-toolbar">
           <button class="back-btn" id="btnLogBack" title="닫기">✕</button>
@@ -788,6 +826,7 @@ graph TD
         <div class="log-add-row">
           <input type="date" id="logDateInput">
           <input type="text" id="logTextInput" placeholder="오늘 한 일을 짧게 적어주세요…">
+          <input type="date" id="logDueInput" title="마감/다음조치일(선택)">
           <button type="button" id="btnLogAdd" class="save-btn">추가</button>
         </div>
         <div id="logList" class="log-list"></div>
@@ -910,6 +949,8 @@ graph TD
     if (typeof diagramView !== 'undefined' && diagramView) diagramView.style.display = 'none';
     if (typeof captureView !== 'undefined' && captureView) captureView.style.display = 'none';
     if (typeof trashView !== 'undefined' && trashView) trashView.style.display = 'none';
+    if (typeof dashboardView !== 'undefined' && dashboardView) dashboardView.style.display = 'none';
+    if (typeof searchView !== 'undefined' && searchView) searchView.style.display = 'none';
     explorerPanelHead.style.display = 'none';
   }
 
@@ -1113,6 +1154,7 @@ graph TD
     try{
       const data = await listFolder(path);
       renderExplorer(data);
+      if (typeof loadChatHistoryForCase === 'function') loadChatHistoryForCase(path);
     }catch(err){
       showExplorerStatus('폴더를 불러오지 못했습니다: ' + err.message, true);
     }
@@ -1178,6 +1220,7 @@ graph TD
   const logFolderLabel = document.getElementById('logFolderLabel');
   const logDateInput = document.getElementById('logDateInput');
   const logTextInput = document.getElementById('logTextInput');
+  const logDueInput = document.getElementById('logDueInput');
   const btnLogAdd = document.getElementById('btnLogAdd');
   const logList = document.getElementById('logList');
   const LOG_FILE_NAME = '경과지.json';
@@ -1199,11 +1242,15 @@ graph TD
       logList.appendChild(empty);
       return;
     }
+    const todayStr = new Date().toISOString().slice(0, 10);
     const sorted = logEntries.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     sorted.forEach(entry=>{
       const row = document.createElement('div');
       row.className = 'log-entry';
-      row.innerHTML = '<div class="log-date">' + escapeHtml(entry.date || '') + '</div>'
+      const dueBadge = entry.dueDate
+        ? '<span class="due-badge' + (entry.dueDate < todayStr ? ' overdue' : (entry.dueDate === todayStr ? ' due-today' : '')) + '">📌 ' + escapeHtml(entry.dueDate) + '</span>'
+        : '';
+      row.innerHTML = '<div class="log-date">' + escapeHtml(entry.date || '') + dueBadge + '</div>'
         + '<div class="log-text">' + escapeHtml(entry.text || '') + '</div>'
         + '<button class="log-del" title="삭제">✕</button>';
       row.querySelector('.log-del').addEventListener('click', ()=>{
@@ -1242,6 +1289,9 @@ graph TD
       }
       if (!logFileId) logFileId = res.id;
       setSaveStatus(logSaveStatusEl, '', '저장됨 ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }));
+      // 대시보드(전체일지)에서 폴더를 일일이 뒤지지 않고도 모아볼 수 있도록 중앙 인덱스에도 반영
+      // (실패해도 이 폴더 저장 자체는 이미 끝났으므로 조용히 무시 — 다음 저장 때 다시 시도됨)
+      callGas('syncGlobalLog', { path: logCurrentPath, entries: logEntries }).catch(()=>{});
     }catch(err){
       setSaveStatus(logSaveStatusEl, 'is-error', '저장 실패');
       alert('경과지 저장 중 오류: ' + (err && err.message ? err.message : err));
@@ -1297,9 +1347,11 @@ graph TD
     logEntries.push({
       id: 'e' + Date.now() + Math.random().toString(36).slice(2, 6),
       date: logDateInput.value || new Date().toISOString().slice(0, 10),
-      text: text
+      text: text,
+      dueDate: logDueInput.value || ''
     });
     logTextInput.value = '';
+    logDueInput.value = '';
     renderLogList();
     saveLog();
   });
@@ -1528,6 +1580,114 @@ graph TD
     addTextAttachment('계산기 · ' + calcCurrentPath.join('/'), text);
   });
 
+  // ---- 계산기 템플릿 (자주 쓰는 세무 계산 패턴을 바로 불러오기) ----
+  // formula가 숫자만 있는 건 "직접 입력하세요"용 자리표시 행, 실제 계산식(=[n]*...)이 있는 건 그대로 채움.
+  const CALC_TEMPLATES = [
+    {
+      name: '양도소득세 개산(기본)',
+      rows: [
+        { label: '양도가액', formula: '' },
+        { label: '취득가액', formula: '' },
+        { label: '필요경비', formula: '' },
+        { label: '양도차익', formula: '=[1]-[2]-[3]' },
+        { label: '장기보유특별공제(직접 계산해 입력)', formula: '' },
+        { label: '양도소득금액', formula: '=[4]-[5]' },
+        { label: '기본공제', formula: '2500000' },
+        { label: '과세표준', formula: '=[6]-[7]' }
+      ]
+    },
+    {
+      name: '취득세 개산(기본, 4주택 미만 기준율 예시)',
+      rows: [
+        { label: '취득가액(과세표준)', formula: '' },
+        { label: '취득세율(%, 예: 1~3 또는 8/12 등 사안별 확인)', formula: '' },
+        { label: '취득세', formula: '=[1]*([2]%)' },
+        { label: '지방교육세(취득세의 10%, 통상)', formula: '=[3]*0.1' },
+        { label: '농어촌특별세(해당 시)', formula: '' },
+        { label: '합계', formula: '=[3]+[4]+[5]' }
+      ]
+    },
+    {
+      name: '증여세 개산(누진공제 방식)',
+      rows: [
+        { label: '증여재산가액', formula: '' },
+        { label: '증여재산공제(배우자6억/직계존비속5천만 등 사안별)', formula: '' },
+        { label: '과세표준', formula: '=[1]-[2]' },
+        { label: '세율(%, 구간별 확인 후 입력)', formula: '' },
+        { label: '누진공제액(구간표 확인 후 입력)', formula: '' },
+        { label: '산출세액', formula: '=[3]*([4]%)-[5]' }
+      ]
+    },
+    {
+      name: '상속세 개산(누진공제 방식)',
+      rows: [
+        { label: '상속재산가액', formula: '' },
+        { label: '상속공제(일괄공제 5억 등 사안별 확인)', formula: '' },
+        { label: '과세표준', formula: '=[1]-[2]' },
+        { label: '세율(%, 구간별 확인 후 입력)', formula: '' },
+        { label: '누진공제액(구간표 확인 후 입력)', formula: '' },
+        { label: '산출세액', formula: '=[3]*([4]%)-[5]' }
+      ]
+    }
+  ];
+
+  const calcTemplatePopup = document.getElementById('calcTemplatePopup');
+  const btnCalcTemplate = document.getElementById('btnCalcTemplate');
+
+  function renderCalcTemplateMenu(){
+    calcTemplatePopup.innerHTML = '<div class="log-hint" style="padding:0 0 4px; font-size:11px;">기존 행 뒤에 이어서 추가됩니다. 세율·공제 구간은 사안별로 반드시 직접 확인해서 채워 넣으세요.</div>';
+    CALC_TEMPLATES.forEach(tpl=>{
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tool-menu-item';
+      btn.textContent = tpl.name;
+      btn.addEventListener('click', ()=>{
+        const offset = calcRows.length;
+        tpl.rows.forEach(r=>{
+          // 템플릿 안의 [n] 참조는 "템플릿 자체 기준 n번째 행"이므로, 실제로 뒤에 이어붙일 때는
+          // 지금까지 쌓인 행 수(offset)만큼 참조번호를 밀어서 실제 위치와 맞춰준다.
+          const shiftedFormula = (r.formula || '').replace(/\[(\d+)\]/g, (m, n) => '[' + (Number(n) + offset) + ']');
+          calcRows.push({ id: 'c' + Date.now() + Math.random().toString(36).slice(2, 6), label: r.label, formula: shiftedFormula });
+        });
+        renderCalcRows();
+        saveCalc();
+        calcTemplatePopup.classList.remove('show');
+      });
+      calcTemplatePopup.appendChild(btn);
+    });
+  }
+
+  btnCalcTemplate.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    renderCalcTemplateMenu();
+    calcTemplatePopup.classList.toggle('show');
+  });
+  document.addEventListener('click', (e)=>{
+    if (calcTemplatePopup.classList.contains('show') && !calcTemplatePopup.contains(e.target) && e.target !== btnCalcTemplate){
+      calcTemplatePopup.classList.remove('show');
+    }
+  });
+
+  // ---- 계산기 → 마크다운 표로 복사 (보고서 md에 바로 붙여넣기용) ----
+  document.getElementById('btnCalcCopyTable').addEventListener('click', async ()=>{
+    evalCalcRows();
+    const header = '| 항목 | 값/계산식 | 결과 |\n|---|---|---|';
+    const lines = calcRows.map(r=>{
+      const result = Number.isFinite(r.result) ? r.result.toLocaleString('ko-KR') : '오류';
+      return '| ' + (r.label || '') + ' | ' + (r.formula || '') + ' | ' + result + ' |';
+    });
+    const md = [header].concat(lines).join('\n');
+    try{
+      await navigator.clipboard.writeText(md);
+      const btn = document.getElementById('btnCalcCopyTable');
+      const original = btn.textContent;
+      btn.textContent = '✓ 복사됨';
+      setTimeout(()=>{ btn.textContent = original; }, 1200);
+    }catch(err){
+      alert('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해주세요.');
+    }
+  });
+
   // ---- 휴지통 (현재 폴더에서 삭제한 항목 확인·복원) ----
   const trashView = document.getElementById('trashView');
   const trashFolderLabel = document.getElementById('trashFolderLabel');
@@ -1598,6 +1758,164 @@ graph TD
 
   document.getElementById('btnOpenTrash').addEventListener('click', openTrashView);
   document.getElementById('btnTrashBack').addEventListener('click', closeTrashView);
+
+  // ---- 대시보드 (모든 폴더의 처리일지를 한 곳에서, 마감일 기준 강조) ----
+  const dashboardView = document.getElementById('dashboardView');
+  const dashboardList = document.getElementById('dashboardList');
+
+  async function openDashboardView(){
+    ensureExplorerVisible();
+    hideAllPanelViews();
+    dashboardView.style.display = 'flex';
+    dashboardList.innerHTML = '<div class="log-empty">불러오는 중…</div>';
+    try{
+      const res = await callGas('getGlobalLog', {});
+      if (res.error){
+        dashboardList.innerHTML = '<div class="log-empty">' + escapeHtml(res.error) + '</div>';
+        return;
+      }
+      renderDashboard(res.entries || []);
+    }catch(err){
+      dashboardList.innerHTML = '<div class="log-empty">불러오지 못했습니다.</div>';
+    }
+  }
+
+  function renderDashboard(entries){
+    dashboardList.innerHTML = '';
+    if (!entries.length){
+      dashboardList.innerHTML = '<div class="log-empty">아직 어느 폴더에도 처리일지 기록이 없습니다.</div>';
+      return;
+    }
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const withDue = entries.filter(e => e.dueDate);
+    const overdue = withDue.filter(e => e.dueDate < todayStr).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const dueToday = withDue.filter(e => e.dueDate === todayStr);
+    const upcoming = withDue.filter(e => e.dueDate > todayStr).sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 10);
+
+    function addSection(title, list, isEmpty){
+      if (!list.length && isEmpty) return;
+      const head = document.createElement('div');
+      head.className = 'dash-section-head';
+      head.textContent = title;
+      dashboardList.appendChild(head);
+      if (!list.length){
+        const e = document.createElement('div');
+        e.className = 'log-empty';
+        e.textContent = '없음';
+        dashboardList.appendChild(e);
+        return;
+      }
+      list.forEach(entry => dashboardList.appendChild(buildDashRow(entry, true)));
+    }
+
+    addSection('⏰ 기한 지남 (' + overdue.length + ')', overdue, false);
+    addSection('📌 오늘 마감 (' + dueToday.length + ')', dueToday, false);
+    if (upcoming.length) addSection('다가오는 마감', upcoming, false);
+
+    const recentHead = document.createElement('div');
+    recentHead.className = 'dash-section-head';
+    recentHead.textContent = '최근 기록';
+    dashboardList.appendChild(recentHead);
+    const recent = entries.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 40);
+    recent.forEach(entry => dashboardList.appendChild(buildDashRow(entry, false)));
+  }
+
+  function buildDashRow(entry, showDue){
+    const row = document.createElement('div');
+    row.className = 'log-entry dash-row';
+    const dueBadge = (showDue && entry.dueDate) ? '<span class="due-badge">📌 ' + escapeHtml(entry.dueDate) + '</span>' : '';
+    row.innerHTML = '<div class="log-date">' + escapeHtml(entry.date || '') + dueBadge + '</div>'
+      + '<div class="log-text"><span class="dash-path">' + escapeHtml((entry.path || []).join(' / ')) + '</span><br>' + escapeHtml(entry.text || '') + '</div>';
+    row.style.cursor = 'pointer';
+    row.title = '클릭하면 해당 폴더로 이동합니다';
+    row.addEventListener('click', ()=>{
+      closeDashboardView();
+      navigateTo(entry.path || []);
+    });
+    return row;
+  }
+
+  function closeDashboardView(){
+    hideAllPanelViews();
+    explorerView.style.display = 'block';
+    explorerPanelHead.style.display = 'flex';
+    navigateTo(explorerPath);
+  }
+
+  document.getElementById('btnOpenDashboard').addEventListener('click', openDashboardView);
+  document.getElementById('btnDashboardBack').addEventListener('click', closeDashboardView);
+
+  // ---- 파일·폴더 검색 (드라이브 전체, 이름 기준) ----
+  const searchView = document.getElementById('searchView');
+  const searchInput = document.getElementById('searchInput');
+  const searchResultList = document.getElementById('searchResultList');
+
+  function openSearchView(){
+    ensureExplorerVisible();
+    hideAllPanelViews();
+    searchView.style.display = 'flex';
+    searchResultList.innerHTML = '<div class="log-empty">검색어를 입력하고 엔터 또는 검색 버튼을 눌러주세요.</div>';
+    setTimeout(()=> searchInput.focus(), 50);
+  }
+
+  async function runSearch(){
+    const q = searchInput.value.trim();
+    if (!q) return;
+    searchResultList.innerHTML = '<div class="log-empty">검색 중…</div>';
+    try{
+      const res = await callGas('searchFiles', { query: q });
+      if (res.error){
+        searchResultList.innerHTML = '<div class="log-empty">' + escapeHtml(res.error) + '</div>';
+        return;
+      }
+      renderSearchResults(res.items || []);
+    }catch(err){
+      searchResultList.innerHTML = '<div class="log-empty">검색 중 오류가 발생했습니다.</div>';
+    }
+  }
+
+  function renderSearchResults(items){
+    searchResultList.innerHTML = '';
+    if (!items.length){
+      searchResultList.innerHTML = '<div class="log-empty">일치하는 결과가 없습니다.</div>';
+      return;
+    }
+    items.forEach(item=>{
+      const row = document.createElement('div');
+      row.className = 'log-entry';
+      row.style.cursor = 'pointer';
+      const icon = item.type === 'folder' ? '📁' : iconForFile(item.mimeType);
+      row.innerHTML = '<div class="log-date">' + icon + '</div>'
+        + '<div class="log-text"><span class="dash-path">' + escapeHtml((item.path || []).join(' / ')) + '</span><br>' + escapeHtml(item.name) + '</div>';
+      row.addEventListener('click', async ()=>{
+        if (item.type === 'folder'){
+          closeSearchView();
+          navigateTo((item.path || []).concat([item.name]));
+        } else {
+          closeSearchView();
+          navigateTo(item.path || []);
+          // 폴더로 이동한 뒤 목록에서 파일을 찾아 바로 열어줌
+          setTimeout(()=>{
+            const target = lastRenderedFiles.find(f => f.id === item.id);
+            if (target) openEditor(target);
+          }, 500);
+        }
+      });
+      searchResultList.appendChild(row);
+    });
+  }
+
+  function closeSearchView(){
+    hideAllPanelViews();
+    explorerView.style.display = 'block';
+    explorerPanelHead.style.display = 'flex';
+    navigateTo(explorerPath);
+  }
+
+  document.getElementById('btnOpenSearch').addEventListener('click', openSearchView);
+  document.getElementById('btnSearchBack').addEventListener('click', closeSearchView);
+  document.getElementById('btnSearchGo').addEventListener('click', runSearch);
+  searchInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter'){ e.preventDefault(); runSearch(); } });
 
   // ---- 관계도/구조도 캔버스 (mermaid 문법) ----
   if (window.mermaid) mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
@@ -1808,6 +2126,8 @@ graph TD
   wireToolMenuItem('menuOpenLog', openLogView);
   wireToolMenuItem('menuOpenCalc', openCalcView);
   wireToolMenuItem('menuOpenTrash', openTrashView);
+  wireToolMenuItem('menuOpenDashboard', openDashboardView);
+  wireToolMenuItem('menuOpenSearch', openSearchView);
   wireToolMenuItem('menuOpenDiagram', openDiagramView);
   wireToolMenuItem('menuOpenScan', openScanModal);
   wireToolMenuItem('menuScreenCapture', captureScreen);
@@ -2067,6 +2387,101 @@ graph TD
   let pendingTextAttachments = []; // [{id,name,text}] — 경과지/계산기/관계도 등에서 "지금 화면 그대로" 참조 버튼으로 넘긴 것 (저장 전 상태 포함)
   let pendingRefMedia = []; // [{id,name,block}] — 편집기에 열린 이미지·PDF를 "참조" 버튼으로 명시적으로 넘긴 것 (block은 이미 Claude API 형식)
 
+  // ---- 사건별 대화기록 저장/복원 ----
+  // "고객/사건" 2단계 경로를 기준으로 대화를 한 파일(_대화기록.json)에 저장해뒀다가,
+  // 같은 사건 폴더로 돌아오면 이어서 물어볼 수 있게 자동으로 불러온다.
+  const CHAT_HISTORY_FILE_NAME = '_대화기록.json';
+  const CHAT_HISTORY_MAX_MESSAGES = 60; // 너무 길어지면 토큰비용이 누적되므로 최근 것만 보관
+  let chatHistoryCaseKey = null; // 지금 로드되어 있는 사건의 "고객 / 사건" 키 (null = 최상위 등, 대화기록 미사용)
+  let chatHistoryFileId = null;
+  let chatHistorySaveTimer = null;
+
+  function caseRootPath(path){
+    return (Array.isArray(path) && path.length >= 2) ? path.slice(0, 2) : null;
+  }
+
+  // 지난 대화를 다시 보여줄 때, EDIT_DOCUMENT/NAVIGATE_TO/DIAGRAM_MERMAID 같은 내부 신호는
+  // 이미 적용됐거나 그 시점의 화면 상태에서만 의미가 있으므로 원문 그대로 노출하지 않는다.
+  function stripSignalMarkersForDisplay(text){
+    return String(text || '')
+      .replace(/<<<NAVIGATE_TO>>>[\s\S]*?<<<END_NAVIGATE_TO>>>/g, '')
+      .replace(/<<<EDIT_DOCUMENT>>>[\s\S]*?<<<END_EDIT_DOCUMENT>>>/g, '(문서 수정 제안 — 지난 대화라 다시 적용할 수 없습니다)')
+      .replace(/<<<DIAGRAM_MERMAID>>>[\s\S]*?<<<END_DIAGRAM_MERMAID>>>/g, '(관계도 제안 — 지난 대화라 다시 적용할 수 없습니다)')
+      .trim();
+  }
+
+  async function saveChatHistoryNow(){
+    if (!chatHistoryCaseKey) return;
+    const rootPath = chatHistoryCaseKey.split(' / ');
+    try{
+      const trimmed = chatMessages.slice(-CHAT_HISTORY_MAX_MESSAGES);
+      const payload = {
+        path: rootPath, name: CHAT_HISTORY_FILE_NAME, mimeType: 'application/json',
+        base64Data: utf8ToBase64(JSON.stringify(trimmed))
+      };
+      if (chatHistoryFileId) payload.fileId = chatHistoryFileId;
+      const res = await callGas('uploadFile', payload);
+      if (!res.error && !chatHistoryFileId) chatHistoryFileId = res.id;
+    }catch(err){
+      console.warn('대화기록 저장 실패', err);
+    }
+  }
+
+  function scheduleChatHistorySave(){
+    clearTimeout(chatHistorySaveTimer);
+    chatHistorySaveTimer = setTimeout(saveChatHistoryNow, 1000);
+  }
+
+  // 다른 사건 폴더로 이동할 때 호출 — 이전 사건 대화를 flush 저장하고, 새 사건의 저장된 대화를 불러온다.
+  // 같은 사건 안에서 하위 폴더만 오갈 때는(caseRootPath가 그대로) 아무 것도 하지 않는다.
+  async function loadChatHistoryForCase(pathArr){
+    const root = caseRootPath(pathArr);
+    const newKey = root ? root.join(' / ') : null;
+    if (newKey === chatHistoryCaseKey) return;
+
+    if (chatHistorySaveTimer){
+      clearTimeout(chatHistorySaveTimer);
+      chatHistorySaveTimer = null;
+      await saveChatHistoryNow();
+    }
+
+    chatHistoryCaseKey = newKey;
+    chatHistoryFileId = null;
+    chatMessages = [];
+    chatBody.innerHTML = '';
+
+    if (!newKey) return; // 고객목록 등 최상위에서는 대화기록을 쓰지 않음
+
+    try{
+      const data = await listFolder(root);
+      const existing = data.files.find(f => f.name === CHAT_HISTORY_FILE_NAME);
+      if (existing){
+        chatHistoryFileId = existing.id;
+        const fileData = await callGas('readFile', { fileId: existing.id });
+        const loaded = fileData.content ? JSON.parse(fileData.content) : [];
+        if (Array.isArray(loaded) && loaded.length){
+          chatMessages = loaded;
+          const hint = document.createElement('div');
+          hint.className = 'chat-history-hint';
+          hint.textContent = '— 이 사건의 지난 대화를 이어서 보여드립니다 —';
+          chatBody.appendChild(hint);
+          loaded.forEach(m => appendBubble(m.role === 'assistant' ? 'assistant' : 'user', stripSignalMarkersForDisplay(m.content)));
+        }
+      }
+    }catch(err){
+      console.warn('대화기록 불러오기 실패', err);
+    }
+  }
+
+  // 탭 전환/화면꺼짐 시 대기 중인 대화기록 저장도 유실되지 않도록 flush
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.hidden && chatHistorySaveTimer){
+      clearTimeout(chatHistorySaveTimer);
+      chatHistorySaveTimer = null;
+      saveChatHistoryNow();
+    }
+  });
+
   function renderAttachBar(){
     attachBar.innerHTML = '';
     if (!pendingAttachments.length && !pendingCaptures.length && !pendingTextAttachments.length && !pendingRefMedia.length){
@@ -2300,6 +2715,10 @@ graph TD
   // "편집기에 적용하기" 버튼을 붙여서 렌더링 (없으면 그냥 평범한 텍스트)
   const EDIT_START = '<<<EDIT_DOCUMENT>>>';
   const EDIT_END = '<<<END_EDIT_DOCUMENT>>>';
+  // AI 응답 안에 <<<DIAGRAM_MERMAID>>>...<<<END_DIAGRAM_MERMAID>>> 구간이 있으면
+  // (관계도 도구가 열려 있을 때만) "관계도에 적용하기" 버튼을 붙여서 렌더링
+  const DIAGRAM_START = '<<<DIAGRAM_MERMAID>>>';
+  const DIAGRAM_END = '<<<END_DIAGRAM_MERMAID>>>';
   // AI 응답 안에 <<<NAVIGATE_TO>>>["고객명","사건명"]<<<END_NAVIGATE_TO>>> 형태가 있으면
   // 확인 버튼 없이 바로 그 폴더로 이동시킨다 (문서 수정과 달리 이동은 되돌리기 쉬워서 즉시 적용)
   const NAV_START = '<<<NAVIGATE_TO>>>';
@@ -2336,6 +2755,11 @@ graph TD
 
     const startIdx = indexOfOutsideFence(text, EDIT_START);
     const endIdx = startIdx === -1 ? -1 : indexOfOutsideFence(text, EDIT_END, startIdx + EDIT_START.length);
+
+    const diagStart = indexOfOutsideFence(text, DIAGRAM_START);
+    const diagEnd = diagStart === -1 ? -1 : indexOfOutsideFence(text, DIAGRAM_END, diagStart + DIAGRAM_START.length);
+    const diagramOpen = (typeof diagramView !== 'undefined' && diagramView.style.display !== 'none');
+
     bubbleEl.innerHTML = '';
 
     if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx && isReportWriterOpen){
@@ -2352,6 +2776,26 @@ graph TD
       applyBtn.textContent = '📝 편집기에 적용하기';
       applyBtn.addEventListener('click', ()=>{
         applyEditorContent(newContent);
+        applyBtn.textContent = '✓ 적용됨';
+        applyBtn.disabled = true;
+      });
+      bubbleEl.appendChild(applyBtn);
+    } else if (diagStart !== -1 && diagEnd !== -1 && diagEnd > diagStart && diagramOpen){
+      const before = text.slice(0, diagStart).trim();
+      const newDiagramCode = text.slice(diagStart + DIAGRAM_START.length, diagEnd).trim();
+      const after = text.slice(diagEnd + DIAGRAM_END.length).trim();
+
+      const textPart = document.createElement('div');
+      textPart.textContent = [before, after].filter(Boolean).join('\n\n') || '관계도 초안을 준비했습니다.';
+      bubbleEl.appendChild(textPart);
+
+      const applyBtn = document.createElement('button');
+      applyBtn.className = 'apply-edit-btn';
+      applyBtn.textContent = '🕸 관계도에 적용하기';
+      applyBtn.addEventListener('click', ()=>{
+        diagramInput.value = newDiagramCode;
+        renderDiagramPreview();
+        saveDiagram();
         applyBtn.textContent = '✓ 적용됨';
         applyBtn.disabled = true;
       });
@@ -2415,6 +2859,11 @@ graph TD
       ? Object.assign({}, currentOpenFile, (liveContent !== null ? { liveContent } : {}))
       : null;
 
+    // 관계도 도구가 열려 있으면, AI가 mermaid 코드를 만들어 바로 반영할 수 있도록 지금 내용을 함께 보낸다.
+    const openDiagramCtx = (typeof diagramView !== 'undefined' && diagramView.style.display !== 'none')
+      ? { liveContent: diagramInput.value }
+      : null;
+
     // 대화 기록(chatMessages)에는 가벼운 텍스트만 남긴다 — 이미지를 기록에 박아두면
     // 다음 턴부터 대화 전체를 다시 보낼 때마다 그 이미지까지 매번 반복 전송되어 낭비가 누적된다.
     chatMessages.push({ role: 'user', content: text });
@@ -2440,6 +2889,7 @@ graph TD
           context: {
             currentPath: explorerPath,
             openFile: openFileCtx,
+            openDiagram: openDiagramCtx,
             attachedItems: attachmentsForThisMessage,
             attachedTexts: textAttachmentsForThisMessage
           },
@@ -2452,6 +2902,7 @@ graph TD
       } else {
         renderAssistantReply(thinkingBubble, data.reply || '(빈 응답)');
         chatMessages.push({ role: 'assistant', content: data.reply || '' });
+        scheduleChatHistorySave();
         if (isVoiceTurn) speakReply(data.reply || '');
       }
     }catch(err){
@@ -3237,6 +3688,30 @@ graph TD
     }
     return await outDoc.save();
   }
+
+  const btnScanSummarize = document.getElementById('btnScanSummarize');
+  btnScanSummarize.addEventListener('click', async ()=>{
+    btnScanSummarize.disabled = true; btnScanSummarize.textContent = '준비 중…';
+    try{
+      const bytes = await buildPdfBytes();
+      if (!bytes){ alert('담긴 페이지가 없습니다. 먼저 스캔하거나 페이지를 추가해주세요.'); return; }
+      const base64 = uint8ToBase64(bytes);
+      const name = (scanOutputName.value.trim() || '스캔문서') + '.pdf';
+      // 드라이브에 저장하지 않고, 지금 만든 PDF를 그대로 채팅에 첨부해서 바로 요약을 물어본다(원터치).
+      pendingRefMedia.push({
+        id: 'ref' + Date.now(),
+        name: name,
+        block: { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+      });
+      closeScanModal();
+      chatInputEl.value = '방금 스캔한 문서 내용을 요약해줘.';
+      sendChatMessage();
+    }catch(err){
+      alert('요약 준비 중 오류: ' + (err && err.message ? err.message : err));
+    }finally{
+      btnScanSummarize.disabled = false; btnScanSummarize.textContent = '🔎 AI 요약';
+    }
+  });
 
   btnDownloadPdf.addEventListener('click', async ()=>{
     btnDownloadPdf.disabled = true; btnDownloadPdf.textContent = '만드는 중…';

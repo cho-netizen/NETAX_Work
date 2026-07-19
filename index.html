@@ -2499,9 +2499,15 @@ graph TD
     function measureRequiredWidth(candidateStage){
       const prevBodyClass = bodyEl.className;
       bodyEl.className = prevBodyClass.replace(/\bstage-\S+/g, '').trim() + ' stage-' + candidateStage;
-      topbarEl.classList.add('measuring'); // 이 순간만 줄바꿈을 강제로 꺼서 "진짜 필요한 폭"을 잼
+      // 클래스(.measuring)로 nowrap을 걸었더니 실제로는 안 먹히는 경우가 있어서(다른 규칙에
+      // 밀렸는지 원인은 불명확), 인라인 스타일 + !important로 직접 강제한다 — 이러면 다른 CSS
+      // 규칙이 뭐가 됐든 무조건 이긴다.
+      const prevWrap = topbarEl.style.getPropertyValue('flex-wrap');
+      const prevWrapPriority = topbarEl.style.getPropertyPriority('flex-wrap');
+      topbarEl.style.setProperty('flex-wrap', 'nowrap', 'important');
       const required = topbarEl.scrollWidth;
-      topbarEl.classList.remove('measuring');
+      if (prevWrap) topbarEl.style.setProperty('flex-wrap', prevWrap, prevWrapPriority);
+      else topbarEl.style.removeProperty('flex-wrap');
       bodyEl.className = prevBodyClass; // 측정 즉시 원상복구 — 동기 실행이라 화면엔 안 그려짐
       return required;
     }

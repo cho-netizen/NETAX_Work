@@ -58,6 +58,24 @@
   body.dark-mode .due-badge{ background:#2c3242; color:var(--sub); }
   body.dark-mode .due-badge.due-today{ background:#4a3d10; color:#e8c86a; }
   body.dark-mode .due-badge.overdue{ background:#4a1f1f; color:#e58a8a; }
+  /* var(--navy)는 다크모드에서도 항상 고정된 짙은 남색이라, 이 색을 글자색으로 쓰던 요소들이
+     배경만 어둡게 바뀌면서(위 규칙들) 글자가 배경과 거의 같은 색이 되어 안 보이는 문제가 있었다
+     (경과지/계산기 등 각 창의 ✕ 닫기버튼, 패널 제목, 첨부칩의 ✕ 등). 다크모드에서는 밝은
+     var(--ink)로 바꿔서 항상 보이게 한다. */
+  body.dark-mode .modal-label,
+  body.dark-mode .tax-feature-title,
+  body.dark-mode .scan-section-title,
+  body.dark-mode .panel-head,
+  body.dark-mode .breadcrumb b,
+  body.dark-mode .selection-inline,
+  body.dark-mode .back-btn,
+  body.dark-mode .attach-chip .x,
+  body.dark-mode .calc-table .calc-result{ color:var(--ink); }
+  body.dark-mode .scan-tray-item button:hover,
+  body.dark-mode .chip-btn:hover,
+  body.dark-mode .icon-round-btn:hover,
+  body.dark-mode .back-btn:hover,
+  body.dark-mode .log-btn:hover{ color:var(--ink); border-color:var(--line); }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%;background:var(--bg);font-family:'Noto Sans KR',sans-serif;color:var(--ink);}
   body{ display:flex; flex-direction:column; overflow:hidden; }
@@ -66,7 +84,7 @@
   .topbar{
     display:flex; align-items:center; flex-wrap:wrap; gap:6px 8px;
     padding:8px 10px; background:var(--navy); color:#fff;
-    border-bottom:3px solid var(--gold); flex-shrink:0;
+    flex-shrink:0;
     row-gap:6px; /* 좁은 화면에서 줄바꿈될 때 줄 사이 간격 */
     position:relative; z-index:95; /* "띄우기" 배경(z-index 90)보다 위에 있어야 버튼이 항상 눌림 */
   }
@@ -187,12 +205,12 @@
   body.stage-compact #topbarActionCluster{
     display:flex; align-items:center; gap:6px;
     position:fixed; left:0; right:0; bottom:0; z-index:95;
-    background:var(--navy); border-top:3px solid var(--gold);
+    background:var(--navy);
     padding:8px 10px; overflow:hidden; max-height:64px; opacity:1;
-    transition:max-height 0.18s ease, opacity 0.18s ease, padding 0.18s ease, border-top-width 0.18s ease;
+    transition:max-height 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
   }
   body.stage-compact.bottombar-hidden #topbarActionCluster{
-    max-height:0; opacity:0; padding-top:0; padding-bottom:0; border-top-width:0;
+    max-height:0; opacity:0; padding-top:0; padding-bottom:0;
   }
   body.stage-compact .mobile-group{ display:flex; flex:1 1 0; min-width:0; }
   body.stage-compact .mobile-group > .tb-btn{ width:100%; justify-content:center; }
@@ -398,7 +416,7 @@
   .apply-edit-btn:hover{ background:var(--gold-light); }
   .apply-edit-btn:disabled{ background:#cfd4dc; color:var(--sub); cursor:default; }
   .chat-input-wrap{
-    display:flex; align-items:center; gap:8px; padding:10px 12px;
+    display:flex; align-items:center; gap:8px; padding:8px 12px;
     border-top:1px solid var(--line); flex-shrink:0;
   }
   .chat-input-wrap input{
@@ -2393,10 +2411,12 @@ graph TD
     }
 
     // compact일 때 #topbarActionCluster가 화면 아래 고정으로 떠 있는 만큼, 그 높이를 실측해서
-    // .workspace의 padding-bottom으로 넣어줘야 채팅 입력창을 가리지 않는다.
+    // .workspace의 padding-bottom으로 넣어줘야 채팅 입력창을 가리지 않는다. +8px는 입력창 위쪽
+    // 여백(패딩 8px)과 똑같은 만큼을 아래쪽에도 줘서, 입력창이 하단바에 바로 붙어 보이지 않게
+    // 하기 위한 여유분이다.
     function updateBottombarHeightVar(){
       if (bodyEl.classList.contains('stage-compact') && !bodyEl.classList.contains('bottombar-hidden')){
-        document.documentElement.style.setProperty('--bottombar-h', cluster.getBoundingClientRect().height + 'px');
+        document.documentElement.style.setProperty('--bottombar-h', (cluster.getBoundingClientRect().height + 8) + 'px');
       } else {
         document.documentElement.style.setProperty('--bottombar-h', '0px');
       }

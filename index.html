@@ -476,6 +476,30 @@
   body.flip-mode #btnModeWebFetch{ display:none !important; } /* 플립모드에선 탐색기 자체가 의미 없으므로 다 숨김 */
   body.flip-mode #btnVoiceInputFlip{ display:inline-flex !important; flex:1 1 0; min-width:0; justify-content:center; }
 
+  /* ===== 미니모드 (PC 전용 — 창을 아주 낮게 줄였을 때) =====
+     탐색기를 강제로 접어서(=워크스페이스 "생략" 모드) 상단바·채팅·하단바가 겹치지 않게 한다.
+     별도 레이아웃 CSS는 필요 없다 — 기존 "생략" 모드(explorer-collapsed)를 그대로 쓰기 때문에
+     이 클래스는 사실 표식(주로 디버그 배지 표시용)의 역할만 한다. */
+  body.mini-mode #nxDebugBadge{ background:rgba(47,111,237,0.85); }
+
+  /* ===== 작업표시줄모드 (?taskbar=1로 연 별도의 작은 PC 창 전용) ===== */
+  #taskbarBar{ display:none; }
+  body.taskbar-mode .topbar{ display:none !important; }
+  body.taskbar-mode.taskbar-icons .workspace{ display:none !important; }
+  body.taskbar-mode.taskbar-icons #taskbarBar{
+    display:flex; position:fixed; inset:0; align-items:center; justify-content:center;
+    gap:10px; background:var(--navy);
+  }
+  #taskbarBar button{
+    width:44px; height:44px; border-radius:50%; border:1px solid rgba(255,255,255,0.25);
+    background:rgba(255,255,255,0.08); color:#fff; font-size:18px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #taskbarBar button:hover{ background:rgba(255,255,255,0.18); }
+  body.taskbar-mode.taskbar-chat .workspace{ display:flex !important; }
+  body.taskbar-mode.taskbar-chat .panel.explorer{ display:none !important; }
+  body.taskbar-mode.taskbar-chat .panel.chat{ flex:1 1 100%; }
+
   /* ===== 파일 드래그&드롭 첨부 ===== */
   .chat-body.drag-over{ background:#eef3fb; outline:2px dashed var(--gold); outline-offset:-6px; }
   .attach-bar{ display:flex; flex-wrap:wrap; gap:6px; padding:8px 12px 0 12px; }
@@ -637,6 +661,13 @@
 
   <!-- 임시 디버그 배지 — 플립모드 판정 확인용. 문제 해결되면 이 div 통째로 지우면 됨. -->
   <div id="nxDebugBadge" style="position:fixed; top:2px; left:2px; z-index:99999; font-size:11px; background:rgba(0,0,0,0.75); color:#4f4; padding:3px 6px; border-radius:4px; pointer-events:none; font-family:monospace; white-space:nowrap;"></div>
+
+  <!-- 작업표시줄모드 전용(별도로 띄운 작은 창에서만 보임, ?taskbar=1일 때만 활성화) -->
+  <div id="taskbarBar" style="display:none;">
+    <button type="button" id="taskbarMicBtn" title="바로 음성대화">🎤</button>
+    <button type="button" id="taskbarKeyboardBtn" title="채팅창 열기">⌨</button>
+    <button type="button" id="taskbarExpandBtn" title="탭모드 크기로 확대">🔍+</button>
+  </div>
 
   <div class="topbar">
     <input type="text" id="customerSelect" class="topbar-select" list="customerListOptions" placeholder="고객 불러오는 중…" autocomplete="off">
@@ -801,6 +832,12 @@
           <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="ghost-btn" style="text-decoration:none; display:inline-block;">Claude 콘솔 열기 ↗</a>
           <a href="https://aistudio.google.com" target="_blank" rel="noopener" class="ghost-btn" style="text-decoration:none; display:inline-block;">Google AI Studio 열기 ↗</a>
         </div>
+
+        <label class="modal-label">🗗 작업표시줄모드 (PC 전용)</label>
+        <div class="modal-checkrow">
+          <button type="button" id="btnOpenTaskbarMode" class="ghost-btn" style="display:inline-block;">작은 창으로 띄우기</button>
+        </div>
+        <div class="modal-hint">별도의 작은 창이 뜹니다 — 마이크 버튼으로 바로 음성대화, 키보드 버튼으로 채팅창, 확대 버튼으로 탭모드 크기까지 그 창 스스로 커집니다. PC 브라우저에서만 의미가 있습니다.</div>
 
       </div>
       <div class="modal-foot">
@@ -2449,6 +2486,8 @@ graph TD
     // 실기기 확인 후 이 숫자만 바꾸면 된다.
     const FLIP_MODE_MAX_WIDTH = 340;
     let wasFlip = false; // 플립모드 여부가 "바뀔 때만" 이벤트를 쏘기 위한 이전 상태 기억
+    let wasMini = false;
+    const isPointerFine = window.matchMedia('(pointer: fine)').matches; // 마우스 있는 환경(=PC로 간주) — 폰 플립모드와 구분하는 기준
     // max-height 트랜지션이 끝나는 순간에도 한 번 더 정확히 재서, setTimeout 타이밍이
     // 살짝 어긋나는 경우(기기 성능 편차 등)까지 이중으로 보정한다.
     cluster.addEventListener('transitionend', (e)=>{
@@ -2540,10 +2579,21 @@ graph TD
         document.dispatchEvent(new CustomEvent('nx:flipmode', { detail: { on: flip } }));
       }
 
-      // 임시 디버그 배지 갱신 — 화면 좌상단에 지금 폭·단계·플립여부를 그대로 찍어준다.
+      // 미니모드(PC 전용) 판정 — 창을 가로로는 크롬 최소폭까지, 세로로는 아주 낮게 줄였을 때.
+      // "하단바가 펼쳐졌을 때 상단바를 가리지 않을 높이"가 기준이라, 상단바 높이의 2배 정도
+      // (상단바·하단바가 거의 같은 높이라서)를 최소 필요 높이로 보고 그보다 낮으면 미니모드.
+      // 터치기기(폰)는 대상이 아니므로 마우스가 있는 환경(isPointerFine)에서만 판단한다.
+      const topbarHNow = topbarEl.getBoundingClientRect().height || 46;
+      const mini = isPointerFine && stage === 'compact' && !flip && window.innerHeight < (topbarHNow * 2 + 40);
+      bodyEl.classList.toggle('mini-mode', mini);
+      if (mini && !wasMini) setWorkspaceMode('hide'); // 미니모드로 막 들어온 순간엔 탐색기를 강제로 접어서 공간 확보
+      wasMini = mini;
+
+      // 임시 디버그 배지 갱신 — 화면 좌상단에 지금 폭·높이·단계·플립/미니 여부를 그대로 찍어준다.
       const debugBadge = document.getElementById('nxDebugBadge');
       if (debugBadge){
-        debugBadge.textContent = 'w:' + window.innerWidth + ' stage:' + stage + ' flip:' + (flip ? 'ON' : 'off') + ' (기준:' + FLIP_MODE_MAX_WIDTH + ')';
+        debugBadge.textContent = 'w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
+          + ' flip:' + (flip ? 'ON' : 'off') + ' mini:' + (mini ? 'ON' : 'off') + ' (flip기준:' + FLIP_MODE_MAX_WIDTH + ')';
       }
     }
 
@@ -2792,6 +2842,13 @@ graph TD
   document.getElementById('btnCloseSettings').addEventListener('click', closeSettingsModal);
   settingsOverlay.addEventListener('click', (e)=>{
     if (e.target === settingsOverlay) closeSettingsModal(); // 바깥(어두운 영역) 클릭 시 닫기
+  });
+  document.getElementById('btnOpenTaskbarMode').addEventListener('click', ()=>{
+    // 스크립트가 직접 크기를 조절할 수 있으려면 스크립트가 "직접 연" 창이어야 한다(브라우저 보안정책) —
+    // 그래서 지금 창을 줄이는 게 아니라, 이렇게 새로 작게 연 창 안에서 버튼 누를 때마다
+    // 그 창 스스로(window.resizeTo) 커지는 방식으로 만들었다.
+    const url = location.pathname + '?taskbar=1';
+    window.open(url, 'nx_taskbar', 'width=110,height=110,resizable=yes');
   });
   settingsAdvisor.addEventListener('change', ()=>{
     advisorModelRow.style.display = settingsAdvisor.checked ? 'block' : 'none';
@@ -3854,6 +3911,34 @@ graph TD
     // 지금 상태를 한 번 직접 확인해서 놓친 이벤트를 보정한다.
     if (document.body.classList.contains('flip-mode') && !voiceModeOn) toggleVoiceMode();
   }
+
+  // ============================================================
+  // 작업표시줄모드 (?taskbar=1 로 열린 별도의 작은 창에서만 동작) — 아이콘 3개짜리 초소형
+  // 상태에서, 버튼을 누를 때마다 이 창 자신을 window.resizeTo로 키워가며 단계적으로 펼친다.
+  // ============================================================
+  (function setupTaskbarMode(){
+    if (new URLSearchParams(location.search).get('taskbar') !== '1') return;
+
+    document.body.classList.add('taskbar-mode', 'taskbar-icons');
+
+    document.getElementById('taskbarMicBtn').addEventListener('click', ()=>{
+      try{ window.resizeTo(300, 320); }catch(e){}
+      document.body.classList.remove('taskbar-icons');
+      document.body.classList.add('taskbar-chat');
+      if (typeof toggleVoiceMode === 'function') toggleVoiceMode(); // 그 자리에서 바로 음성대화 시작
+    });
+    document.getElementById('taskbarKeyboardBtn').addEventListener('click', ()=>{
+      try{ window.resizeTo(380, 600); }catch(e){}
+      document.body.classList.remove('taskbar-icons');
+      document.body.classList.add('taskbar-chat');
+    });
+    document.getElementById('taskbarExpandBtn').addEventListener('click', ()=>{
+      try{ window.resizeTo(760, 820); }catch(e){}
+      // 탭모드 크기로 확대 = 더 이상 작업표시줄모드의 제약을 걸지 않고, 이제부터는
+      // 커진 창 크기 기준으로 기존 반응형(전체/그룹/압축)이 알아서 알맞은 화면을 고르게 둔다.
+      document.body.classList.remove('taskbar-mode', 'taskbar-icons', 'taskbar-chat');
+    });
+  })();
 
   // ============================================================
   // 문서 스캔 · PDF 조립

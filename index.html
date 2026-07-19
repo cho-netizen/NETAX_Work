@@ -2506,10 +2506,15 @@ graph TD
       return required;
     }
 
+    let lastMeasure = { available: 0, reqFull: 0, reqGrouped: 0 }; // 디버그 배지에 그대로 보여주기 위한 최근 실측값
+
     function resolveStage(){
       const available = topbarEl.clientWidth - 4; // 스크롤바 등 오차 여유
-      if (measureRequiredWidth('full') <= available) return 'full';
-      if (measureRequiredWidth('grouped') <= available) return 'grouped';
+      const reqFull = measureRequiredWidth('full');
+      const reqGrouped = measureRequiredWidth('grouped');
+      lastMeasure = { available, reqFull, reqGrouped };
+      if (reqFull <= available) return 'full';
+      if (reqGrouped <= available) return 'grouped';
       return 'compact'; // 마지막 단계는 flex:1이 알아서 맞춰주므로 항상 채택
     }
 
@@ -2591,11 +2596,12 @@ graph TD
       if (mini && !wasMini) setWorkspaceMode('hide'); // 미니모드로 막 들어온 순간엔 탐색기를 강제로 접어서 공간 확보
       wasMini = mini;
 
-      // 임시 디버그 배지 갱신 — 화면 좌상단에 지금 폭·높이·단계·플립/미니 여부를 그대로 찍어준다.
+      // 임시 디버그 배지 갱신 — 화면 좌상단에 지금 폭·높이·단계·플립/미니 여부·실측폭을 그대로 찍어준다.
       const debugBadge = document.getElementById('nxDebugBadge');
       if (debugBadge){
-        debugBadge.textContent = 'w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
-          + ' flip:' + (flip ? 'ON' : 'off') + ' mini:' + (mini ? 'ON' : 'off') + ' (flip기준:' + FLIP_MODE_MAX_WIDTH + ')';
+        debugBadge.innerHTML = 'w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
+          + ' flip:' + (flip ? 'ON' : 'off') + ' mini:' + (mini ? 'ON' : 'off') + ' (flip기준:' + FLIP_MODE_MAX_WIDTH + ')'
+          + '<br>available:' + lastMeasure.available + ' reqFull:' + lastMeasure.reqFull + ' reqGrouped:' + lastMeasure.reqGrouped;
       }
     }
 

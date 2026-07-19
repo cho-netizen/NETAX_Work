@@ -298,6 +298,9 @@
     flex-shrink:0; background:#f4f5f8;
   }
   .panel-head .dot{ width:6px; height:6px; border-radius:50%; background:var(--gold); }
+  .save-status{ font-size:12px; color:var(--sub); margin-left:8px; white-space:nowrap; }
+  .save-status.is-saving{ color:var(--gold); }
+  .save-status.is-error{ color:#a83232; }
   .autoref-toggle{
     display:flex; align-items:center; gap:6px; flex-shrink:0;
     font-family:inherit; font-size:11.5px; font-weight:700; cursor:pointer;
@@ -503,6 +506,7 @@
     <div class="tool-buttons-wide">
       <button type="button" id="btnOpenLog" class="tb-btn" title="이 폴더의 경과지 보기">📝 경과지</button>
       <button type="button" id="btnOpenCalc" class="tb-btn" title="이 폴더의 계산 워크시트 보기">🧮 계산기</button>
+      <button type="button" id="btnOpenTrash" class="tb-btn" title="이 폴더에서 최근 삭제한 항목 복원">🗑 휴지통</button>
       <button type="button" id="btnOpenDiagram" class="tb-btn" title="이 폴더의 관계도/구조도 보기">🕸 관계도</button>
       <button id="btnOpenScan" class="tb-btn" title="문서 스캔 · PDF 조립">📷 스캔</button>
       <button type="button" id="btnScreenCapture" class="tb-btn" title="다른 창(홈택스 등) 화면 캡처해서 첨부">📸 캡처</button>
@@ -513,6 +517,7 @@
       <div id="toolMenuPopup" class="nx-popup">
         <button type="button" class="tool-menu-item" id="menuOpenLog">📝 경과지</button>
         <button type="button" class="tool-menu-item" id="menuOpenCalc">🧮 계산기</button>
+        <button type="button" class="tool-menu-item" id="menuOpenTrash">🗑 휴지통</button>
         <button type="button" class="tool-menu-item" id="menuOpenDiagram">🕸 관계도</button>
         <button type="button" class="tool-menu-item" id="menuOpenScan">📷 스캔</button>
         <button type="button" class="tool-menu-item" id="menuScreenCapture">📸 캡처</button>
@@ -749,6 +754,7 @@ graph TD
         <div class="editor-toolbar">
           <button class="back-btn" id="btnCalcBack" title="닫기">✕</button>
           <span class="editor-filename" id="calcFolderLabel"></span>
+          <span class="save-status" id="calcSaveStatus"></span>
           <div class="spacer"></div>
           <button type="button" id="btnCalcRef" class="ghost-btn">📎 참조</button>
           <button type="button" id="btnCalcAddRow" class="ghost-btn">+ 행 추가</button>
@@ -762,10 +768,20 @@ graph TD
         </div>
       </div>
 
+      <div id="trashView" style="display:none; flex:1; flex-direction:column; min-height:0;">
+        <div class="editor-toolbar">
+          <button class="back-btn" id="btnTrashBack" title="닫기">✕</button>
+          <span class="editor-filename" id="trashFolderLabel"></span>
+        </div>
+        <div class="log-hint" style="padding:8px 12px; font-size:12.5px; color:var(--sub);">이 폴더에서 최근 삭제(휴지통 이동)한 항목만 보여줍니다. 다른 폴더에서 삭제한 항목은 구글드라이브 휴지통에서 직접 찾아야 합니다.</div>
+        <div id="trashList" class="log-list"></div>
+      </div>
+
       <div id="logView" style="display:none; flex:1; flex-direction:column; min-height:0;">
         <div class="editor-toolbar">
           <button class="back-btn" id="btnLogBack" title="닫기">✕</button>
           <span class="editor-filename" id="logFolderLabel"></span>
+          <span class="save-status" id="logSaveStatus"></span>
           <div class="spacer"></div>
           <button type="button" id="btnLogRef" class="ghost-btn">📎 참조</button>
         </div>
@@ -893,6 +909,7 @@ graph TD
     if (typeof calcView !== 'undefined' && calcView) calcView.style.display = 'none';
     if (typeof diagramView !== 'undefined' && diagramView) diagramView.style.display = 'none';
     if (typeof captureView !== 'undefined' && captureView) captureView.style.display = 'none';
+    if (typeof trashView !== 'undefined' && trashView) trashView.style.display = 'none';
     explorerPanelHead.style.display = 'none';
   }
 
@@ -1198,7 +1215,17 @@ graph TD
     });
   }
 
+  const logSaveStatusEl = document.getElementById('logSaveStatus');
+
+  function setSaveStatus(el, state, text){
+    if (!el) return;
+    el.classList.remove('is-saving', 'is-error');
+    if (state) el.classList.add(state);
+    el.textContent = text || '';
+  }
+
   async function saveLog(){
+    setSaveStatus(logSaveStatusEl, 'is-saving', '저장 중…');
     try{
       const payload = {
         path: logCurrentPath,
@@ -1208,9 +1235,15 @@ graph TD
       };
       if (logFileId) payload.fileId = logFileId;
       const res = await callGas('uploadFile', payload);
-      if (res.error){ alert('경과지 저장 실패: ' + res.error); return; }
+      if (res.error){
+        setSaveStatus(logSaveStatusEl, 'is-error', '저장 실패');
+        alert('경과지 저장 실패: ' + res.error);
+        return;
+      }
       if (!logFileId) logFileId = res.id;
+      setSaveStatus(logSaveStatusEl, '', '저장됨 ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }));
     }catch(err){
+      setSaveStatus(logSaveStatusEl, 'is-error', '저장 실패');
       alert('경과지 저장 중 오류: ' + (err && err.message ? err.message : err));
     }
   }
@@ -1395,7 +1428,14 @@ graph TD
     renderCalcRows();
   }
 
-  async function saveCalc(){
+  const calcSaveStatusEl = document.getElementById('calcSaveStatus');
+  let calcSaveDebounceTimer = null;
+
+  // 실제 저장(네트워크 호출)을 수행. 라벨/계산식 입력의 'change'(포커스를 벗어날 때)마다
+  // 곧바로 호출되던 것을, 짧은 시간 안에 연달아 여러 필드를 옮겨다니며 편집할 때
+  // 요청이 겹치지 않도록 살짝 묶어서(디바운스) 보낸다.
+  async function saveCalcNow(){
+    setSaveStatus(calcSaveStatusEl, 'is-saving', '저장 중…');
     try{
       const payload = {
         path: calcCurrentPath,
@@ -1405,12 +1445,34 @@ graph TD
       };
       if (calcFileId) payload.fileId = calcFileId;
       const res = await callGas('uploadFile', payload);
-      if (res.error){ alert('계산기 저장 실패: ' + res.error); return; }
+      if (res.error){
+        setSaveStatus(calcSaveStatusEl, 'is-error', '저장 실패');
+        alert('계산기 저장 실패: ' + res.error);
+        return;
+      }
       if (!calcFileId) calcFileId = res.id;
+      setSaveStatus(calcSaveStatusEl, '', '저장됨 ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }));
     }catch(err){
+      setSaveStatus(calcSaveStatusEl, 'is-error', '저장 실패');
       alert('계산기 저장 중 오류: ' + (err && err.message ? err.message : err));
     }
   }
+
+  function saveCalc(){
+    setSaveStatus(calcSaveStatusEl, 'is-saving', '저장 대기…');
+    clearTimeout(calcSaveDebounceTimer);
+    calcSaveDebounceTimer = setTimeout(saveCalcNow, 600);
+  }
+
+  // 탭을 다른 화면으로 전환하거나 화면을 끌 때(모바일 홈으로 나가기 등) 디바운스로
+  // 미뤄둔 저장이 유실되지 않도록, 화면이 안 보이게 되는 순간 즉시 flush한다.
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.hidden && calcSaveDebounceTimer){
+      clearTimeout(calcSaveDebounceTimer);
+      calcSaveDebounceTimer = null;
+      saveCalcNow();
+    }
+  });
 
   async function openCalcView(){
     ensureExplorerVisible();
@@ -1440,7 +1502,13 @@ graph TD
     renderCalcRows();
   }
 
-  function closeCalcView(){
+  async function closeCalcView(){
+    // 디바운스로 미뤄둔 저장이 남아있으면(예: 입력 직후 바로 닫기) 나가기 전에 즉시 반영
+    if (calcSaveDebounceTimer){
+      clearTimeout(calcSaveDebounceTimer);
+      calcSaveDebounceTimer = null;
+      await saveCalcNow();
+    }
     hideAllPanelViews();
     explorerView.style.display = 'block';
     explorerPanelHead.style.display = 'flex';
@@ -1459,6 +1527,77 @@ graph TD
     }).join('\n');
     addTextAttachment('계산기 · ' + calcCurrentPath.join('/'), text);
   });
+
+  // ---- 휴지통 (현재 폴더에서 삭제한 항목 확인·복원) ----
+  const trashView = document.getElementById('trashView');
+  const trashFolderLabel = document.getElementById('trashFolderLabel');
+  const trashList = document.getElementById('trashList');
+  let trashCurrentPath = [];
+
+  function iconForTrashItem(item){
+    return item.type === 'folder' ? '📁' : '📄';
+  }
+
+  function renderTrashList(items){
+    trashList.innerHTML = '';
+    if (!items.length){
+      const empty = document.createElement('div');
+      empty.className = 'log-empty';
+      empty.textContent = '최근 삭제한 항목이 없습니다.';
+      trashList.appendChild(empty);
+      return;
+    }
+    items.forEach(item=>{
+      const row = document.createElement('div');
+      row.className = 'log-entry';
+      row.innerHTML = '<div class="log-date">' + iconForTrashItem(item) + '</div>'
+        + '<div class="log-text">' + escapeHtml(item.name) + '</div>'
+        + '<button class="log-del" title="복원">↩ 복원</button>';
+      row.querySelector('.log-del').addEventListener('click', async ()=>{
+        try{
+          const res = await callGas('restoreItem', { id: item.id, type: item.type });
+          if (res.error){ alert('복원 실패: ' + res.error); return; }
+          openTrashView(); // 목록 새로고침
+        }catch(err){
+          alert('복원 중 오류: ' + (err && err.message ? err.message : err));
+        }
+      });
+      trashList.appendChild(row);
+    });
+  }
+
+  async function openTrashView(){
+    ensureExplorerVisible();
+    trashCurrentPath = explorerPath.slice();
+    hideAllPanelViews();
+    trashView.style.display = 'flex';
+    trashFolderLabel.textContent = trashCurrentPath.join(' / ') + ' 의 휴지통';
+    trashList.innerHTML = '<div class="log-empty">불러오는 중…</div>';
+    try{
+      const res = await callGas('listTrash', { path: trashCurrentPath });
+      if (res.error){
+        trashList.innerHTML = '';
+        const err = document.createElement('div');
+        err.className = 'log-empty';
+        err.textContent = res.error;
+        trashList.appendChild(err);
+        return;
+      }
+      renderTrashList(res.items || []);
+    }catch(err){
+      trashList.innerHTML = '<div class="log-empty">불러오지 못했습니다.</div>';
+    }
+  }
+
+  function closeTrashView(){
+    hideAllPanelViews();
+    explorerView.style.display = 'block';
+    explorerPanelHead.style.display = 'flex';
+    navigateTo(trashCurrentPath); // 복원한 항목이 목록에 바로 보이도록 새로고침
+  }
+
+  document.getElementById('btnOpenTrash').addEventListener('click', openTrashView);
+  document.getElementById('btnTrashBack').addEventListener('click', closeTrashView);
 
   // ---- 관계도/구조도 캔버스 (mermaid 문법) ----
   if (window.mermaid) mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
@@ -1668,6 +1807,7 @@ graph TD
   }
   wireToolMenuItem('menuOpenLog', openLogView);
   wireToolMenuItem('menuOpenCalc', openCalcView);
+  wireToolMenuItem('menuOpenTrash', openTrashView);
   wireToolMenuItem('menuOpenDiagram', openDiagramView);
   wireToolMenuItem('menuOpenScan', openScanModal);
   wireToolMenuItem('menuScreenCapture', captureScreen);
@@ -2165,11 +2305,26 @@ graph TD
   const NAV_START = '<<<NAVIGATE_TO>>>';
   const NAV_END = '<<<END_NAVIGATE_TO>>>';
 
+  // AI가 이 신호체계 자체를 설명하거나 예시로 보여줄 때(```코드블록``` 안)는 실제 명령으로
+  // 오인해서 실행하면 안 되므로, 백틱 3개짜리 코드펜스 안에 있는 위치는 건너뛰고 찾는다.
+  // (펜스 시작 전까지 나온 ``` 개수가 홀수면 지금 위치가 펜스 "안"이라는 뜻)
+  function indexOfOutsideFence(text, marker, fromIndex){
+    let idx = fromIndex || 0;
+    while (true){
+      const found = text.indexOf(marker, idx);
+      if (found === -1) return -1;
+      const before = text.slice(0, found);
+      const fenceCount = (before.match(/```/g) || []).length;
+      if (fenceCount % 2 === 0) return found; // 짝수 = 펜스 밖
+      idx = found + marker.length; // 홀수(펜스 안)면 건너뛰고 다음 occurrence 탐색
+    }
+  }
+
   function renderAssistantReply(bubbleEl, replyText){
     let text = replyText;
 
-    const navStart = text.indexOf(NAV_START);
-    const navEnd = text.indexOf(NAV_END);
+    const navStart = indexOfOutsideFence(text, NAV_START);
+    const navEnd = navStart === -1 ? -1 : indexOfOutsideFence(text, NAV_END, navStart + NAV_START.length);
     if (navStart !== -1 && navEnd !== -1 && navEnd > navStart){
       const pathJson = text.slice(navStart + NAV_START.length, navEnd).trim();
       text = (text.slice(0, navStart) + text.slice(navEnd + NAV_END.length)).trim();
@@ -2179,8 +2334,8 @@ graph TD
       }catch(err){ console.warn('NAVIGATE_TO 파싱 실패', err); }
     }
 
-    const startIdx = text.indexOf(EDIT_START);
-    const endIdx = text.indexOf(EDIT_END);
+    const startIdx = indexOfOutsideFence(text, EDIT_START);
+    const endIdx = startIdx === -1 ? -1 : indexOfOutsideFence(text, EDIT_END, startIdx + EDIT_START.length);
     bubbleEl.innerHTML = '';
 
     if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx && isReportWriterOpen){

@@ -635,6 +635,9 @@
 </head>
 <body>
 
+  <!-- 임시 디버그 배지 — 플립모드 판정 확인용. 문제 해결되면 이 div 통째로 지우면 됨. -->
+  <div id="nxDebugBadge" style="position:fixed; top:2px; left:2px; z-index:99999; font-size:11px; background:rgba(0,0,0,0.75); color:#4f4; padding:3px 6px; border-radius:4px; pointer-events:none; font-family:monospace; white-space:nowrap;"></div>
+
   <div class="topbar">
     <input type="text" id="customerSelect" class="topbar-select" list="customerListOptions" placeholder="고객 불러오는 중…" autocomplete="off">
     <datalist id="customerListOptions"></datalist>
@@ -2535,6 +2538,12 @@ graph TD
       if (flip !== wasFlip){
         wasFlip = flip;
         document.dispatchEvent(new CustomEvent('nx:flipmode', { detail: { on: flip } }));
+      }
+
+      // 임시 디버그 배지 갱신 — 화면 좌상단에 지금 폭·단계·플립여부를 그대로 찍어준다.
+      const debugBadge = document.getElementById('nxDebugBadge');
+      if (debugBadge){
+        debugBadge.textContent = 'w:' + window.innerWidth + ' stage:' + stage + ' flip:' + (flip ? 'ON' : 'off') + ' (기준:' + FLIP_MODE_MAX_WIDTH + ')';
       }
     }
 

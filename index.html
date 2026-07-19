@@ -146,6 +146,22 @@
   /* 도구1+도구2를 하나로 합칠지는 고정된 화면폭이 아니라, 버튼 하나가 실제로 얼마나 좁아졌는지
      JS(setupToolMenuResponsive)가 재서 판단한다 — #toolMergedWrap의 표시 여부는 JS가 제어. */
 
+  /* ===== 하단 액션바 (폰모드 전용) =====
+     레이아웃전환·도구1·도구2(또는 병합된 도구)·설정 버튼을 상단에서 이 하단바로 옮겨서
+     엄지로 누르기 편한 위치에 둔다. 항상 떠있으면 그만큼 채팅 보이는 영역이 줄어드니까,
+     메시지 입력창에 포커스가 가 있는 동안(=타이핑 중, 어차피 이 버튼들 쓸 일 없음)에는
+     max-height를 0으로 접어서 그 공간을 채팅에 돌려준다. */
+  .bottombar{
+    display:none; align-items:center; gap:6px; padding:8px 10px;
+    background:var(--navy); color:#fff; border-top:3px solid var(--gold);
+    flex-shrink:0; overflow:hidden; max-height:64px; opacity:1;
+    transition:max-height 0.18s ease, opacity 0.18s ease, padding 0.18s ease, border-top-width 0.18s ease;
+  }
+  .bottombar.bottombar-active{ display:flex; }
+  .bottombar.bottombar-hidden{ max-height:0; opacity:0; padding-top:0; padding-bottom:0; border-top-width:0; }
+  /* 하단바 안의 팝업은 버튼 아래(화면 밖)가 아니라 버튼 위로 열려야 함 */
+  .bottombar .nx-popup{ top:auto; bottom:calc(100% + 6px); }
+
   /* ===== AI 설정 모달 ===== */
   .modal-overlay{
     position:fixed; inset:0; background:rgba(13,27,61,0.55);
@@ -2213,6 +2229,66 @@ graph TD
     setTimeout(evaluate, 0); // 초기 렌더 직후 폭이 확정된 다음 한 번 더 판단
   })();
 
+  // ---- 폰모드 하단 액션바 ----
+  // 화면이 아주 좁아지면(위 "2차 반응형"과 같은 기준, ≤540px) 레이아웃전환·도구1·도구2(또는
+  // 병합된 도구)·설정 버튼을 상단바에서 떼어내 화면 맨 아래로 옮긴다(엄지로 누르기 편하게).
+  // 그 버튼 자리를 comment 노드로 표시해뒀다가, 화면이 다시 넓어지면 그 자리로 되돌린다.
+  (function setupBottomBar(){
+    const PHONE_MODE_MAX_WIDTH = 540; // 도구1/2 균등폭·아이콘전용 단계와 같은 기준선
+    const bottomBar = document.getElementById('bottomBar');
+    const topbarEl = document.querySelector('.topbar');
+    const layoutBtn = document.getElementById('btnWorkspaceMode');
+    const settingsBtn = document.getElementById('btnOpenSettings');
+
+    // 상단바 안에서 이 버튼들이 원래 있던 자리를 comment 노드 두 개로 표시해둔다
+    // (레이아웃전환 버튼 하나, 도구그룹들+설정 버튼 네 개 — 이 두 자리가 서로 떨어져 있어서
+    // anchor를 하나씩 둔다).
+    const layoutAnchor = document.createComment('bottombar-layout-anchor');
+    topbarEl.insertBefore(layoutAnchor, layoutBtn);
+    const toolsAnchor = document.createComment('bottombar-tools-anchor');
+    topbarEl.insertBefore(toolsAnchor, toolGroup1Wrap);
+
+    function insertAfterAnchor(anchor, elements){
+      const ref = anchor.nextSibling;
+      elements.forEach(el => anchor.parentNode.insertBefore(el, ref));
+    }
+
+    let isPhoneMode = false;
+
+    function applyPhoneMode(on){
+      if (on === isPhoneMode) return;
+      isPhoneMode = on;
+      if (on){
+        bottomBar.appendChild(layoutBtn);
+        bottomBar.appendChild(toolGroup1Wrap);
+        bottomBar.appendChild(toolGroup2Wrap);
+        bottomBar.appendChild(toolMergedWrap);
+        bottomBar.appendChild(settingsBtn);
+        bottomBar.classList.add('bottombar-active');
+      } else {
+        insertAfterAnchor(layoutAnchor, [layoutBtn]);
+        insertAfterAnchor(toolsAnchor, [toolGroup1Wrap, toolGroup2Wrap, toolMergedWrap, settingsBtn]);
+        bottomBar.classList.remove('bottombar-active');
+        bottomBar.classList.remove('bottombar-hidden'); // 폰모드를 벗어나면 숨김상태도 초기화
+      }
+    }
+
+    function evaluatePhoneMode(){
+      applyPhoneMode(window.innerWidth <= PHONE_MODE_MAX_WIDTH);
+    }
+
+    window.addEventListener('resize', evaluatePhoneMode);
+    evaluatePhoneMode();
+
+    // 메시지 입력창에 포커스가 가 있는 동안(타이핑 중)에는 하단바를 접어서
+    // 그 공간을 채팅에 돌려준다 — 키보드가 올라오는 타이밍과 자연스럽게 맞물림.
+    const chatInputForBottomBar = document.getElementById('chatInputEl');
+    if (chatInputForBottomBar){
+      chatInputForBottomBar.addEventListener('focus', ()=> bottomBar.classList.add('bottombar-hidden'));
+      chatInputForBottomBar.addEventListener('blur', ()=> bottomBar.classList.remove('bottombar-hidden'));
+    }
+  })();
+
 
   // ============================================================
   // 자동참조 (ON: AI가 알아서 판단해 폴더/파일을 읽음 / OFF: 명시적으로 요청했을 때만) — ⚙설정 모달 안 체크박스로 관리
@@ -3840,5 +3916,6 @@ graph TD
     }
   });
 </script>
+  <div class="bottombar" id="bottomBar"></div>
 </body>
 </html>

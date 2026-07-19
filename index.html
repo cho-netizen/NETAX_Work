@@ -2496,19 +2496,35 @@ graph TD
 
     // 지금 stage를 candidateStage로 잠깐 바꿔서(화면엔 안 그려짐 — 아래 설명 참고) 그 상태로
     // 한 줄로 쭉 펼쳤을 때 실제로 몇 px가 필요한지(scrollWidth)를 재고 원래 상태로 되돌린다.
+    // id가 겹치면(getElementById 혼선) 안 되므로 복제본에서는 전부 지운다.
+    function stripIds_(el){
+      if (el.id) el.removeAttribute('id');
+      Array.from(el.children).forEach(stripIds_);
+    }
+
+    // 화면에 있는 진짜 상단바를 클래스만 바꿔가며 그 자리에서 재는 방식이 두 번이나 실패해서
+    // (원인 불명 — flex-shrink·display:contents 관련 브라우저 특이사항으로 추정),
+    // 아예 화면 밖(안 보이는 곳)에 상단바를 통째로 복제해서 폭 제약 없이 자연스럽게 펼친 뒤
+    // 그 복제본의 진짜 필요폭을 직접 재는, 훨씬 더 확실한 방식으로 바꾼다.
     function measureRequiredWidth(candidateStage){
+      const clone = topbarEl.cloneNode(true);
+      stripIds_(clone);
+      clone.classList.remove('measuring');
+      clone.style.position = 'fixed';
+      clone.style.left = '-99999px';
+      clone.style.top = '0';
+      clone.style.width = 'auto';
+      clone.style.maxWidth = 'none';
+      clone.style.flexWrap = 'nowrap';
+      clone.style.visibility = 'hidden';
+      document.body.appendChild(clone);
+
       const prevBodyClass = bodyEl.className;
       bodyEl.className = prevBodyClass.replace(/\bstage-\S+/g, '').trim() + ' stage-' + candidateStage;
-      // 클래스(.measuring)로 nowrap을 걸었더니 실제로는 안 먹히는 경우가 있어서(다른 규칙에
-      // 밀렸는지 원인은 불명확), 인라인 스타일 + !important로 직접 강제한다 — 이러면 다른 CSS
-      // 규칙이 뭐가 됐든 무조건 이긴다.
-      const prevWrap = topbarEl.style.getPropertyValue('flex-wrap');
-      const prevWrapPriority = topbarEl.style.getPropertyPriority('flex-wrap');
-      topbarEl.style.setProperty('flex-wrap', 'nowrap', 'important');
-      const required = topbarEl.scrollWidth;
-      if (prevWrap) topbarEl.style.setProperty('flex-wrap', prevWrap, prevWrapPriority);
-      else topbarEl.style.removeProperty('flex-wrap');
+      const required = clone.scrollWidth;
       bodyEl.className = prevBodyClass; // 측정 즉시 원상복구 — 동기 실행이라 화면엔 안 그려짐
+
+      document.body.removeChild(clone);
       return required;
     }
 
@@ -2605,7 +2621,7 @@ graph TD
       // 임시 디버그 배지 갱신 — 화면 좌상단에 지금 폭·높이·단계·플립/미니 여부·실측폭을 그대로 찍어준다.
       const debugBadge = document.getElementById('nxDebugBadge');
       if (debugBadge){
-        debugBadge.innerHTML = '[v2] w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
+        debugBadge.innerHTML = '[v3] w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
           + ' flip:' + (flip ? 'ON' : 'off') + ' mini:' + (mini ? 'ON' : 'off') + ' (flip기준:' + FLIP_MODE_MAX_WIDTH + ')'
           + '<br>available:' + lastMeasure.available + ' reqFull:' + lastMeasure.reqFull + ' reqGrouped:' + lastMeasure.reqGrouped;
       }

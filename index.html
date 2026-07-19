@@ -2394,6 +2394,11 @@ graph TD
     const topbarEl = document.querySelector('.topbar');
     const bodyEl = document.body;
     const cluster = document.getElementById('topbarActionCluster');
+    // max-height 트랜지션이 끝나는 순간에도 한 번 더 정확히 재서, setTimeout 타이밍이
+    // 살짝 어긋나는 경우(기기 성능 편차 등)까지 이중으로 보정한다.
+    cluster.addEventListener('transitionend', (e)=>{
+      if (e.propertyName === 'max-height') updateBottombarHeightVar();
+    });
 
     // 지금 stage를 candidateStage로 잠깐 바꿔서(화면엔 안 그려짐 — 아래 설명 참고) 그 상태로
     // 한 줄로 쭉 펼쳤을 때 실제로 몇 px가 필요한지(scrollWidth)를 재고 원래 상태로 되돌린다.
@@ -2492,7 +2497,12 @@ graph TD
       });
       chatInputForBottomBar.addEventListener('blur', ()=>{
         bodyEl.classList.remove('bottombar-hidden');
+        // 하단바가 접힌 상태(0)에서 펼쳐지는 애니메이션(0.18초)이 막 시작된 시점이라,
+        // 지금 바로 재면 "다 펼쳐지기 전의 작은 값"이 잡혀서 여백이 부족하게 계산된다.
+        // 일단 한 번 재두고(즉시 반응하는 느낌은 유지), 애니메이션이 끝난 뒤 정확한 값으로
+        // 한 번 더 재서 덮어씌운다 — 그래야 입력창이 하단바에 가려지지 않는다.
         updateBottombarHeightVar();
+        setTimeout(updateBottombarHeightVar, 220);
       });
     }
   })();

@@ -460,7 +460,7 @@
   .attach-chip .x:hover{ color:#a83232; }
 
   /* ===== 탐색기 / 편집기 패널 ===== */
-  .breadcrumb{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--sub); }
+  .breadcrumb{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--sub); min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
   .breadcrumb b{ color:var(--navy); }
   .breadcrumb .sep{ color:#c3c8d1; }
   .explorer-body{ flex:1; overflow-y:auto; padding:6px; }
@@ -845,6 +845,9 @@
     <div class="panel explorer">
       <div class="panel-head" id="explorerPanelHead">
         <div class="breadcrumb" id="breadcrumb">&nbsp;</div>
+        <div class="spacer"></div>
+        <button type="button" id="btnNewFolder" class="ghost-btn" title="지금 보고 있는 폴더 안에 새 폴더를 만듭니다" style="padding:5px 10px; font-size:11.5px;">📁 새 폴더</button>
+        <button type="button" id="btnNewDoc" class="ghost-btn" title="지금 보고 있는 폴더 안에 새 문서(.md)를 만들고 바로 편집기로 엽니다" style="padding:5px 10px; font-size:11.5px;">📄 새 문서</button>
       </div>
 
       <div id="diagramView" style="display:none; flex:1; flex-direction:column; min-height:0;">
@@ -890,7 +893,7 @@ graph TD
         </div>
       </div>
 
-      <div id="explorerView">
+      <div id="explorerView" style="display:flex; flex:1; flex-direction:column; min-height:0;">
         <div class="explorer-body" id="explorerBody">
           <div class="explorer-status">불러오는 중…</div>
         </div>
@@ -1369,7 +1372,7 @@ graph TD
   document.getElementById('btnBack').addEventListener('click', ()=>{
     editorFrame.src = 'about:blank';
     hideAllPanelViews();
-    explorerView.style.display = 'block';
+    explorerView.style.display = 'flex';
     explorerPanelHead.style.display = 'flex'; // 탐색 중일 때는 경로표시줄 다시 보이게
     currentOpenFile = null;
     isReportWriterOpen = false;
@@ -1505,7 +1508,7 @@ graph TD
 
   function closeLogView(){
     hideAllPanelViews();
-    explorerView.style.display = 'block';
+    explorerView.style.display = 'flex';
     explorerPanelHead.style.display = 'flex';
     navigateTo(logCurrentPath); // 방금 저장한 경과지.json이 목록에 바로 보이도록 새로고침
   }
@@ -1739,7 +1742,7 @@ graph TD
       await saveCalcNow();
     }
     hideAllPanelViews();
-    explorerView.style.display = 'block';
+    explorerView.style.display = 'flex';
     explorerPanelHead.style.display = 'flex';
     navigateTo(calcCurrentPath); // 방금 저장한 계산기.json이 목록에 바로 보이도록 새로고침
   }
@@ -1928,7 +1931,7 @@ graph TD
 
   function closeTrashView(){
     hideAllPanelViews();
-    explorerView.style.display = 'block';
+    explorerView.style.display = 'flex';
     explorerPanelHead.style.display = 'flex';
     navigateTo(trashCurrentPath); // 복원한 항목이 목록에 바로 보이도록 새로고침
   }
@@ -2014,7 +2017,7 @@ graph TD
 
   function closeDashboardView(){
     hideAllPanelViews();
-    explorerView.style.display = 'block';
+    explorerView.style.display = 'flex';
     explorerPanelHead.style.display = 'flex';
     navigateTo(explorerPath);
   }
@@ -2084,7 +2087,7 @@ graph TD
 
   function closeSearchView(){
     hideAllPanelViews();
-    explorerView.style.display = 'block';
+    explorerView.style.display = 'flex';
     explorerPanelHead.style.display = 'flex';
     navigateTo(explorerPath);
   }
@@ -2189,7 +2192,7 @@ graph TD
 
   function closeDiagramView(){
     hideAllPanelViews();
-    explorerView.style.display = 'block';
+    explorerView.style.display = 'flex';
     explorerPanelHead.style.display = 'flex';
     navigateTo(diagramCurrentPath); // 방금 저장한 관계도.mmd가 목록에 바로 보이도록 새로고침
   }
@@ -2549,6 +2552,36 @@ graph TD
       navigateTo(explorerPath); // 바뀐 이름이 목록에 바로 보이도록 새로고침
     }catch(err){
       alert('이름 변경 중 오류: ' + (err && err.message ? err.message : err));
+    }
+  });
+
+  // ---- 새 폴더 / 새 문서 만들기 (탐색기 상단, 경로표시줄 오른쪽) ----
+  document.getElementById('btnNewFolder').addEventListener('click', async ()=>{
+    const name = prompt('새 폴더 이름을 입력하세요:');
+    if (!name || !name.trim()) return;
+    try{
+      const res = await callGas('createFolder', { path: explorerPath, name: name.trim() });
+      if (res.error){ alert('폴더 만들기 실패: ' + res.error); return; }
+      navigateTo(explorerPath); // 새 폴더가 목록에 바로 보이도록 새로고침
+    }catch(err){
+      alert('폴더 만들기 중 오류: ' + (err && err.message ? err.message : err));
+    }
+  });
+
+  document.getElementById('btnNewDoc').addEventListener('click', async ()=>{
+    let name = prompt('새 문서 이름을 입력하세요 (확장자는 자동으로 .md가 붙습니다):');
+    if (!name || !name.trim()) return;
+    name = name.trim();
+    if (!/\.md$/i.test(name)) name += '.md';
+    try{
+      const res = await callGas('uploadFile', {
+        path: explorerPath, name: name, mimeType: 'text/markdown',
+        base64Data: utf8ToBase64('# ' + name.replace(/\.md$/i, '') + '\n\n')
+      });
+      if (res.error){ alert('문서 만들기 실패: ' + res.error); return; }
+      openEditor({ id: res.id, name: name, mimeType: 'text/markdown' }); // 만들자마자 바로 편집기로 열기
+    }catch(err){
+      alert('문서 만들기 중 오류: ' + (err && err.message ? err.message : err));
     }
   });
 
@@ -3034,7 +3067,7 @@ graph TD
 
   function closeCaptureView(){
     hideAllPanelViews();
-    explorerView.style.display = 'block';
+    explorerView.style.display = 'flex';
     explorerPanelHead.style.display = 'flex';
     pendingCaptureDataUrl = null;
     closeCropMode(); // 자르기 모드를 열어둔 채 닫았으면 정리
@@ -3332,10 +3365,13 @@ graph TD
 
     const thinkingBubble = appendBubble('assistant', '생각 중…');
 
-    // report-writer가 열려있으면 "지금 타이핑 중인(저장 전) 내용"까지 실시간으로 받아옴 — 이미지/PDF와 동일하게 자동참조 ON일 때만
-    const liveContent = autoRefMode ? await getEditorLiveContent() : null;
+    // report-writer가 열려있으면 "지금 타이핑 중인(저장 전) 내용"까지 실시간으로 받아온다.
+    // 이건 자동참조(여러 폴더/파일을 알아서 뒤지는 기능) 설정과는 별개다 — 지금 사용자가 화면에
+    // 펼쳐놓고 보고 있는 문서 하나일 뿐이라 비용도 적고, "편집기 열어두면 AI가 내용을 알아서
+    // 인지하고 수정 제안도 해준다"는 게 이 도구의 핵심 기능이라 자동참조 OFF여도 항상 켜둔다.
+    const liveContent = await getEditorLiveContent();
     // report-writer가 아니라 이미지·PDF 뷰어로 열려 있으면, 자동참조가 ON일 때만 그 파일을 이번 요청에 실어보냄.
-    // (OFF일 때 매턴 자동전송하면 낭비이므로, 명시적으로 열어보고 싶으면 첨부 기능을 쓰거나 자동참조를 켜야 함)
+    // (이미지·PDF는 용량이 있어 매턴 자동전송하면 낭비이므로, 명시적으로 열어보고 싶으면 첨부 기능을 쓰거나 자동참조를 켜야 함)
     const openFileMediaBlock = autoRefMode ? await getOpenFileMediaBlock() : null;
     // 화면캡처·명시적 참조 첨부는 사용자가 직접 붙인 것이므로 자동참조 여부와 무관하게 항상 포함
     const captureBlocks = capturesForThisMessage

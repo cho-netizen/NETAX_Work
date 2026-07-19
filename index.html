@@ -2605,7 +2605,7 @@ graph TD
       // 임시 디버그 배지 갱신 — 화면 좌상단에 지금 폭·높이·단계·플립/미니 여부·실측폭을 그대로 찍어준다.
       const debugBadge = document.getElementById('nxDebugBadge');
       if (debugBadge){
-        debugBadge.innerHTML = 'w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
+        debugBadge.innerHTML = '[v2] w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
           + ' flip:' + (flip ? 'ON' : 'off') + ' mini:' + (mini ? 'ON' : 'off') + ' (flip기준:' + FLIP_MODE_MAX_WIDTH + ')'
           + '<br>available:' + lastMeasure.available + ' reqFull:' + lastMeasure.reqFull + ' reqGrouped:' + lastMeasure.reqGrouped;
       }

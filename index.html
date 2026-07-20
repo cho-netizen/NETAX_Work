@@ -655,7 +655,7 @@
 <body>
 
   <!-- 임시 디버그 배지 — 플립모드 판정 확인용. 문제 해결되면 이 div 통째로 지우면 됨. -->
-  <div id="nxDebugBadge" style="position:fixed; top:2px; left:2px; right:2px; z-index:99999; font-size:11px; background:rgba(0,0,0,0.75); color:#4f4; padding:3px 6px; border-radius:4px; pointer-events:none; font-family:monospace; white-space:normal; overflow-wrap:break-word; max-width:calc(100vw - 8px);"></div>
+  <div id="nxDebugBadge" style="position:fixed; top:calc(var(--topbar-h, 50px) + 4px); left:2px; right:2px; z-index:99999; font-size:11px; background:rgba(0,0,0,0.75); color:#4f4; padding:3px 6px; border-radius:4px; pointer-events:none; font-family:monospace; white-space:normal; overflow-wrap:break-word; max-width:calc(100vw - 8px);"></div>
 
   <!-- 작업표시줄모드 전용(별도로 띄운 작은 창에서만 보임, ?taskbar=1일 때만 활성화) -->
   <div id="taskbarBar" style="display:none;">

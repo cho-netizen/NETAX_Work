@@ -684,12 +684,16 @@
   <div class="topbar">
     <input type="text" id="customerSelect" class="topbar-select" list="customerListOptions" placeholder="고객 불러오는 중…" autocomplete="off">
     <datalist id="customerListOptions"></datalist>
-    <!-- 폰(compact) 전용 모드버튼 3개: 탐색작업창(레이아웃 순환) · 자동참조 · 웹서치.
+    <!-- 폰(compact) 전용 모드버튼들: 탐색작업창(레이아웃 순환) · 자동참조 · 웹서치 · 가져오기 · 외부조회.
          작업폴더(customerSelect) 바로 오른쪽에 위치, 항상 상단바에 남아있고 하단으로 안 내려감. -->
     <button id="btnWorkspaceMode" class="tb-btn" title="탐색작업창 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기)"><span id="workspaceModeIcon">⬓</span> <span class="tool-menu-label" id="workspaceModeLabel">좌우</span></button>
     <button type="button" id="btnModeAutoRef" class="tb-btn" title="자동참조: AI가 알아서 판단해서 지금 보고 있는 폴더/파일을 확인">🔗 <span class="tool-menu-label">자동참조</span></button>
     <button type="button" id="btnModeWebSearch" class="tb-btn" title="웹서치: AI가 필요하면 인터넷에서 검색">🌐 <span class="tool-menu-label">웹서치</span></button>
     <button type="button" id="btnModeWebFetch" class="tb-btn" title="웹페이지 가져오기: 채팅에 붙여넣은 URL을 AI가 직접 열어서 읽음">📥 <span class="tool-menu-label">가져오기</span></button>
+    <div class="topbar-item" id="externalSitesWrap" style="position:relative;">
+      <button type="button" id="btnExternalSites" class="tb-btn" title="국토부 실거래가·공시가격 등 API로 못 가져오는 사이트를 새 탭으로 엽니다 — 조회한 값은 복사해서 채팅에 붙여넣어 주세요">🔗 <span class="tool-menu-label">외부조회</span></button>
+      <div id="externalSitesPopup" class="nx-popup"></div>
+    </div>
     <div class="layout-buttons-wide">
       <button type="button" id="btnLayoutRow" class="tb-btn" data-mode="row" title="좌우 배치">⬓ 좌우</button>
       <button type="button" id="btnLayoutCol" class="tb-btn" data-mode="col" title="상하 배치">⬒ 상하</button>
@@ -2502,6 +2506,22 @@ graph TD
 
   loadCustomers();
 
+  // ---- 외부조회(새 탭) — API로 못 가져오는 사이트(공시가격·부동산공시가격알리미 등)를
+  // 새 탭으로 열어서 직접 조회한 뒤, 값을 복사해 채팅에 붙여넣는 흐름을 위한 바로가기 모음.
+  // (iframe으로 안 되는 이유: 상당수 정부·공공 사이트가 다른 사이트 안에 끼워넣는 것 자체를
+  //  막아두고 있고, 설령 끼워넣어도 동일출처정책 때문에 스크립트로 내용을 읽거나 조작할 수 없음)
+  const EXTERNAL_SITES = [
+    { icon: '🏢', label: '국토부 실거래가', handler: () => window.open('https://rt.molit.go.kr', '_blank', 'noopener') },
+    { icon: '🏷', label: '부동산공시가격알리미', handler: () => window.open('https://www.realtyprice.kr', '_blank', 'noopener') },
+    { icon: '🏗', label: '건축HUB(세움터)', handler: () => window.open('https://cloud.eais.go.kr', '_blank', 'noopener') },
+    { icon: '🧾', label: '홈택스', handler: () => window.open('https://hometax.go.kr', '_blank', 'noopener') },
+    { icon: '⚖', label: '국가법령정보센터', handler: () => window.open('https://www.law.go.kr', '_blank', 'noopener') },
+    { icon: '📜', label: '인터넷등기소', handler: () => window.open('https://www.iros.go.kr', '_blank', 'noopener') },
+    { icon: '🏛', label: '정부24', handler: () => window.open('https://www.gov.kr', '_blank', 'noopener') }
+  ];
+  const btnExternalSites = document.getElementById('btnExternalSites');
+  const externalSitesPopup = document.getElementById('externalSitesPopup');
+
   // ---- 좁은 화면(PC/탭, grouped 단계)용 도구 그룹 팝업 — 도구1/도구2 2그룹 ----
   const TOOL_GROUP_1 = [
     { icon: '🔍', label: '검색', handler: openSearchView },
@@ -2574,6 +2594,7 @@ graph TD
 
   fillToolPopup(toolGroup1Popup, TOOL_GROUP_1);
   fillToolPopup(toolGroup2Popup, TOOL_GROUP_2);
+  fillToolPopup(externalSitesPopup, EXTERNAL_SITES);
   fillToolPopup(mgFilesPopup, MOBILE_GROUP_FILES);
   fillToolPopup(mgRecordsPopup, MOBILE_GROUP_RECORDS);
   fillToolPopup(mgAnalysisPopup, MOBILE_GROUP_ANALYSIS);
@@ -2582,6 +2603,7 @@ graph TD
 
   const ALL_GROUP_POPUPS = [
     [toolGroup1Popup, btnToolGroup1], [toolGroup2Popup, btnToolGroup2],
+    [externalSitesPopup, btnExternalSites],
     [mgFilesPopup, mgFilesBtn], [mgRecordsPopup, mgRecordsBtn], [mgAnalysisPopup, mgAnalysisBtn],
     [mgCapturePopup, mgCaptureBtn], [mgConfigPopup, mgConfigBtn]
   ];

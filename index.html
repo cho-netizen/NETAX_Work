@@ -148,17 +148,21 @@
 
      예전엔 중간 단계(grouped)에서 도구 9개를 한 번에 "도구1/도구2" 2개로 뭉개버렸는데,
      이건 "충분히 넓은 화면"에서도 경계선 하나를 넘는 순간 전부 뭉쳐 보이는 부자연스러운
-     이분법이었다. 지금은 그 대신 desktop(=stage-full) 단계 안에서 도구버튼이 뒤쪽부터
-     하나씩 순서대로 "더보기"(#toolOverflowWrap) 안으로 접힌다 — 몇 개가 들어가는지는
-     JS(applyVisibleToolCount)가 매번 실측해서 정한다. 그래서 창을 서서히 줄이면 버튼이
-     한꺼번에 뭉치지 않고 하나씩 자연스럽게 접힌다.
+     이분법이었다. 지금은 desktop(=stage-full) 단계 안에서 압축을 "작은 것부터 큰 것 순서로"
+     두 단계에 걸쳐 한다: ① 도구버튼이 뒤쪽부터 하나씩 순서대로 "더보기"(#toolOverflowWrap)
+     안으로 접힌다. ② 도구를 0개까지 다 접어도 여전히 안 들어갈 만큼 좁으면(레이아웃 4버튼
+     자체가 자리를 많이 차지하는 게 원인), 그제서야 레이아웃 4버튼(좌우·상하·생략·띄우기)도
+     순환버튼 1개로 접는다(body.layout-collapsed). 몇 개/어느 단계가 맞는지는
+     JS(resolveDesktopConfig/applyDesktopConfig)가 매번 실측해서 정한다. 그래서 창을 서서히
+     줄이면 버튼이 한꺼번에 뭉치지 않고 작은 것부터 하나씩 자연스럽게 접힌다.
 
      두 단계의 역할:
-     - full(=desktop, PC/탭 전부): 레이아웃 4버튼 + 도구버튼(들어가는 만큼 개별표시, 안 들어가는
-       나머지는 "더보기" 안으로) + 설정
-     - compact(폰): 상단엔 [작업폴더] + [탐색작업창·자동참조·웹서치·가져오기] 모드버튼 4개만
-       남고, 나머지 도구는 검색·기록·분석·캡처·설정 5그룹으로 나뉘어 하단 고정바로 옮겨감
-       (옮기는 건 DOM이 아니라 CSS position — #topbarActionCluster 항목 참고) */
+     - full(=desktop, PC/탭 전부): 레이아웃(4버튼 또는 다 안 들어가면 1순환버튼) + 도구버튼
+       (들어가는 만큼 개별표시, 안 들어가는 나머지는 "더보기" 안으로) + 설정
+     - compact(폰, 또는 desktop이 레이아웃까지 접어도 여전히 안 들어갈 만큼 좁을 때): 상단엔
+       [작업폴더] + [탐색작업창·자동참조·웹서치·가져오기] 모드버튼 4개만 남고, 나머지 도구는
+       검색·기록·분석·캡처·설정 5그룹으로 나뉘어 하단 고정바로 옮겨감(옮기는 건 DOM이 아니라
+       CSS position — #topbarActionCluster 항목 참고) */
 
   /* 기본값(=stage-full, JS 실행 전에도 일단 이 형태로 보이도록): 개별 버튼 전부 표시 */
   .layout-buttons-wide{ display:contents; }
@@ -176,6 +180,13 @@
   /* "더보기" 버튼 — JS가 도구버튼 중 몇 개가 안 들어가는지 실측해서, 안 들어가는 만큼만
      이 버튼을 통해서 팝업으로 접근하게 한다(display 여부도 JS가 직접 결정). */
   #toolOverflowWrap .tool-menu-label{ display:inline; }
+
+  /* desktop(=stage-full) 안에서도, 도구버튼을 0개까지 다 접어도 여전히 안 들어갈 만큼 좁으면
+     레이아웃 4버튼(좌우·상하·생략·띄우기)까지 순환버튼 1개로 접는다 — 이것도 도구버튼과 같은
+     "일단 다 보여주고, 안 들어가면 그 다음으로 큰 걸 하나씩 접는다"는 원칙을 그대로 따른다.
+     body에 layout-collapsed가 붙었을 때만 전환되고, 이 판단은 JS(resolveDesktopConfig)가 한다. */
+  body.stage-full.layout-collapsed .layout-buttons-wide{ display:none; }
+  body.stage-full.layout-collapsed #btnWorkspaceMode{ display:inline-flex; }
 
   /* ---- compact(폰): 상단엔 모드버튼 4개만, 도구는 전부 하단 5그룹으로 ---- */
   body.stage-compact .layout-buttons-wide{ display:none; }
@@ -669,7 +680,7 @@
     <datalist id="customerListOptions"></datalist>
     <!-- 폰(compact) 전용 모드버튼 3개: 탐색작업창(레이아웃 순환) · 자동참조 · 웹서치.
          작업폴더(customerSelect) 바로 오른쪽에 위치, 항상 상단바에 남아있고 하단으로 안 내려감. -->
-    <button id="btnWorkspaceMode" class="tb-btn" data-mode-btn-idx="0" title="탐색작업창 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기)"><span id="workspaceModeIcon">⬓</span> <span class="tool-menu-label" id="workspaceModeLabel">좌우</span></button>
+    <button id="btnWorkspaceMode" class="tb-btn" data-mode-btn-idx="0" data-layout-cycle title="탐색작업창 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기)"><span id="workspaceModeIcon">⬓</span> <span class="tool-menu-label" id="workspaceModeLabel">좌우</span></button>
     <button type="button" id="btnModeAutoRef" class="tb-btn" data-mode-btn-idx="1" title="자동참조: AI가 알아서 판단해서 지금 보고 있는 폴더/파일을 확인">🔗 <span class="tool-menu-label">자동참조</span></button>
     <button type="button" id="btnModeWebSearch" class="tb-btn" data-mode-btn-idx="2" title="웹서치: AI가 필요하면 인터넷에서 검색">🌐 <span class="tool-menu-label">웹서치</span></button>
     <button type="button" id="btnModeWebFetch" class="tb-btn" data-mode-btn-idx="3" title="웹페이지 가져오기: 채팅에 붙여넣은 URL을 AI가 직접 열어서 읽음">📥 <span class="tool-menu-label">가져오기</span></button>
@@ -2402,7 +2413,7 @@ graph TD
   }
 
   // desktop(=stage-full) 단계에서 좁아져 안 들어가는 도구버튼들이 순서대로 담기는 "더보기" 팝업.
-  // 내용은 고정이 아니라 매번 실측 결과(applyVisibleToolCount)에 따라 다시 채워진다.
+  // 내용은 고정이 아니라 매번 실측 결과(applyDesktopConfig)에 따라 다시 채워진다.
   const toolOverflowWrap = document.getElementById('toolOverflowWrap');
   const btnToolOverflow = document.getElementById('btnToolOverflow');
   const toolOverflowPopup = document.getElementById('toolOverflowPopup');
@@ -2508,9 +2519,9 @@ graph TD
 
     let lastMeasure = { available: 0, reqCore: 0, reqAll: 0 }; // 디버그 배지 표시용
 
-    // "도구버튼 n개까지 개별표시 + 나머지는 더보기"일 때 필요한 폭을 잰다.
-    // desktop 단계 자체가 성립하는지(=레이아웃4+도구0개+설정만이라도 들어가는지)도 이걸로 같이 확인한다.
-    function measureToolCount_(n){
+    // "도구버튼 n개까지 개별표시(나머지는 더보기) + 레이아웃을 4버튼으로 둘지/1버튼으로 접을지"
+    // 조합일 때 필요한 폭을 잰다.
+    function measureDesktopConfig_(n, layoutCollapsed){
       syncMeasureClone_();
       const prevBodyClass = bodyEl.className;
       bodyEl.className = prevBodyClass.replace(/\bstage-\S+/g, '').trim() + ' stage-full';
@@ -2520,37 +2531,62 @@ graph TD
       const cloneOverflow = measureClone.querySelector('[data-overflow-wrap]');
       if (cloneOverflow) cloneOverflow.style.display = (n < cloneTools.length) ? '' : 'none';
 
+      const cloneLayoutWide = measureClone.querySelector('.layout-buttons-wide');
+      const cloneLayoutCycle = measureClone.querySelector('[data-layout-cycle]');
+      if (cloneLayoutWide) cloneLayoutWide.style.display = layoutCollapsed ? 'none' : 'contents';
+      if (cloneLayoutCycle) cloneLayoutCycle.style.display = layoutCollapsed ? 'inline-flex' : 'none';
+
       const required = measureClone.scrollWidth;
       bodyEl.className = prevBodyClass; // 동기 실행 중 즉시 원상복구 — 화면(진짜 상단바)엔 애초에 손도 안 댐
       return required;
     }
 
-    // 도구버튼을 9개→8개→…→0개까지 하나씩 줄여가며 "몇 개까지 개별표시하면 한 줄에 들어가는지"를
-    // 찾는다. 0개(=더보기 버튼 하나만)조차 안 들어가면 desktop 자체가 무리라는 뜻이라 -1을 돌려준다
-    // (그러면 compact/폰 화면으로 전환됨). 이게 예전의 "전부 보이거나 전부 뭉치거나" 이분법을 없애고,
-    // 창을 서서히 줄이면 도구가 뒤쪽부터 하나씩만 순서대로 접히게 만드는 핵심이다.
-    function resolveVisibleToolCount(){
+    // 1단계: 레이아웃 4버튼은 그대로 둔 채, 도구버튼을 9개→0개까지 하나씩 줄여가며 맞는 걸 찾는다.
+    // 2단계: 도구 0개까지 줄여도(=더보기 버튼 하나만 남아도) 여전히 안 들어가면, 그제서야
+    // 레이아웃 4버튼도 순환버튼 1개로 접고 같은 방식으로 다시 도구 개수를 찾는다.
+    // 그래도(레이아웃 1버튼+도구 0개) 안 들어가면 desktop 자체를 포기(null)하고 compact(폰
+    // 화면)로 넘어간다. 이게 예전의 "전부 보이거나 전부 뭉치거나" 이분법을 없애는 핵심이다 —
+    // "큰 걸(레이아웃 4버튼)"보다 "작은 걸(도구버튼 하나하나)"부터 먼저 접어보고, 그래도 안
+    // 되면 그 다음으로 큰 것을 접는 순서로 항상 "지금 가능한 가장 안 압축된 형태"를 고른다.
+    function resolveDesktopConfig(){
       const available = topbarEl.clientWidth - 4; // 스크롤바 등 오차 여유
-      const reqAll = measureToolCount_(TOOL_BUTTON_COUNT);
-      const reqCore = measureToolCount_(0);
-      lastMeasure = { available, reqCore, reqAll };
-      if (reqCore > available) return -1; // 도구 0개(핵심요소만)도 안 들어가면 desktop 불가 → compact
-      if (reqAll <= available) return TOOL_BUTTON_COUNT; // 다 들어가면 굳이 하나씩 잴 필요 없이 바로 확정
-      for (let n = TOOL_BUTTON_COUNT - 1; n >= 1; n--){
-        if (measureToolCount_(n) <= available) return n;
+
+      for (const layoutCollapsed of [false, true]){
+        const reqAll = measureDesktopConfig_(TOOL_BUTTON_COUNT, layoutCollapsed);
+        if (reqAll <= available) return { toolCount: TOOL_BUTTON_COUNT, layoutCollapsed, reqCore: null, reqAll };
+
+        const reqCore = measureDesktopConfig_(0, layoutCollapsed);
+        if (reqCore > available){
+          lastMeasure = { available, reqCore, reqAll };
+          continue; // 이 레이아웃 상태로는 도구 0개도 안 들어감 → (아직 false 차례였다면) 레이아웃 접기로 넘어감
+        }
+
+        for (let n = TOOL_BUTTON_COUNT - 1; n >= 1; n--){
+          const req = measureDesktopConfig_(n, layoutCollapsed);
+          if (req <= available){
+            lastMeasure = { available, reqCore, reqAll };
+            return { toolCount: n, layoutCollapsed, reqCore, reqAll };
+          }
+        }
+        lastMeasure = { available, reqCore, reqAll };
+        return { toolCount: 0, layoutCollapsed, reqCore, reqAll };
       }
-      return 0;
+      return null; // 레이아웃을 접어도 도구 0개조차 안 들어가면 desktop 자체를 포기 → compact
     }
 
-    // 확정된 개수만큼 실제(화면에 보이는 진짜) 도구버튼을 켜고, 나머지는 "더보기" 팝업 안으로.
-    let appliedToolCount = null;
-    function applyVisibleToolCount(n){
-      if (n === appliedToolCount) return;
-      appliedToolCount = n;
+    // 확정된 설정을 실제(화면에 보이는 진짜) 상단바에 반영한다.
+    let appliedConfigKey = null;
+    function applyDesktopConfig(config){
+      const key = config.toolCount + ':' + config.layoutCollapsed;
+      if (key === appliedConfigKey) return;
+      appliedConfigKey = key;
+
+      bodyEl.classList.toggle('layout-collapsed', config.layoutCollapsed);
+
       const realTools = Array.from(topbarEl.querySelectorAll('[data-tool-idx]'));
       const hidden = [];
       realTools.forEach((btn, i)=>{
-        const show = i < n;
+        const show = i < config.toolCount;
         btn.style.display = show ? '' : 'none';
         if (!show) hidden.push(btn);
       });
@@ -2611,7 +2647,14 @@ graph TD
 
     function updateModeButtonsLabeled(currentStage){
       if (currentStage !== 'compact'){
-        appliedModeLabelCount = null; // 다음에 compact로 돌아왔을 때 다시 확실히 재적용되도록 초기화
+        if (appliedModeLabelCount !== null){
+          // compact를 벗어나면 라벨 표시여부 판단 자체를 안 하니(desktop에선 CSS 기본값에 맡김),
+          // compact에 있을 때 inline으로 걸어뒀던 display:none 잔여물을 확실히 지워야 한다 —
+          // 안 지우면 desktop에서 레이아웃이 접혀 순환버튼(#btnWorkspaceMode)이 나타날 때
+          // 라벨이 예전 compact 상태 그대로 숨겨진 채로 남아있을 수 있다.
+          topbarEl.querySelectorAll('[data-mode-btn-idx] .tool-menu-label').forEach(label => { label.style.display = ''; });
+          appliedModeLabelCount = null;
+        }
         return;
       }
       applyModeLabelCount(resolveModeLabelCount());
@@ -2638,13 +2681,14 @@ graph TD
     let wasMin = false;
 
     function update(){
-      const visibleToolCount = resolveVisibleToolCount();
-      const stage = visibleToolCount < 0 ? 'compact' : 'full';
+      const config = resolveDesktopConfig();
+      const stage = config ? 'full' : 'compact';
       if (stage !== currentStage){
         currentStage = stage;
         bodyEl.className = bodyEl.className.replace(/\bstage-\S+/g, '').trim() + ' stage-' + stage;
       }
-      if (stage === 'full') applyVisibleToolCount(visibleToolCount);
+      if (stage === 'full') applyDesktopConfig(config);
+      else bodyEl.classList.remove('layout-collapsed'); // compact에선 이 클래스 자체가 무의미 — 깨끗하게 정리
       updateModeButtonsLabeled(stage);
       updateBottombarHeightVar();
       updateTopbarHeightVar();
@@ -2672,8 +2716,9 @@ graph TD
       // 임시 디버그 배지 — 문제 해결 확인되면 이 블록과 #nxDebugBadge div 통째로 지우면 됨.
       const debugBadge = document.getElementById('nxDebugBadge');
       if (debugBadge){
-        debugBadge.innerHTML = '[v8] w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
-          + ' tools:' + visibleToolCount + '/' + TOOL_BUTTON_COUNT
+        debugBadge.innerHTML = '[v9] w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
+          + ' tools:' + (config ? config.toolCount : '-1') + '/' + TOOL_BUTTON_COUNT
+          + ' layout:' + (config && config.layoutCollapsed ? '접힘' : '4버튼')
           + ' flip:' + (flip ? 'ON' : 'off') + ' min:' + (isMin ? 'ON' : 'off') + ' (flip기준:' + FLIP_MODE_MAX_WIDTH + ')'
           + '<br>available:' + lastMeasure.available + ' reqCore:' + lastMeasure.reqCore + ' reqAll:' + lastMeasure.reqAll;
       }

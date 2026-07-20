@@ -879,9 +879,32 @@
   .floating-panel-handle span:hover{ color:#333; }
   .floating-panel .statute-modal-body{ padding:16px 20px 20px; margin-bottom:0; }
 
+  /* ===== 토스트 알림 (NX 작업실 index.html과 동일 디자인) =====
+     여러 파일을 한 번에 업로드할 때처럼 실패가 반복적으로 발생할 수 있는 곳에서
+     alert()를 쓰면 브라우저가 반복 호출을 차단할 수 있어, 흐름을 막지 않는 알림으로 통일한다. */
+  #nxToastHost{
+    position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:9999;
+    display:flex; flex-direction:column; gap:8px; align-items:center;
+    pointer-events:none; width:min(92vw, 420px);
+  }
+  .nx-toast{
+    pointer-events:auto; width:100%; box-sizing:border-box;
+    padding:10px 14px; border-radius:10px; font-size:13.5px; line-height:1.4;
+    color:#fff; box-shadow:0 6px 18px rgba(0,0,0,0.25);
+    background:#3D5378; opacity:0; transform:translateY(8px);
+    transition:opacity 0.18s ease, transform 0.18s ease; cursor:pointer;
+    word-break:keep-all; white-space:pre-line;
+  }
+  .nx-toast.show{ opacity:1; transform:translateY(0); }
+  .nx-toast.error{ background:#B3261E; }
+  .nx-toast.warning{ background:#8A6D1E; }
+  .nx-toast.success{ background:#1E7A46; }
+
 </style>
+<script src="/config.js"></script>
 </head>
 <body>
+<div id="nxToastHost" aria-live="polite"></div>
 <div id="appRoot">
 
 <div id="toolbar">
@@ -1002,7 +1025,30 @@ const SELECTED_KEY = 'nxReportRenderer.selected.v1';
 
 // NX 작업실 파일탐색기에서 ?fileId=... 로 열었을 때, 그 드라이브 파일 내용을 실제로 읽어오기 위한 GAS 엔드포인트
 // (NX Assistant 프록시와 같은 배포 URL — listFolder/readFile 액션이 그 안에 있음)
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbz9pam82WMSMKHYo6-6EtEguMbpZ0AaqHirVzwcW6ZFRsdq4WGluvhpPkYUoTE2l_bm/exec';
+// GAS_URL은 /config.js(window.NX_CONFIG) 하나로 통합 관리됩니다 — index.html(NX 작업실)과 동일 파일을 참조.
+const GAS_URL = (window.NX_CONFIG && window.NX_CONFIG.GAS_URL)
+  || 'https://script.google.com/macros/s/AKfycbz9pam82WMSMKHYo6-6EtEguMbpZ0AaqHirVzwcW6ZFRsdq4WGluvhpPkYUoTE2l_bm/exec';
+
+// 토스트 알림 (기존 일부 alert 대체) — type: 'info'(기본) | 'error' | 'warning' | 'success'
+function showToast(message, type){
+  const host = document.getElementById('nxToastHost');
+  if (!host){ console.warn('[toast]', type || 'info', message); return; }
+  const el = document.createElement('div');
+  el.className = 'nx-toast' + (type ? ' ' + type : '');
+  el.textContent = message;
+  const duration = type === 'error' ? 6000 : 4000;
+  let dismissed = false;
+  const dismiss = ()=>{
+    if (dismissed) return;
+    dismissed = true;
+    el.classList.remove('show');
+    setTimeout(()=>el.remove(), 200);
+  };
+  el.addEventListener('click', dismiss);
+  host.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(dismiss, duration);
+}
 
 function uid(){
   return 'doc-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7);
@@ -1024,9 +1070,24 @@ function loadDocs(){
   ];
 }
 
+// 저장 성공 여부를 반환한다 — 실패(용량초과 등)를 호출부가 무시하지 않도록 하기 위함.
+// 과거에는 실패해도 console.error만 찍고 화면은 "저장됨"이라고 표시해서,
+// 사용자가 저장된 줄 알았는데 실제로는 저장 안 된 상태로 남는 위험이 있었다.
 function saveDocs(docs){
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(docs)); }
-  catch (e) { console.error('문서함 저장 실패(브라우저 저장공간 문제일 수 있습니다).', e); }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
+    return true;
+  } catch (e) {
+    console.error('문서함 저장 실패(브라우저 저장공간 문제일 수 있습니다).', e);
+    const isQuota = e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
+    showToast(
+      isQuota
+        ? '저장 공간이 가득 차서 저장하지 못했습니다. 문서함에서 큰 문서(이미지 포함)를 정리하거나, 이 문서를 HTML로 다운로드해 백업한 뒤 삭제해주세요.'
+        : '저장에 실패했습니다: ' + (e && e.message ? e.message : e),
+      'error'
+    );
+    return false;
+  }
 }
 
 let docs = loadDocs();
@@ -1035,9 +1096,11 @@ if (!docs.find(d => d.id === selectedId)) selectedId = docs.length ? docs[0].id 
 
 function getSelected(){ return docs.find(d => d.id === selectedId) || null; }
 
+// 저장 성공 여부를 반환한다 — 호출부는 이 값을 보고 "저장됨" 표시 여부를 결정해야 한다.
 function persist(){
-  saveDocs(docs);
-  if (selectedId) localStorage.setItem(SELECTED_KEY, selectedId);
+  const ok = saveDocs(docs);
+  if (ok && selectedId) localStorage.setItem(SELECTED_KEY, selectedId);
+  return ok;
 }
 
 // ---------- 문서 선택 드롭다운 ----------
@@ -1240,7 +1303,7 @@ function addFilesFromInput(fileList){
           content = safeSanitizeHtml(reader.result);
           if (content === null) {
             // 정리 로직이 완전히 실패한 경우: 빈 문서로 만들지 않고 원본 그대로라도 넣어 최소한 내용은 보이게 함
-            alert('"' + file.name + '" 파일의 스타일 제거 처리에 실패했습니다.\n원본 내용을 그대로 불러옵니다(스타일이 정리되지 않았을 수 있어요).');
+            showToast('"' + file.name + '" 파일의 스타일 제거 처리에 실패했습니다.\n원본 내용을 그대로 불러옵니다(스타일이 정리되지 않았을 수 있어요).', 'warning');
             content = reader.result;
           }
         } else {
@@ -1257,21 +1320,21 @@ function addFilesFromInput(fileList){
         if (firstNewId === null) firstNewId = newDoc.id;
       } catch (err) {
         console.error('[파일 불러오기 오류]', file.name, err);
-        alert('"' + file.name + '" 파일을 불러오는 중 오류가 발생했습니다.\n' + (err && err.message ? err.message : err));
+        showToast('"' + file.name + '" 파일을 불러오는 중 오류가 발생했습니다.\n' + (err && err.message ? err.message : err), 'error');
       } finally {
         remaining -= 1;
         if (remaining === 0) {
           if (firstNewId !== null) selectedId = firstNewId;
-          persist();
+          const saved = persist();
           refreshDocSelect();
           loadSelectedIntoEditor();
           render();
-          if (firstNewId !== null) flashSaveState('불러옴');
+          if (firstNewId !== null && saved) flashSaveState('불러옴');
         }
       }
     };
     reader.onerror = () => {
-      alert('"' + file.name + '" 파일을 읽는 중 오류가 발생했습니다.');
+      showToast('"' + file.name + '" 파일을 읽는 중 오류가 발생했습니다.', 'error');
       remaining -= 1;
     };
     reader.readAsText(file, 'utf-8');
@@ -1303,11 +1366,11 @@ function createNewDoc(kind){
   const newDoc = { id: uid(), name: name.trim() || tpl.fallbackName, theme: 'memo', format: 'md', md: tpl.md };
   docs.push(newDoc);
   selectedId = newDoc.id;
-  persist();
+  const saved = persist();
   refreshDocSelect();
   loadSelectedIntoEditor();
   render();
-  flashSaveState('생성됨');
+  if (saved) flashSaveState('생성됨');
 }
 
 function addBlankDoc(){ createNewDoc('blank'); }
@@ -1319,11 +1382,11 @@ function deleteCurrentDoc(){
   if (!window.confirm('"' + d.name + '" 문서를 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) return;
   docs = docs.filter(x => x.id !== d.id);
   selectedId = docs.length ? docs[0].id : null;
-  persist();
+  const saved = persist();
   refreshDocSelect();
   loadSelectedIntoEditor();
   render();
-  flashSaveState('삭제됨');
+  if (saved) flashSaveState('삭제됨');
 }
 
 // ---------- 저장 상태 표시 ----------
@@ -2242,7 +2305,7 @@ document.getElementById('mdInput').addEventListener('input', () => {
   if (!d) return;
   d.md = document.getElementById('mdInput').value;
   clearTimeout(mdSaveTimer);
-  mdSaveTimer = setTimeout(() => { persist(); flashSaveState('저장됨'); }, 400);
+  mdSaveTimer = setTimeout(() => { if (persist()) flashSaveState('저장됨'); }, 400);
 });
 
 document.getElementById('btnDocPlus').addEventListener('click', (e) => {

@@ -267,31 +267,6 @@
   .modal-body textarea{ resize:vertical; }
   .modal-checkrow{ display:flex; flex-direction:column; gap:6px; margin-top:8px; font-size:12.5px; color:var(--ink); }
 
-  /* ===== 외부조회 목록 관리 ===== */
-  .ext-sites-list{ display:flex; flex-direction:column; gap:6px; margin-top:6px; }
-  .ext-site-row{
-    display:flex; align-items:center; gap:8px; padding:8px 10px;
-    border:1px solid var(--line); border-radius:8px; background:#f8f9fb;
-  }
-  .ext-site-row .ext-site-icon{ font-size:15px; flex-shrink:0; }
-  .ext-site-row .ext-site-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-  .ext-site-row .ext-site-name{ font-size:13px; font-weight:600; color:var(--navy); }
-  .ext-site-row .ext-site-url{ font-size:11px; color:var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .ext-site-row button{
-    flex-shrink:0; border:none; border-radius:6px; padding:5px 9px; font-size:11.5px; cursor:pointer;
-    font-family:inherit;
-  }
-  .ext-site-row .ext-site-open-btn{ background:var(--gold); color:var(--navy-deep); font-weight:700; }
-  .ext-site-row .ext-site-del-btn{ background:#f0d5d5; color:#a83232; }
-  .ext-sites-add-row{ display:flex; gap:6px; margin-top:4px; }
-  .ext-site-icon-input{ width:56px; flex-shrink:0; }
-  .ext-site-name-input{ width:110px; flex-shrink:0; }
-  .ext-site-url-input{ flex:1; min-width:0; }
-  .ext-sites-add-row input{
-    font-family:inherit; font-size:12.5px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;
-    color:var(--ink); background:var(--panel);
-  }
-
   .voice-command-list{ display:flex; flex-direction:column; gap:6px; margin-top:6px; max-height:220px; overflow-y:auto; }
 
   .tax-feature-list{ display:flex; flex-direction:column; gap:8px; margin-top:6px; }
@@ -717,8 +692,8 @@
     <button id="btnWorkspaceMode" class="tb-btn" title="탐색작업창 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기)"><span id="workspaceModeIcon">⬓</span> <span class="tool-menu-label" id="workspaceModeLabel">좌우</span></button>
     <button type="button" id="btnModeAutoRef" class="tb-btn" title="자동참조: AI가 알아서 판단해서 지금 보고 있는 폴더/파일을 확인">🔗 <span class="tool-menu-label">자동참조</span></button>
     <button type="button" id="btnModeWebSearch" class="tb-btn" title="웹서치: AI가 필요하면 인터넷에서 검색">🌐 <span class="tool-menu-label">웹서치</span></button>
-    <button type="button" id="btnModeWebFetch" class="tb-btn" title="웹페이지 가져오기: 채팅에 붙여넣은 URL을 AI가 직접 열어서 읽음">📥 <span class="tool-menu-label">가져오기</span></button>
-    <button type="button" id="btnExternalSites" class="tb-btn" title="국토부 실거래가·공시가격 등 API로 못 가져오는 사이트를 새 탭으로 엽니다 — 조회한 값은 복사해서 채팅에 붙여넣어 주세요">🔗 <span class="tool-menu-label">외부조회</span></button>
+    <button type="button" id="btnModeWebFetch" class="tb-btn" title="웹페이지 가져오기: URL이 있으면 자동으로 켜집니다. 이 버튼은 항상 켜두고 싶을 때만 수동으로 누르세요.">📥 <span class="tool-menu-label">가져오기</span></button>
+    <button type="button" id="btnExternalSites" class="tb-btn" title="NETAX Desk(desk.netax.kr)를 새 탭으로 엽니다 — 홈택스·국토부 등 자주 쓰는 외부 사이트 모음">🔗 <span class="tool-menu-label">Desk</span></button>
     <div class="layout-buttons-wide">
       <button type="button" id="btnLayoutRow" class="tb-btn" data-mode="row" title="좌우 배치">⬓ 좌우</button>
       <button type="button" id="btnLayoutCol" class="tb-btn" data-mode="col" title="상하 배치">⬒ 상하</button>
@@ -927,30 +902,6 @@
         <button id="btnScanSummarize" class="ghost-btn">🔎 AI 요약</button>
         <button id="btnDownloadPdf" class="ghost-btn">PC에 다운로드</button>
         <button id="btnSaveToFolder" class="save-btn">현재 폴더에 저장</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="externalSitesOverlay" style="display:none;">
-    <div class="modal-panel">
-      <div class="modal-head">
-        <span>🔗 외부조회</span>
-        <span class="modal-close" id="btnCloseExternalSites" title="닫기">✕</span>
-      </div>
-      <div class="modal-body">
-        <div class="modal-hint">API로 못 가져오는 사이트(공시가격·실거래가 등)를 새 탭으로 엽니다. 조회한 값은 복사해서 채팅창의 📋 버튼(또는 Ctrl+V)으로 붙여넣어 주세요.</div>
-        <div id="externalSitesList" class="ext-sites-list"></div>
-
-        <label class="modal-label">사이트 추가</label>
-        <div class="ext-sites-add-row">
-          <input type="text" id="extSiteIcon" placeholder="아이콘(선택)" maxlength="4" class="ext-site-icon-input">
-          <input type="text" id="extSiteName" placeholder="이름 (예: 위택스)" class="ext-site-name-input">
-          <input type="text" id="extSiteUrl" placeholder="주소 (예: https://www.wetax.go.kr)" class="ext-site-url-input">
-        </div>
-        <button type="button" id="btnAddExternalSite" class="ghost-btn" style="align-self:flex-start; margin-top:6px;">+ 추가</button>
-      </div>
-      <div class="modal-foot">
-        <button id="btnResetExternalSites" class="ghost-btn">기본값으로 복원</button>
       </div>
     </div>
   </div>
@@ -2565,104 +2516,12 @@ graph TD
 
   loadCustomers();
 
-  // ---- 외부조회(새 탭) — API로 못 가져오는 사이트(공시가격·부동산공시가격알리미 등)를
-  // 새 탭으로 열어서 직접 조회한 뒤, 값을 복사해 채팅에 붙여넣는 흐름을 위한 바로가기 모음.
-  // (iframe으로 안 되는 이유: 상당수 정부·공공 사이트가 다른 사이트 안에 끼워넣는 것 자체를
-  //  막아두고 있고, 설령 끼워넣어도 동일출처정책 때문에 스크립트로 내용을 읽거나 조작할 수 없음)
-  // 사용자가 직접 추가·삭제할 수 있어야 해서 드롭다운이 아니라 모달(설정 창과 같은 방식)로 관리한다.
-  const EXTERNAL_SITES_KEY = 'nx_external_sites';
-  const DEFAULT_EXTERNAL_SITES = [
-    { icon: '🏢', name: '국토부 실거래가', url: 'https://rt.molit.go.kr' },
-    { icon: '🏷', name: '부동산공시가격알리미', url: 'https://www.realtyprice.kr' },
-    { icon: '🏗', name: '건축HUB(세움터)', url: 'https://cloud.eais.go.kr' },
-    { icon: '🗺', name: '토지이음(토지이용계획)', url: 'https://www.eum.go.kr' },
-    { icon: '🧾', name: '홈택스', url: 'https://hometax.go.kr' },
-    { icon: '💰', name: '위택스(지방세)', url: 'https://www.wetax.go.kr' },
-    { icon: '⚖', name: '국가법령정보센터', url: 'https://www.law.go.kr' },
-    { icon: '📜', name: '인터넷등기소', url: 'https://www.iros.go.kr' },
-    { icon: '🔨', name: '법원경매정보', url: 'https://www.courtauction.go.kr' },
-    { icon: '🏛', name: '정부24', url: 'https://www.gov.kr' }
-  ];
-  function loadExternalSites(){
-    try{
-      const raw = localStorage.getItem(EXTERNAL_SITES_KEY);
-      if (raw){
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    }catch(err){ console.warn('외부조회 목록 로드 실패, 기본값 사용', err); }
-    return DEFAULT_EXTERNAL_SITES.slice();
-  }
-  function saveExternalSites(list){
-    localStorage.setItem(EXTERNAL_SITES_KEY, JSON.stringify(list));
-  }
-  let externalSites = loadExternalSites();
-
+  // ---- 외부사이트(Desk) — 예전엔 여기서 자체 링크 목록(localStorage)을 따로 관리했으나,
+  // 이미 desk.netax.kr(NETAX Desk)이 구글시트 CSV 기반으로 똑같은 역할(폴더별 링크 모음,
+  // 검색, 앱/웹 자동연결)을 팀 전체가 공유하는 형태로 하고 있어서 완전히 중복이었다.
+  // 그래서 별도 목록을 만드는 대신 Desk를 새 탭으로 여는 버튼 하나로 대체한다.
   const btnExternalSites = document.getElementById('btnExternalSites');
-  const externalSitesOverlay = document.getElementById('externalSitesOverlay');
-  const externalSitesList = document.getElementById('externalSitesList');
-
-  function renderExternalSitesList(){
-    externalSitesList.innerHTML = '';
-    if (!externalSites.length){
-      const empty = document.createElement('div');
-      empty.className = 'modal-hint';
-      empty.textContent = '등록된 사이트가 없습니다. 아래에서 추가해주세요.';
-      externalSitesList.appendChild(empty);
-      return;
-    }
-    externalSites.forEach((site, idx)=>{
-      const row = document.createElement('div');
-      row.className = 'ext-site-row';
-      row.innerHTML =
-        '<span class="ext-site-icon"></span>' +
-        '<span class="ext-site-info"><span class="ext-site-name"></span><span class="ext-site-url"></span></span>' +
-        '<button type="button" class="ext-site-open-btn">열기</button>' +
-        '<button type="button" class="ext-site-del-btn">삭제</button>';
-      row.querySelector('.ext-site-icon').textContent = site.icon || '🔗';
-      row.querySelector('.ext-site-name').textContent = site.name;
-      row.querySelector('.ext-site-url').textContent = site.url;
-      row.querySelector('.ext-site-open-btn').addEventListener('click', ()=> window.open(site.url, '_blank', 'noopener'));
-      row.querySelector('.ext-site-del-btn').addEventListener('click', ()=>{
-        externalSites.splice(idx, 1);
-        saveExternalSites(externalSites);
-        renderExternalSitesList();
-      });
-      externalSitesList.appendChild(row);
-    });
-  }
-
-  function openExternalSitesModal(){
-    renderExternalSitesList();
-    externalSitesOverlay.style.display = 'flex';
-  }
-  function closeExternalSitesModal(){ externalSitesOverlay.style.display = 'none'; }
-  btnExternalSites.addEventListener('click', openExternalSitesModal);
-  document.getElementById('btnCloseExternalSites').addEventListener('click', closeExternalSitesModal);
-  externalSitesOverlay.addEventListener('click', (e)=>{ if (e.target === externalSitesOverlay) closeExternalSitesModal(); });
-
-  document.getElementById('btnAddExternalSite').addEventListener('click', ()=>{
-    const iconInput = document.getElementById('extSiteIcon');
-    const nameInput = document.getElementById('extSiteName');
-    const urlInput = document.getElementById('extSiteUrl');
-    const name = nameInput.value.trim();
-    let url = urlInput.value.trim();
-    if (!name){ showToast('이름을 입력해주세요.', 'warning'); nameInput.focus(); return; }
-    if (!url){ showToast('주소를 입력해주세요.', 'warning'); urlInput.focus(); return; }
-    if (!/^https?:\/\//i.test(url)) url = 'https://' + url; // https:// 생략하고 입력해도 되도록 보정
-    externalSites.push({ icon: iconInput.value.trim() || '🔗', name, url });
-    saveExternalSites(externalSites);
-    renderExternalSitesList();
-    iconInput.value = ''; nameInput.value = ''; urlInput.value = '';
-    nameInput.focus();
-  });
-
-  document.getElementById('btnResetExternalSites').addEventListener('click', ()=>{
-    if (!window.confirm('외부조회 목록을 기본값으로 되돌릴까요? 직접 추가한 사이트는 모두 사라집니다.')) return;
-    externalSites = DEFAULT_EXTERNAL_SITES.slice();
-    saveExternalSites(externalSites);
-    renderExternalSitesList();
-  });
+  btnExternalSites.addEventListener('click', ()=> window.open('https://desk.netax.kr', '_blank', 'noopener'));
 
   // ---- 좁은 화면(PC/탭, grouped 단계)용 도구 그룹 팝업 — 도구1/도구2 2그룹 ----
   const TOOL_GROUP_1 = [
@@ -2697,10 +2556,10 @@ graph TD
     { icon: '📸', label: '캡처', handler: captureScreen }
   ];
   // 예전엔 여기 [편집, 설정]이었는데, 설정은 항상 상단바 우측에 고정 표시되므로 뺐고
-  // 그 자리엔 외부조회(모달 열기)를 넣었다.
+  // 그 자리엔 Desk(desk.netax.kr) 바로가기를 넣었다.
   const MOBILE_GROUP_CONFIG = [
     { icon: '🖋', label: '편집', handler: openFullEditor },
-    { icon: '🔗', label: '외부조회', handler: () => openExternalSitesModal() }
+    { icon: '🔗', label: 'Desk', handler: () => window.open('https://desk.netax.kr', '_blank', 'noopener') }
   ];
 
   function fillToolPopup(popupEl, items){
@@ -3183,12 +3042,20 @@ graph TD
   updateChatModelBadge();
 
   // 채팅 전송 시 GAS로 실어보낼 AI 설정 payload 조립 (값이 기본값/공백이면 아예 안 실어서 서버 기본값이 적용되게 함)
-  function buildAiSettingsPayload(){
+  // 메시지 안에 URL이 있는지 감지 — 사용자가 매번 "가져오기" 버튼을 켰다 껐다 하지 않아도,
+  // URL을 붙여넣은 순간에는 이번 요청 한정으로 자동으로 웹페이지 가져오기 도구를 켜준다.
+  // (평소엔 꺼둔 채로 두고, 필요할 때만 켜지는 게 자연스럽다는 판단)
+  const URL_DETECT_RE = /https?:\/\/[^\s]+/i;
+  function messageContainsUrl(text){
+    return URL_DETECT_RE.test(text || '');
+  }
+
+  function buildAiSettingsPayload(forceWebFetch){
     const payload = { model: aiSettings.model, effort: aiSettings.effort };
     if (aiSettings.temperature !== null && aiSettings.temperature !== undefined) payload.temperature = aiSettings.temperature;
     if (aiSettings.maxTokens !== null && aiSettings.maxTokens !== undefined) payload.maxTokens = aiSettings.maxTokens;
     if (aiSettings.enableWebSearch) payload.enableWebSearch = true;
-    if (aiSettings.enableWebFetch) payload.enableWebFetch = true;
+    if (aiSettings.enableWebFetch || forceWebFetch) payload.enableWebFetch = true;
     if (aiSettings.enableCodeExecution) payload.enableCodeExecution = true;
     if (aiSettings.enableAdvisor){
       payload.enableAdvisor = true;
@@ -3796,6 +3663,9 @@ graph TD
       };
     }
 
+    const autoWebFetch = messageContainsUrl(text) && !aiSettings.enableWebFetch;
+    if (autoWebFetch) showToast('메시지에 URL이 있어 이번 요청만 웹페이지 가져오기를 자동으로 켰습니다.', 'info');
+
     try{
       currentChatAbortController = new AbortController();
       const res = await fetch(GAS_URL, {
@@ -3812,7 +3682,7 @@ graph TD
             attachedTexts: textAttachmentsForThisMessage
           },
           autoRef: autoRefMode
-        }, buildAiSettingsPayload()))
+        }, buildAiSettingsPayload(messageContainsUrl(text))))
       });
       const data = await res.json();
       if (data.error){

@@ -467,11 +467,15 @@
   body.flip-mode #btnModeWebFetch{ display:none !important; } /* 플립모드에선 탐색기 자체가 의미 없으므로 다 숨김 */
   body.flip-mode #btnVoiceInputFlip{ display:inline-flex !important; flex:1 1 0; min-width:0; justify-content:center; }
 
-  /* ===== 미니모드 (PC 전용 — 창을 아주 낮게 줄였을 때) =====
+  /* ===== 최소모드 (PC 전용 — 창을 아주 낮게 줄였을 때) =====
+     용어 정리: "미니보기"(PC 창 폭이 좁아져 폰처럼 하단바가 뜨는 상태)는 기존 compact 단계
+     그 자체라 별도 처리가 필요 없다. 그보다 더 좁고 특히 "높이"까지 낮아져서 탐색기까지
+     강제로 접어야 할 정도로 빠듯한 상태만 "최소모드"라고 부른다(예전엔 "미니모드"라고
+     불렀는데 위 "미니보기"와 헷갈려서 이름을 바꿈).
      탐색기를 강제로 접어서(=워크스페이스 "생략" 모드) 상단바·채팅·하단바가 겹치지 않게 한다.
      별도 레이아웃 CSS는 필요 없다 — 기존 "생략" 모드(explorer-collapsed)를 그대로 쓰기 때문에
      이 클래스는 사실 표식(주로 디버그 배지 표시용)의 역할만 한다. */
-  body.mini-mode #nxDebugBadge{ background:rgba(47,111,237,0.85); }
+  body.min-mode #nxDebugBadge{ background:rgba(47,111,237,0.85); }
 
   /* ===== 작업표시줄모드 (?taskbar=1로 연 별도의 작은 PC 창 전용) ===== */
   #taskbarBar{ display:none; }
@@ -651,7 +655,7 @@
 <body>
 
   <!-- 임시 디버그 배지 — 플립모드 판정 확인용. 문제 해결되면 이 div 통째로 지우면 됨. -->
-  <div id="nxDebugBadge" style="position:fixed; top:2px; left:2px; z-index:99999; font-size:11px; background:rgba(0,0,0,0.75); color:#4f4; padding:3px 6px; border-radius:4px; pointer-events:none; font-family:monospace; white-space:nowrap;"></div>
+  <div id="nxDebugBadge" style="position:fixed; top:2px; left:2px; right:2px; z-index:99999; font-size:11px; background:rgba(0,0,0,0.75); color:#4f4; padding:3px 6px; border-radius:4px; pointer-events:none; font-family:monospace; white-space:normal; overflow-wrap:break-word; max-width:calc(100vw - 8px);"></div>
 
   <!-- 작업표시줄모드 전용(별도로 띄운 작은 창에서만 보임, ?taskbar=1일 때만 활성화) -->
   <div id="taskbarBar" style="display:none;">
@@ -2631,7 +2635,7 @@ graph TD
 
     let currentStage = null;
     let wasFlip = false;
-    let wasMini = false;
+    let wasMin = false;
 
     function update(){
       const visibleToolCount = resolveVisibleToolCount();
@@ -2655,20 +2659,22 @@ graph TD
         document.dispatchEvent(new CustomEvent('nx:flipmode', { detail: { on: flip } }));
       }
 
-      // 미니모드 — PC 전용. "하단바가 펼쳐졌을 때 상단바를 가리지 않을 높이"가 기준이라,
-      // 상단바 높이의 2배(상단바·하단바가 거의 같은 높이)를 최소 필요 높이로 보고 그보다 낮으면 진입.
+      // 최소모드 — PC 전용. "미니보기"(=그냥 compact 단계, 폭이 좁아 폰처럼 하단바가 뜨는
+      // 상태)와는 다른, 그보다 한 단계 더 좁은 상태다. "하단바가 펼쳐졌을 때 상단바를 가리지
+      // 않을 높이"가 기준이라, 상단바 높이의 2배(상단바·하단바가 거의 같은 높이)를 최소 필요
+      // 높이로 보고 그보다 낮으면 진입한다.
       const topbarHNow = topbarEl.getBoundingClientRect().height || 46;
-      const mini = isPointerFine && stage === 'compact' && !flip && window.innerHeight < (topbarHNow * 2 + 40);
-      bodyEl.classList.toggle('mini-mode', mini);
-      if (mini && !wasMini) setWorkspaceMode('hide'); // 미니모드 진입 순간엔 탐색기를 강제로 접어서 공간 확보
-      wasMini = mini;
+      const isMin = isPointerFine && stage === 'compact' && !flip && window.innerHeight < (topbarHNow * 2 + 40);
+      bodyEl.classList.toggle('min-mode', isMin);
+      if (isMin && !wasMin) setWorkspaceMode('hide'); // 최소모드 진입 순간엔 탐색기를 강제로 접어서 공간 확보
+      wasMin = isMin;
 
       // 임시 디버그 배지 — 문제 해결 확인되면 이 블록과 #nxDebugBadge div 통째로 지우면 됨.
       const debugBadge = document.getElementById('nxDebugBadge');
       if (debugBadge){
-        debugBadge.innerHTML = '[v7] w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
+        debugBadge.innerHTML = '[v8] w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
           + ' tools:' + visibleToolCount + '/' + TOOL_BUTTON_COUNT
-          + ' flip:' + (flip ? 'ON' : 'off') + ' mini:' + (mini ? 'ON' : 'off') + ' (flip기준:' + FLIP_MODE_MAX_WIDTH + ')'
+          + ' flip:' + (flip ? 'ON' : 'off') + ' min:' + (isMin ? 'ON' : 'off') + ' (flip기준:' + FLIP_MODE_MAX_WIDTH + ')'
           + '<br>available:' + lastMeasure.available + ' reqCore:' + lastMeasure.reqCore + ' reqAll:' + lastMeasure.reqAll;
       }
     }

@@ -376,6 +376,26 @@
   .workspace.explorer-collapsed .panel.explorer{ display:none; }
   .workspace.explorer-collapsed .panel.chat{ flex:1 1 100%; max-height:none; border:none; }
 
+  /* 채팅 패널을 접었을 때 — 도구화면(탐색기 자리)만 화면 전체를 차지 */
+  .workspace.chat-collapsed .panel.chat{ display:none; }
+  .workspace.chat-collapsed .panel.explorer{ flex:1 1 100%; }
+
+  /* 채팅↔도구화면 사이 경계선 — 드래그로 크기 조절, 끝까지 밀면 그 쪽이 닫힘.
+     탐색기나 채팅이 이미 접혀있을 땐(나눌 두 조각이 없으므로) 숨긴다. */
+  .panel-resizer{
+    flex: 0 0 6px; background: var(--line); position: relative; z-index: 5;
+    transition: background 0.15s ease; touch-action: none;
+  }
+  .panel-resizer:hover, .panel-resizer.dragging{ background: var(--gold); }
+  .workspace.layout-row .panel-resizer{ cursor: col-resize; }
+  .workspace.layout-col .panel-resizer{ cursor: row-resize; }
+  .workspace.explorer-collapsed .panel-resizer,
+  .workspace.chat-collapsed .panel-resizer{ display: none; }
+  /* 실제 막대(6px)는 얇지만, 마우스로 잡기 쉽게 앞뒤로 여유 히트영역을 넓혀준다 */
+  .panel-resizer::before{
+    content:''; position:absolute; inset: -5px;
+  }
+
   /* 탐색기 "띄우기" — 기본은 생략(채팅만)이지만, 채팅 위에 잠깐 겹쳐서 보여줌 */
   .explorer-float-backdrop{ display:none; }
   .workspace.explorer-floating .explorer-float-backdrop{
@@ -675,6 +695,7 @@
       <button type="button" id="btnLayoutCol" class="tb-btn" data-mode="col" title="상하 배치">⬒ 상하</button>
       <button type="button" id="btnLayoutHide" class="tb-btn" data-mode="hide" title="탐색기 생략 · 채팅만">💬 생략</button>
       <button type="button" id="btnLayoutFloat" class="tb-btn" data-mode="float" title="탐색기 띄우기 · 채팅 위에 잠깐 보기">🗗 띄우기</button>
+      <button type="button" id="btnToggleChat" class="tb-btn" title="채팅창 끄기 · 도구화면만 전체로 보기">💬 채팅 끄기</button>
     </div>
     <div class="spacer"></div>
     <div id="selectionInline" class="selection-inline" style="display:none;">
@@ -909,6 +930,8 @@
       </div>
     </div>
 
+    <div class="panel-resizer" id="panelResizer" title="드래그해서 크기 조절 (끝까지 밀면 그 쪽이 닫힙니다)"></div>
+
     <div class="panel explorer">
       <div class="panel-head" id="explorerPanelHead">
         <div class="breadcrumb" id="breadcrumb">&nbsp;</div>
@@ -1141,9 +1164,96 @@ graph TD
   function setWorkspaceMode(mode){
     // 지금 방향에서 못 쓰는 배치를 요청받으면(음성명령 등 어디서 오든) "생략"으로 안전하게 대체
     const safeMode = isModeAvailable(mode) ? mode : 'hide';
+    // 탐색기를 생략/띄우기 하는 순간 채팅이 이미 꺼져 있으면 화면이 통째로 비게 되므로 먼저 채팅을 되돌린다.
+    if ((safeMode === 'hide' || safeMode === 'float') && workspace.classList.contains('chat-collapsed')){
+      setChatCollapsed(false);
+    }
     applyWorkspaceMode(safeMode);
     localStorage.setItem(WORKSPACE_MODE_KEY, safeMode);
+    applySavedSplit();
   }
+
+  // ---- 채팅창 끄기/보이기 (탐색기 "생략"의 반대 방향 — 도구화면만 전체로 보기) ----
+  const CHAT_COLLAPSED_KEY = 'nx_chat_collapsed';
+  const btnToggleChat = document.getElementById('btnToggleChat');
+  function updateChatToggleButton(){
+    const collapsed = workspace.classList.contains('chat-collapsed');
+    btnToggleChat.textContent = collapsed ? '💬 채팅 보이기' : '💬 채팅 끄기';
+    btnToggleChat.classList.toggle('is-on', collapsed);
+  }
+  function setChatCollapsed(collapsed){
+    // 탐색기가 이미 생략/띄우기 상태에서 채팅까지 끄면 화면이 통째로 비므로, 먼저 탐색기 쪽을 되돌린다.
+    if (collapsed && workspace.classList.contains('explorer-collapsed')){
+      setWorkspaceMode(detectDefaultMode());
+    }
+    workspace.classList.toggle('chat-collapsed', collapsed);
+    localStorage.setItem(CHAT_COLLAPSED_KEY, collapsed ? '1' : '0');
+    updateChatToggleButton();
+  }
+  btnToggleChat.addEventListener('click', ()=> setChatCollapsed(!workspace.classList.contains('chat-collapsed')));
+  if (localStorage.getItem(CHAT_COLLAPSED_KEY) === '1') workspace.classList.add('chat-collapsed');
+  updateChatToggleButton();
+
+  // ---- 채팅↔도구화면 경계선 드래그로 크기 조절 (끝까지 밀면 그 쪽이 닫힘) ----
+  const panelResizer = document.getElementById('panelResizer');
+  const chatPanelEl = document.querySelector('.panel.chat');
+  const RESIZE_MIN_PX = 60; // 이보다 좁아지면 "닫으려는 의도"로 보고 스냅
+  const SPLIT_KEY_ROW = 'nx_split_row'; // 좌우 배치일 때 채팅 패널의 폭(%)
+  const SPLIT_KEY_COL = 'nx_split_col'; // 상하 배치일 때 채팅 패널의 높이(%)
+
+  function currentSplitKey(){
+    return workspace.classList.contains('layout-col') ? SPLIT_KEY_COL : SPLIT_KEY_ROW;
+  }
+  // 저장된 비율이 있으면 그걸로, 없으면 CSS 기본값(40%, 상하는 auto+min/max-height)으로 되돌린다.
+  function applySavedSplit(){
+    const saved = localStorage.getItem(currentSplitKey());
+    chatPanelEl.style.flex = saved ? ('0 0 ' + saved + '%') : '';
+  }
+
+  let resizing = false;
+  panelResizer.addEventListener('pointerdown', (e)=>{
+    if (workspace.classList.contains('explorer-collapsed') || workspace.classList.contains('chat-collapsed')) return;
+    resizing = true;
+    panelResizer.classList.add('dragging');
+    panelResizer.setPointerCapture(e.pointerId);
+    document.body.style.userSelect = 'none';
+  });
+  panelResizer.addEventListener('pointermove', (e)=>{
+    if (!resizing) return;
+    const rect = workspace.getBoundingClientRect();
+    const isCol = workspace.classList.contains('layout-col');
+    const totalPx = isCol ? rect.height : rect.width;
+    let chatPx = isCol ? (e.clientY - rect.top) : (e.clientX - rect.left);
+    chatPx = Math.max(0, Math.min(totalPx, chatPx));
+    chatPanelEl.style.flex = '0 0 ' + ((chatPx / totalPx) * 100).toFixed(2) + '%';
+    panelResizer.dataset.chatPx = chatPx;
+    panelResizer.dataset.explorerPx = totalPx - chatPx;
+  });
+  function endResize(e){
+    if (!resizing) return;
+    resizing = false;
+    panelResizer.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    const chatPx = Number(panelResizer.dataset.chatPx || 0);
+    const explorerPx = Number(panelResizer.dataset.explorerPx || 0);
+
+    if (chatPx < RESIZE_MIN_PX){
+      chatPanelEl.style.flex = ''; // 다음에 다시 켤 때는 기본 비율로 시작
+      setChatCollapsed(true);
+      return;
+    }
+    if (explorerPx < RESIZE_MIN_PX){
+      chatPanelEl.style.flex = '';
+      setWorkspaceMode('hide');
+      return;
+    }
+    const rect = workspace.getBoundingClientRect();
+    const totalPx = workspace.classList.contains('layout-col') ? rect.height : rect.width;
+    localStorage.setItem(currentSplitKey(), ((chatPx / totalPx) * 100).toFixed(2));
+  }
+  panelResizer.addEventListener('pointerup', endResize);
+  panelResizer.addEventListener('pointercancel', endResize);
+
   btnWorkspaceMode.addEventListener('click', ()=>{
     const current = localStorage.getItem(WORKSPACE_MODE_KEY) || detectDefaultMode();
     let idx = WORKSPACE_MODES.indexOf(current);
@@ -1158,6 +1268,14 @@ graph TD
     layoutModeButtons[mode].addEventListener('click', ()=> setWorkspaceMode(mode));
   });
   applyWorkspaceMode(localStorage.getItem(WORKSPACE_MODE_KEY) || detectDefaultMode());
+  // 저장된 값들의 조합이 꼬여서(예: 예전 버전 데이터) 채팅·탐색기가 동시에 접힌 상태로 시작되면
+  // 화면이 통째로 비게 되므로, 그 경우엔 채팅을 강제로 되돌린다.
+  if (workspace.classList.contains('chat-collapsed') && workspace.classList.contains('explorer-collapsed')){
+    workspace.classList.remove('chat-collapsed');
+    localStorage.setItem(CHAT_COLLAPSED_KEY, '0');
+    updateChatToggleButton();
+  }
+  applySavedSplit(); // layout-row/col 클래스가 확정된 뒤에 호출해야 올바른 저장키를 참조함
   // 폰을 회전시켜서 지금 쓰던 배치가 못 쓰게 되면(예: 좌우배치 중 세로로 돌림) 자동으로 안전한
   // 배치로 바꿔준다.
   window.addEventListener('resize', ()=>{

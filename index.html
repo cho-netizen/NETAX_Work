@@ -140,75 +140,99 @@
   }
   .nx-popup .tool-menu-item:hover{ background:rgba(255,255,255,0.12); }
 
-  /* ===== 상단바 + 하단바 (2026.07 백지 재설계) =====
-     예전 방식(측정용 복제본을 만들어서 실제로 몇 px가 필요한지 정밀하게 재는 방식)이 계속
-     새로운 버그를 만들어내서, 훨씬 단순하고 예측 가능한 방식으로 전면 교체했다.
+  /* ===== 상단바 3단계 (full → grouped → compact) =====
+     아래 상태는 "화면폭이 몇 px 이하면"이 아니라, 지금 이 내용이 실제로 한 줄에 들어가는지를
+     JS(setupTopbarResponsive)가 매번 재서 결정한다 — body에 stage-full/stage-grouped/stage-compact
+     클래스를 붙였다 뗐다 하는 방식. 그래서 고객명이 길든 짧든, 브라우저를 확대했든, 폰트가
+     조금 다르게 렌더링되든 관계없이 "지금 실제로 한 줄에 맞는 가장 넉넉한 단계"가 항상 골라진다.
 
-     - 상단바: 작업폴더 + 탐색작업창(순환버튼 1개) + 자동참조 + 웹서치 + 가져오기 + 설정.
-       화면 크기와 무관하게 항상 이 구성 그대로다(레이아웃을 4버튼으로 펼치는 기능은 없앴다 —
-       순환버튼 하나로 항상 통일하는 게 훨씬 안정적이다).
-     - 하단바: 검색·휴지통·현황판·경과지·계산기·관계도·스캔·캡처·편집. 상단바와 별개의
-       고정 요소로, 화면 크기와 무관하게 "화면 맨 아래"에 항상 고정되어 있다(상단바 밑에
-       붙는 게 아니라 진짜 화면 하단!). 넓으면(900px 초과) 9개가 개별로, 좁으면(900px 이하)
-       5개 그룹으로 묶여서 나온다 — 이 전환은 JS 실측이 아니라 순수 CSS 미디어쿼리 하나로만
-       결정된다. 좁을 때만 추가로 "입력 중엔 접힘" 애니메이션이 붙는다.
-     - 두 기준선(900px, 480px)은 JS의 NARROW_BREAKPOINT와 반드시 같은 값을 써야 한다. */
+     세 단계의 역할:
+     - full(넓은 PC): 레이아웃 4버튼 + 도구 9버튼 개별 표시
+     - grouped(태블릿 등 중간폭): 레이아웃 1버튼(순환) + 도구1/도구2 2그룹으로 축소, 전부 상단바 안에 있음
+     - compact(폰): 상단엔 [작업폴더] + [탐색작업창·자동참조·웹서치] 모드버튼 3개만 남고,
+       나머지 도구는 화면·기록·분석·캡처·설정 5그룹으로 나뉘어 하단 고정바로 옮겨감(옮기는 건
+       DOM이 아니라 CSS position — #topbarActionCluster 항목 참고) */
 
-  .topbar{
-    display:flex; align-items:center; flex-wrap:wrap; gap:6px 8px;
-    padding:8px 10px; background:var(--navy); color:#fff;
-    flex-shrink:0; row-gap:6px; position:relative; z-index:95;
+  /* 기본값(=stage-full, JS 실행 전에도 일단 이 형태로 보이도록): 개별 버튼 전부 표시 */
+  .layout-buttons-wide{ display:contents; }
+  .tool-buttons-wide{ display:contents; }
+  #btnWorkspaceMode{ display:none; }
+  .tool-group-narrow{ display:none; }
+  #btnModeAutoRef, #btnModeWebSearch, #btnModeWebFetch{ display:none; } /* 폰 전용 — full/grouped(PC·탭)에서는 숨김 */
+  .mobile-group{ display:none; } /* 폰 전용 하단 5그룹 — full/grouped에서는 숨김 */
+  /* #topbarActionCluster는 폰 하단 5그룹을 담는 래퍼 — 평소(full/grouped)에는 display:contents로
+     "안 보이는 그릇" 역할만 하고(자식이 어차피 .mobile-group{display:none}이라 안 보임),
+     compact일 때만 이 래퍼 자체가 실제 박스가 되어 position:fixed로 화면 맨 아래에 붙는다 —
+     버튼을 실제로 옮기는(insertBefore) 게 아니라 "보여지는 위치"만 CSS로 바꾸는 것이므로
+     순서가 꼬일 수가 없다. */
+  #topbarActionCluster{ display:contents; }
+
+  /* ---- grouped(PC/탭 중간폭): 레이아웃 순환버튼 + 도구1/도구2 2그룹 ---- */
+  body.stage-grouped .layout-buttons-wide{ display:none; }
+  body.stage-grouped #btnWorkspaceMode{ display:inline-flex; }
+  body.stage-grouped .tool-buttons-wide{ display:none; }
+  body.stage-grouped .tool-group-narrow{ display:flex; }
+  body.stage-grouped .topbar .spacer{ flex:0 0 8px; min-width:0; }
+
+  /* ---- compact(폰): 상단엔 모드버튼 4개만, 도구는 전부 하단 5그룹으로 ---- */
+  body.stage-compact .layout-buttons-wide{ display:none; }
+  body.stage-compact .tool-buttons-wide{ display:none; }
+  body.stage-compact .tool-group-narrow{ display:none; } /* PC용 도구1/2는 폰에서 아예 안 씀 */
+  body.stage-compact #btnOpenSettings{ display:none; } /* 폰에서는 5번째 그룹(설정) 안으로 흡수 */
+  body.stage-compact #btnWorkspaceMode,
+  body.stage-compact #btnModeAutoRef,
+  body.stage-compact #btnModeWebSearch,
+  body.stage-compact #btnModeWebFetch{
+    display:inline-flex; flex:1 1 0; min-width:0; justify-content:center;
   }
-  .bottombar{
-    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
-    padding:8px 10px; background:var(--navy); flex-shrink:0;
-    position:fixed; left:0; right:0; bottom:0; z-index:95; /* 화면 크기와 무관하게 항상 진짜 화면 맨 아래 */
+  body.stage-compact .topbar .spacer{ flex:0 0 8px; min-width:0; }
+
+  /* 상단 모드버튼 4개(탐색작업창·자동참조·웹서치·가져오기)의 글자 라벨은 화면에 여유가 있을
+     때만 보여준다 — 예전엔 폰이면 무조건 아이콘만 남겨서, 화면이 넓은 폰(가로모드 등)에서도
+     불필요하게 작게 고정돼 있었다. JS(updateModeButtonsLabeled)가 "customerSelect+이 4버튼이
+     한 줄에 들어가는지" 실측해서, 들어가면 body에 mode-buttons-labeled를 붙여 글자를 보여준다.
+     하단 5그룹(mobile-group)은 폭을 5등분해서 쓰는 자리라 항상 아이콘만 유지한다. */
+  body.stage-compact #btnWorkspaceMode .tool-menu-label,
+  body.stage-compact #btnModeAutoRef .tool-menu-label,
+  body.stage-compact #btnModeWebSearch .tool-menu-label,
+  body.stage-compact #btnModeWebFetch .tool-menu-label,
+  body.stage-compact .mobile-group .tool-menu-label{ display:none; }
+  body.stage-compact.mode-buttons-labeled #btnWorkspaceMode .tool-menu-label,
+  body.stage-compact.mode-buttons-labeled #btnModeAutoRef .tool-menu-label,
+  body.stage-compact.mode-buttons-labeled #btnModeWebSearch .tool-menu-label,
+  body.stage-compact.mode-buttons-labeled #btnModeWebFetch .tool-menu-label{ display:inline; }
+
+  body.stage-compact #topbarActionCluster{
+    display:flex; align-items:center; gap:6px;
+    position:fixed; left:0; right:0; bottom:0; z-index:95;
+    background:var(--navy);
+    padding:8px 10px; overflow:hidden; max-height:64px; opacity:1;
+    transition:max-height 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
   }
-  .tools-wide{ display:contents; }
-  .tools-narrow{ display:none; }
-  #btnVoiceInputFlip{ display:none; } /* 플립모드 전용 — 평소엔 숨김 */
-
-  /* 하단바가 화면 아래 고정으로 떠 있는 만큼, 본문(워크스페이스)에 여백을 줘서 채팅 입력창 등이
-     안 가리게 한다 — 실측 대신 넉넉한 고정값(60px)을 그냥 쓴다. 화면 크기와 무관하게 항상 적용. */
-  .workspace{ padding-bottom:60px; transition:padding-bottom 0.18s ease; }
-
-  @media (max-width: 900px){
-    .tools-wide{ display:none; }
-    .tools-narrow{ display:flex; flex:1 1 auto; gap:6px; min-width:0; }
-    .tools-narrow .mobile-group{ display:flex; flex:1 1 0; min-width:0; }
-    .tools-narrow .mobile-group > .tb-btn{ width:100%; justify-content:center; }
-    .tools-narrow .tb-btn{ justify-content:center; min-width:0; padding-left:6px; padding-right:6px; }
-    .tools-narrow .tool-menu-label{ display:none; } /* 폰 폭에서는 5그룹 라벨 항상 아이콘만 */
-    #btnOpenSettings{ display:none; } /* 하단 5그룹의 "설정"과 중복이라 상단에서는 숨김 */
-
-    /* 좁은 화면에서만 "입력 중엔 하단바가 접힌다" 기능을 추가한다 — 넓은 화면은 세로 공간이
-       넉넉해서 굳이 접을 필요가 없다. */
-    .bottombar{
-      overflow:hidden; max-height:64px; opacity:1;
-      transition:max-height 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
-    }
-    body.bottombar-hidden .bottombar{ max-height:0; opacity:0; padding-top:0; padding-bottom:0; }
-    body.bottombar-hidden .workspace{ padding-bottom:0; }
-    /* 좁은 화면의 팝업은 "그 버튼 기준"이 아니라 "화면 기준"으로 연다 — 버튼 기준으로 열면
-       화면 오른쪽에 가까운 버튼(캡처·설정 등)을 눌렀을 때 팝업이 화면 밖으로 밀려나
-       안 보이게 되는 문제가 있었다. */
-    .bottombar .nx-popup{
-      position:fixed; left:10px; right:10px; top:auto; bottom:72px;
-      min-width:0; width:auto; max-height:60vh; overflow-y:auto;
-    }
+  body.stage-compact.bottombar-hidden #topbarActionCluster{
+    max-height:0; opacity:0; padding-top:0; padding-bottom:0;
   }
-
-  @media (max-width: 480px){
-    /* 상단바 요소가 좁은 폰 폭에서까지 라벨을 다 붙이고 있으면 안 맞을 수 있어서,
-       이 폭 이하에서는 라벨을 없애고 아이콘만 남기며 균등폭으로 채운다.
-       (#btnOpenSettings는 900px 기준에서 이미 숨겨지므로 여기선 다룰 필요 없음) */
-    #btnWorkspaceMode, #btnModeAutoRef, #btnModeWebSearch, #btnModeWebFetch{
-      flex:1 1 0; min-width:0; justify-content:center;
-    }
-    #btnWorkspaceMode .tool-menu-label, #btnModeAutoRef .tool-menu-label,
-    #btnModeWebSearch .tool-menu-label, #btnModeWebFetch .tool-menu-label{ display:none; }
-    .topbar .spacer{ flex:0 0 8px; min-width:0; }
+  body.stage-compact .mobile-group{ display:flex; flex:1 1 0; min-width:0; }
+  body.stage-compact .mobile-group > .tb-btn{ width:100%; justify-content:center; }
+  body.stage-compact .mobile-group .tb-btn{ justify-content:center; min-width:0; padding-left:6px; padding-right:6px; }
+  /* compact(폰) 단계의 팝업은 "그 버튼 기준"이 아니라 "화면 기준"으로 연다 — 버튼 기준으로 열면
+     화면 오른쪽에 가까운 버튼(캡처·설정 등)을 눌렀을 때 220px짜리 팝업이 화면 밖으로 밀려나
+     안 보이게 되는 문제가 있었다(클릭은 되는데 뜬 메뉴가 안 보여서 "안 눌리는 것처럼" 보임).
+     position:fixed로 바꾸고 좌우를 화면 여백 기준으로 고정하면 어떤 버튼을 눌러도 항상
+     화면 안에 온전히 들어온다. */
+  body.stage-compact #topbarActionCluster .nx-popup{
+    position:fixed; left:10px; right:10px; top:auto;
+    bottom:calc(var(--bottombar-h, 64px) + 6px);
+    min-width:0; width:auto; max-height:60vh; overflow-y:auto;
   }
+  /* 고정바가 화면 아래 떠있는 만큼, 그 뒤에 깔리는 본문(워크스페이스)에 여백을 줘서
+     채팅 입력창 등이 안 가리게 한다 — 높이는 JS가 실측해서 --bottombar-h로 넣어준다. */
+  body.stage-compact .workspace{ padding-bottom: var(--bottombar-h, 0px); transition: padding-bottom 0.18s ease; }
+
+  /* 측정 전용 임시 클래스 — "한 줄로 쭉 펼치면 실제로 몇 px가 필요한지"를 scrollWidth로 재기
+     위해 그 순간에만 줄바꿈을 강제로 끈다. JS 안에서 클래스를 붙였다 재는 즉시 떼기 때문에
+     화면에는 절대 보이지 않는다(같은 동기 실행 안에서 끝나서 브라우저가 그 상태로 그리지 않음). */
+  .topbar.measuring{ flex-wrap: nowrap !important; }
 
   /* ===== AI 설정 모달 ===== */
   .modal-overlay{
@@ -360,7 +384,7 @@
   .workspace.explorer-floating .panel.explorer{
     display:flex; position:fixed;
     top:calc(var(--topbar-h, 50px) + 8px); left:5vw; right:5vw;
-    bottom:70px; z-index:91;
+    bottom:calc(var(--bottombar-h, 8px) + 8px); z-index:91;
     border-radius:12px; overflow:hidden; box-shadow:0 16px 48px rgba(0,0,0,0.4); border:1px solid var(--line);
   }
 
@@ -445,44 +469,12 @@
   #flipVoiceIcon.listening{ background:#d9534f; border-color:#d9534f; color:#fff; animation:pulseRec 1.1s ease-in-out infinite; }
   #flipVoiceIcon.speaking{ background:#2f6fed; border-color:#2f6fed; color:#fff; }
   #flipVoiceText{ font-size:13px; color:var(--sub); font-weight:600; }
-  /* 플립모드에선 화면이 너무 작아 탐색·검색 등 도구가 의미 없으므로, 상단바 모드버튼·설정도
-     다 숨기고 음성 상태 표시만 남긴다. 마이크는 하단바 쪽 전용 버튼(btnVoiceInputFlip)으로 대체. */
+  body.flip-mode .layout-buttons-wide,
   body.flip-mode #btnWorkspaceMode,
   body.flip-mode #btnModeAutoRef,
   body.flip-mode #btnModeWebSearch,
-  body.flip-mode #btnModeWebFetch,
-  body.flip-mode #btnOpenSettings{ display:none !important; }
-  body.flip-mode .tools-narrow .mobile-group{ display:none !important; } /* 도구 5그룹도 숨기고 */
+  body.flip-mode #btnModeWebFetch{ display:none !important; } /* 플립모드에선 탐색기 자체가 의미 없으므로 다 숨김 */
   body.flip-mode #btnVoiceInputFlip{ display:inline-flex !important; flex:1 1 0; min-width:0; justify-content:center; }
-
-  /* ===== 최소모드 (PC 전용 — 창을 아주 낮게 줄였을 때) =====
-     용어 정리: "미니보기"(PC 창 폭이 좁아져 폰처럼 하단바가 뜨는 상태)는 기존 compact 단계
-     그 자체라 별도 처리가 필요 없다. 그보다 더 좁고 특히 "높이"까지 낮아져서 탐색기까지
-     강제로 접어야 할 정도로 빠듯한 상태만 "최소모드"라고 부른다(예전엔 "미니모드"라고
-     불렀는데 위 "미니보기"와 헷갈려서 이름을 바꿈).
-     탐색기를 강제로 접어서(=워크스페이스 "생략" 모드) 상단바·채팅·하단바가 겹치지 않게 한다.
-     별도 레이아웃 CSS는 필요 없다 — 기존 "생략" 모드(explorer-collapsed)를 그대로 쓰기 때문에
-     이 클래스는 사실 표식(주로 디버그 배지 표시용)의 역할만 한다. */
-  body.min-mode #nxDebugBadge{ background:rgba(47,111,237,0.85); }
-
-  /* ===== 작업표시줄모드 (?taskbar=1로 연 별도의 작은 PC 창 전용) ===== */
-  #taskbarBar{ display:none; }
-  body.taskbar-mode .topbar,
-  body.taskbar-mode .bottombar{ display:none !important; } /* 상단바·하단바(이제 별개 요소) 둘 다 숨김 */
-  body.taskbar-mode.taskbar-icons .workspace{ display:none !important; }
-  body.taskbar-mode.taskbar-icons #taskbarBar{
-    display:flex; position:fixed; inset:0; align-items:center; justify-content:center;
-    gap:10px; background:var(--navy);
-  }
-  #taskbarBar button{
-    width:44px; height:44px; border-radius:50%; border:1px solid rgba(255,255,255,0.25);
-    background:rgba(255,255,255,0.08); color:#fff; font-size:18px; cursor:pointer;
-    display:flex; align-items:center; justify-content:center;
-  }
-  #taskbarBar button:hover{ background:rgba(255,255,255,0.18); }
-  body.taskbar-mode.taskbar-chat .workspace{ display:flex !important; }
-  body.taskbar-mode.taskbar-chat .panel.explorer{ display:none !important; }
-  body.taskbar-mode.taskbar-chat .panel.chat{ flex:1 1 100%; }
 
   /* ===== 파일 드래그&드롭 첨부 ===== */
   .chat-body.drag-over{ background:#eef3fb; outline:2px dashed var(--gold); outline-offset:-6px; }
@@ -644,22 +636,23 @@
 <body>
 
   <!-- 임시 디버그 배지 — 플립모드 판정 확인용. 문제 해결되면 이 div 통째로 지우면 됨. -->
-  <div id="nxDebugBadge" style="position:fixed; top:calc(var(--topbar-h, 50px) + 4px); left:2px; right:2px; z-index:99999; font-size:11px; background:rgba(0,0,0,0.75); color:#4f4; padding:3px 6px; border-radius:4px; pointer-events:none; font-family:monospace; white-space:normal; overflow-wrap:break-word; max-width:calc(100vw - 8px);"></div>
-
-  <!-- 작업표시줄모드 전용(별도로 띄운 작은 창에서만 보임, ?taskbar=1일 때만 활성화) -->
-  <div id="taskbarBar" style="display:none;">
-    <button type="button" id="taskbarMicBtn" title="바로 음성대화">🎤</button>
-    <button type="button" id="taskbarKeyboardBtn" title="채팅창 열기">⌨</button>
-    <button type="button" id="taskbarExpandBtn" title="탭모드 크기로 확대">🔍+</button>
-  </div>
+  <div id="nxDebugBadge" style="position:fixed; top:2px; left:2px; z-index:99999; font-size:11px; background:rgba(0,0,0,0.75); color:#4f4; padding:3px 6px; border-radius:4px; pointer-events:none; font-family:monospace; white-space:nowrap;"></div>
 
   <div class="topbar">
     <input type="text" id="customerSelect" class="topbar-select" list="customerListOptions" placeholder="고객 불러오는 중…" autocomplete="off">
     <datalist id="customerListOptions"></datalist>
+    <!-- 폰(compact) 전용 모드버튼 3개: 탐색작업창(레이아웃 순환) · 자동참조 · 웹서치.
+         작업폴더(customerSelect) 바로 오른쪽에 위치, 항상 상단바에 남아있고 하단으로 안 내려감. -->
     <button id="btnWorkspaceMode" class="tb-btn" title="탐색작업창 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기)"><span id="workspaceModeIcon">⬓</span> <span class="tool-menu-label" id="workspaceModeLabel">좌우</span></button>
     <button type="button" id="btnModeAutoRef" class="tb-btn" title="자동참조: AI가 알아서 판단해서 지금 보고 있는 폴더/파일을 확인">🔗 <span class="tool-menu-label">자동참조</span></button>
     <button type="button" id="btnModeWebSearch" class="tb-btn" title="웹서치: AI가 필요하면 인터넷에서 검색">🌐 <span class="tool-menu-label">웹서치</span></button>
     <button type="button" id="btnModeWebFetch" class="tb-btn" title="웹페이지 가져오기: 채팅에 붙여넣은 URL을 AI가 직접 열어서 읽음">📥 <span class="tool-menu-label">가져오기</span></button>
+    <div class="layout-buttons-wide">
+      <button type="button" id="btnLayoutRow" class="tb-btn" data-mode="row" title="좌우 배치">⬓ 좌우</button>
+      <button type="button" id="btnLayoutCol" class="tb-btn" data-mode="col" title="상하 배치">⬒ 상하</button>
+      <button type="button" id="btnLayoutHide" class="tb-btn" data-mode="hide" title="탐색기 생략 · 채팅만">💬 생략</button>
+      <button type="button" id="btnLayoutFloat" class="tb-btn" data-mode="float" title="탐색기 띄우기 · 채팅 위에 잠깐 보기">🗗 띄우기</button>
+    </div>
     <div class="spacer"></div>
     <div id="selectionInline" class="selection-inline" style="display:none;">
       <span id="selectionCountText"></span>
@@ -669,14 +662,7 @@
       <button type="button" id="btnDeleteSelected" class="danger">🗑 삭제</button>
       <button type="button" id="btnClearSelected" class="ghost">취소</button>
     </div>
-    <button id="btnOpenSettings" class="tb-btn" title="AI 설정">⚙ <span class="tool-menu-label">설정</span></button>
-  </div>
-
-  <!-- 하단바 — 상단바와 완전히 별개의 고정 요소. 넓은 화면이든 좁은 화면이든 항상 존재한다.
-       넓으면 9개 도구가 개별로, 좁으면 5개 그룹으로 묶여서 보인다(CSS 기준선 900px 하나로만 결정,
-       실측 로직 없음). -->
-  <div class="bottombar" id="toolBar">
-    <div class="tools-wide">
+    <div class="tool-buttons-wide">
       <button type="button" id="btnOpenSearch" class="tb-btn" title="파일·폴더 이름 검색">🔍 검색</button>
       <button type="button" id="btnOpenTrash" class="tb-btn" title="이 폴더에서 최근 삭제한 항목 복원">🗑 휴지통</button>
       <button type="button" id="btnOpenDashboard" class="tb-btn" title="모든 폴더의 처리일지·마감일을 한눈에">📊 현황판</button>
@@ -687,7 +673,18 @@
       <button type="button" id="btnScreenCapture" class="tb-btn" title="다른 창(홈택스 등) 화면 캡처해서 첨부">📸 캡처</button>
       <button id="btnOpenFullEditor" class="tb-btn" title="전체화면으로 직접 편집 (AI 개입 없이)">🖋 편집</button>
     </div>
-    <div class="tools-narrow">
+    <div class="topbar-item tool-group-narrow" id="toolGroup1Wrap">
+      <button type="button" id="btnToolGroup1" class="tb-btn" title="검색 · 휴지통 · 현황판">🔍 <span class="tool-menu-label">도구1</span></button>
+      <div id="toolGroup1Popup" class="nx-popup"></div>
+    </div>
+    <div class="topbar-item tool-group-narrow" id="toolGroup2Wrap">
+      <button type="button" id="btnToolGroup2" class="tb-btn" title="경과지 · 계산기 · 관계도 · 스캔 · 캡처 · 편집">🛠 <span class="tool-menu-label">도구2</span></button>
+      <div id="toolGroup2Popup" class="nx-popup"></div>
+    </div>
+    <button id="btnOpenSettings" class="tb-btn" title="AI 설정">⚙ <span class="tool-menu-label">설정</span></button>
+    <!-- 폰(compact) 전용 하단 도구 5그룹. compact가 되면 이 덩어리 통째로 CSS(position:fixed)로
+         화면 맨 아래에 보이게만 바뀐다 — 버튼을 실제로 옮기지 않으므로 순서가 꼬일 여지가 없다. -->
+    <div id="topbarActionCluster">
       <div class="topbar-item mobile-group" id="mgFilesWrap">
         <button type="button" id="btnMgFiles" class="tb-btn" title="검색 · 휴지통">🔍 <span class="tool-menu-label">파일</span></button>
         <div id="mgFilesPopup" class="nx-popup"></div>
@@ -708,10 +705,10 @@
         <button type="button" id="btnMgConfig" class="tb-btn" title="편집 · 설정">⚙ <span class="tool-menu-label">설정</span></button>
         <div id="mgConfigPopup" class="nx-popup"></div>
       </div>
+      <!-- 플립모드(화면이 아주 작은 폰) 전용 마이크 — 채팅창·입력란이 없는 대신 이 버튼 하나로
+           음성모드를 켜고 끈다. 일반 폰 모드에서는 숨겨져 있고, 원래 마이크(입력창 옆)가 그대로 쓰인다. -->
+      <button type="button" id="btnVoiceInputFlip" class="tb-btn" title="음성모드" style="display:none;">🎤</button>
     </div>
-    <!-- 플립모드(화면이 아주 작은 폰) 전용 마이크 — 일반 폰 모드에서는 숨겨져 있고,
-         원래 마이크(입력창 옆)가 그대로 쓰인다. -->
-    <button type="button" id="btnVoiceInputFlip" class="tb-btn" title="음성모드" style="display:none;">🎤</button>
   </div>
 
   <div class="modal-overlay" id="settingsOverlay" style="display:none;">
@@ -804,12 +801,6 @@
           <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="ghost-btn" style="text-decoration:none; display:inline-block;">Claude 콘솔 열기 ↗</a>
           <a href="https://aistudio.google.com" target="_blank" rel="noopener" class="ghost-btn" style="text-decoration:none; display:inline-block;">Google AI Studio 열기 ↗</a>
         </div>
-
-        <label class="modal-label">🗗 작업표시줄모드 (PC 전용)</label>
-        <div class="modal-checkrow">
-          <button type="button" id="btnOpenTaskbarMode" class="ghost-btn" style="display:inline-block;">작은 창으로 띄우기</button>
-        </div>
-        <div class="modal-hint">별도의 작은 창이 뜹니다 — 마이크 버튼으로 바로 음성대화, 키보드 버튼으로 채팅창, 확대 버튼으로 탭모드 크기까지 그 창 스스로 커집니다. PC 브라우저에서만 의미가 있습니다.</div>
 
       </div>
       <div class="modal-foot">
@@ -1062,6 +1053,13 @@ graph TD
     hide:  { icon: '💬', label: '생략', title: '탐색기 생략 · 채팅만 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기)' },
     float: { icon: '🗗', label: '띄우기', title: '탐색기 띄우기 · 채팅 위에 잠깐 보기 (클릭하면 다시 좌우 배치로)' }
   };
+  // 넓은 화면에서 보이는 4개 버튼(직접 선택용) — 지금 모드에 해당하는 것만 강조 표시
+  const layoutModeButtons = {
+    row: document.getElementById('btnLayoutRow'),
+    col: document.getElementById('btnLayoutCol'),
+    hide: document.getElementById('btnLayoutHide'),
+    float: document.getElementById('btnLayoutFloat')
+  };
 
   function applyWorkspaceMode(mode){
     workspace.classList.toggle('layout-row', mode === 'row' || mode === 'hide' || mode === 'float');
@@ -1071,6 +1069,7 @@ graph TD
     workspaceModeIcon.textContent = WORKSPACE_MODE_META[mode].icon;
     workspaceModeLabel.textContent = WORKSPACE_MODE_META[mode].label;
     btnWorkspaceMode.title = WORKSPACE_MODE_META[mode].title;
+    Object.keys(layoutModeButtons).forEach(m => layoutModeButtons[m].classList.toggle('is-on', m === mode));
   }
   // 폰(compact 단계)에서는 화면 방향에 따라 실제로 못 쓰는 배치가 있다 —
   // 세로로 들면 좌우배치(row)는 각 창이 너무 좁아져 못 쓰고, 가로로 돌리면 상하배치(col)는
@@ -1103,6 +1102,10 @@ graph TD
       if (isModeAvailable(candidate)){ setWorkspaceMode(candidate); return; }
     }
     setWorkspaceMode('hide'); // 이론상 도달 안 하지만 안전장치
+  });
+  // 넓은 화면의 4개 버튼은 순환이 아니라 각자 자기 모드로 바로 전환
+  Object.keys(layoutModeButtons).forEach(mode=>{
+    layoutModeButtons[mode].addEventListener('click', ()=> setWorkspaceMode(mode));
   });
   applyWorkspaceMode(localStorage.getItem(WORKSPACE_MODE_KEY) || detectDefaultMode());
   // 폰을 회전시켜서 지금 쓰던 배치가 못 쓰게 되면(예: 좌우배치 중 세로로 돌림) 자동으로 안전한
@@ -2331,6 +2334,21 @@ graph TD
 
   loadCustomers();
 
+  // ---- 좁은 화면(PC/탭, grouped 단계)용 도구 그룹 팝업 — 도구1/도구2 2그룹 ----
+  const TOOL_GROUP_1 = [
+    { icon: '🔍', label: '검색', handler: openSearchView },
+    { icon: '🗑', label: '휴지통', handler: openTrashView },
+    { icon: '📊', label: '현황판', handler: openDashboardView }
+  ];
+  const TOOL_GROUP_2 = [
+    { icon: '📝', label: '경과지', handler: openLogView },
+    { icon: '🧮', label: '계산기', handler: openCalcView },
+    { icon: '🕸', label: '관계도', handler: openDiagramView },
+    { icon: '📷', label: '스캔', handler: openScanModal },
+    { icon: '📸', label: '캡처', handler: captureScreen },
+    { icon: '🖋', label: '편집', handler: openFullEditor }
+  ];
+
   // ---- 폰(compact 단계) 전용 하단 도구 5그룹 — 기능이 비슷한 것끼리 2개씩 묶음 ----
   const MOBILE_GROUP_FILES = [
     { icon: '🔍', label: '검색', handler: openSearchView },
@@ -2368,6 +2386,13 @@ graph TD
     });
   }
 
+  const toolGroup1Wrap = document.getElementById('toolGroup1Wrap');
+  const toolGroup2Wrap = document.getElementById('toolGroup2Wrap');
+  const btnToolGroup1 = document.getElementById('btnToolGroup1');
+  const btnToolGroup2 = document.getElementById('btnToolGroup2');
+  const toolGroup1Popup = document.getElementById('toolGroup1Popup');
+  const toolGroup2Popup = document.getElementById('toolGroup2Popup');
+
   const mgFilesBtn = document.getElementById('btnMgFiles');
   const mgRecordsBtn = document.getElementById('btnMgRecords');
   const mgAnalysisBtn = document.getElementById('btnMgAnalysis');
@@ -2379,6 +2404,8 @@ graph TD
   const mgCapturePopup = document.getElementById('mgCapturePopup');
   const mgConfigPopup = document.getElementById('mgConfigPopup');
 
+  fillToolPopup(toolGroup1Popup, TOOL_GROUP_1);
+  fillToolPopup(toolGroup2Popup, TOOL_GROUP_2);
   fillToolPopup(mgFilesPopup, MOBILE_GROUP_FILES);
   fillToolPopup(mgRecordsPopup, MOBILE_GROUP_RECORDS);
   fillToolPopup(mgAnalysisPopup, MOBILE_GROUP_ANALYSIS);
@@ -2386,6 +2413,7 @@ graph TD
   fillToolPopup(mgConfigPopup, MOBILE_GROUP_CONFIG);
 
   const ALL_GROUP_POPUPS = [
+    [toolGroup1Popup, btnToolGroup1], [toolGroup2Popup, btnToolGroup2],
     [mgFilesPopup, mgFilesBtn], [mgRecordsPopup, mgRecordsBtn], [mgAnalysisPopup, mgAnalysisBtn],
     [mgCapturePopup, mgCaptureBtn], [mgConfigPopup, mgConfigBtn]
   ];
@@ -2405,66 +2433,117 @@ graph TD
   });
 
   // ============================================================
-  // 상단바 + 하단바 반응형 — 백지 재설계(2026.07)
-  //
-  // 예전 방식(측정용 복제본으로 정밀하게 몇 px가 필요한지 재는 방식)이 계속 새 버그를
-  // 만들어냈다. 지금은 CSS 미디어쿼리(NARROW_BREAKPOINT=900px) 하나로만 "넓다/좁다"를
-  // 가르고, JS는 그 상태에 따라 부수적인 것들(플립모드·최소모드·상단바 높이 변수)만
-  // 처리한다. 도구버튼 9개가 개별로 보이는지 5그룹으로 뭉치는지는 순수 CSS만으로 결정되고
-  // JS는 전혀 관여하지 않는다 — 그래서 "측정이 틀려서 엉뚱한 화면이 나오는" 종류의 버그가
-  // 구조적으로 불가능하다.
+  // 상단바 반응형 — "화면폭이 몇 px면"이 아니라 "지금 이 내용이 실제로 한 줄에 들어가는가"를
+  // 재서 단계를 정한다. 순서: ① 다 펼친 상태(full)가 들어가면 그대로 ② 안 들어가면 그룹으로
+  // 접은 상태(grouped)를 재본다 ③ 그것도 안 들어가면 라벨 없애고 균등폭으로 압축(compact).
+  // compact 안에서는 버튼이 그래도 너무 좁아지면(높이의 1.3배 미만) 도구1+도구2를 합치고,
+  // compact로 판정된 순간에만 이 버튼들을 화면 하단으로 옮긴다(폰에서 엄지로 누르기 편하게).
   // ============================================================
   (function setupTopbarResponsive(){
     const topbarEl = document.querySelector('.topbar');
     const bodyEl = document.body;
-    const isPointerFine = window.matchMedia('(pointer: fine)').matches; // 마우스 있는 환경(=PC로 간주)
+    const cluster = document.getElementById('topbarActionCluster');
+    // 플립폰 커버화면처럼 아주 작은 폰 판정 기준(가로 px). 처음엔 280으로 좁게 잡았더니
+    // 실기기·브라우저 테스트에서 거의 도달하지 않는 극단값이라 전혀 안 걸렸다 — 일반 폰도
+    // 세로모드에서 보통 320~430px는 되므로, 테스트가 실제로 되는 값(340)으로 올려둔다.
+    // 실기기 확인 후 이 숫자만 바꾸면 된다.
+    const FLIP_MODE_MAX_WIDTH = 340;
+    let wasFlip = false; // 플립모드 여부가 "바뀔 때만" 이벤트를 쏘기 위한 이전 상태 기억
+    // max-height 트랜지션이 끝나는 순간에도 한 번 더 정확히 재서, setTimeout 타이밍이
+    // 살짝 어긋나는 경우(기기 성능 편차 등)까지 이중으로 보정한다.
+    cluster.addEventListener('transitionend', (e)=>{
+      if (e.propertyName === 'max-height') updateBottombarHeightVar();
+    });
 
-    const NARROW_BREAKPOINT = 900; // CSS의 "@media (max-width: 900px)"와 반드시 같은 값
-    const FLIP_MODE_MAX_WIDTH = 340; // 플립폰 커버화면처럼 아주 작은 폰 판정 기준(가로 px)
+    // 지금 stage를 candidateStage로 잠깐 바꿔서(화면엔 안 그려짐 — 아래 설명 참고) 그 상태로
+    // 한 줄로 쭉 펼쳤을 때 실제로 몇 px가 필요한지(scrollWidth)를 재고 원래 상태로 되돌린다.
+    function measureRequiredWidth(candidateStage){
+      const prevBodyClass = bodyEl.className;
+      bodyEl.className = prevBodyClass.replace(/\bstage-\S+/g, '').trim() + ' stage-' + candidateStage;
+      topbarEl.classList.add('measuring'); // 이 순간만 줄바꿈을 강제로 꺼서 "진짜 필요한 폭"을 잼
+      const required = topbarEl.scrollWidth;
+      topbarEl.classList.remove('measuring');
+      bodyEl.className = prevBodyClass; // 측정 즉시 원상복구 — 동기 실행이라 화면엔 안 그려짐
+      return required;
+    }
 
-    function isNarrow(){ return window.innerWidth <= NARROW_BREAKPOINT; }
+    function resolveStage(){
+      const available = topbarEl.clientWidth - 4; // 스크롤바 등 오차 여유
+      if (measureRequiredWidth('full') <= available) return 'full';
+      if (measureRequiredWidth('grouped') <= available) return 'grouped';
+      return 'compact'; // 마지막 단계는 flex:1이 알아서 맞춰주므로 항상 채택
+    }
 
-    // 상단바 실제 높이를 실측해서 --topbar-h로 넣어준다 — "띄우기" 모드 탐색기 패널 등
-    // position:fixed로 뜨는 것들이 막연한 vh 값 대신 실제 상단바 높이만큼 정확히 비켜서 그려지게.
+    // compact(폰) 단계에서, 상단 모드버튼 4개(탐색작업창·자동참조·웹서치·가져오기)에 글자
+    // 라벨을 붙일 여유가 있는지 실측한다 — 화면이 넓은 폰(가로모드 등)이면 라벨을 보여주고,
+    // 좁으면 아이콘만 남긴다. 고정폭 기준이 아니라 "customerSelect+이 4버튼이 실제로 한 줄에
+    // 들어가는지"를 매번 재서 판단하므로, 항상 지금 화면에 맞는 가장 넉넉한 크기가 나온다.
+    let modeButtonsLabeled = false;
+    function updateModeButtonsLabeled(){
+      if (currentStage !== 'compact'){
+        if (modeButtonsLabeled){ modeButtonsLabeled = false; bodyEl.classList.remove('mode-buttons-labeled'); }
+        return;
+      }
+      const prevBodyClass = bodyEl.className;
+      bodyEl.className = prevBodyClass.includes('mode-buttons-labeled')
+        ? prevBodyClass
+        : prevBodyClass + ' mode-buttons-labeled';
+      topbarEl.classList.add('measuring');
+      const required = topbarEl.scrollWidth;
+      topbarEl.classList.remove('measuring');
+      bodyEl.className = prevBodyClass;
+
+      const fits = required <= topbarEl.clientWidth - 4;
+      if (fits !== modeButtonsLabeled){
+        modeButtonsLabeled = fits;
+        bodyEl.classList.toggle('mode-buttons-labeled', fits);
+      }
+    }
+
+    // compact일 때 #topbarActionCluster가 화면 아래 고정으로 떠 있는 만큼, 그 높이를 실측해서
+    // .workspace의 padding-bottom으로 넣어준다. 버퍼를 아예 없앴더니(0) 이번엔 너무 붙어
+    // 보인다는 피드백이 있어서, 살짝만(4px) 여유를 둔다 — 이전(8px)보다는 좁고 0보다는 넓게.
+    function updateBottombarHeightVar(){
+      if (bodyEl.classList.contains('stage-compact') && !bodyEl.classList.contains('bottombar-hidden')){
+        document.documentElement.style.setProperty('--bottombar-h', (cluster.getBoundingClientRect().height + 4) + 'px');
+      } else {
+        document.documentElement.style.setProperty('--bottombar-h', '0px');
+      }
+    }
+
+    // 상단바 실제 높이도 실측해서 --topbar-h로 넣어준다 — "띄우기" 모드의 탐색기 패널처럼
+    // position:fixed로 뜨는 것들이 막연히 "화면의 6%" 같은 값 대신 실제 상단바 높이만큼
+    // 정확히 비켜서 그려지도록 하기 위함 (안 그러면 버튼이 상단바 뒤에 가려질 수 있음).
     function updateTopbarHeightVar(){
       document.documentElement.style.setProperty('--topbar-h', topbarEl.getBoundingClientRect().height + 'px');
     }
 
-    let wasFlip = false;
-    let wasMin = false;
-
+    let currentStage = null;
     function update(){
-      const narrow = isNarrow();
-      const stage = narrow ? 'compact' : 'full'; // 다른 코드(설정 등)가 참조할 수 있어 계속 body 클래스로 유지
-      bodyEl.className = bodyEl.className.replace(/\bstage-\S+/g, '').trim() + ' stage-' + stage;
+      const stage = resolveStage();
+      if (stage !== currentStage){
+        currentStage = stage;
+        bodyEl.className = bodyEl.className.replace(/\bstage-\S+/g, '').trim() + ' stage-' + stage;
+      }
+      updateModeButtonsLabeled();
+      updateBottombarHeightVar();
       updateTopbarHeightVar();
 
-      // 플립모드 — "키보드가 없다고 가정해도 되는" 터치기기(폰)만 대상, 좁은 화면 안에서
-      // 그보다도 더 좁을 때만. 상태가 "바뀔 때만" 이벤트를 쏴서, 아직 초기화 전일 수 있는
-      // 음성모드 섹션이 자기 준비가 끝난 뒤 그 이벤트를 받아 처리하게 한다.
-      const flip = !isPointerFine && narrow && window.innerWidth <= FLIP_MODE_MAX_WIDTH;
+      // 플립모드(아주 작은 폰 커버화면 등) 판정 — compact 단계 안에서, 그보다도 더 좁을 때만.
+      // 순수 CSS 클래스 토글이라 다른 변수에 의존하지 않는다(음성모드 쪽은 아직 스크립트
+      // 뒤쪽에서 초기화되기 전일 수 있어서, 직접 호출하지 않고 상태가 "바뀔 때만" 커스텀
+      // 이벤트로 알려준다 — 음성모드 섹션이 자기 준비가 끝난 뒤 그 이벤트를 받아 처리함).
+      const flip = (stage === 'compact') && window.innerWidth <= FLIP_MODE_MAX_WIDTH;
       bodyEl.classList.toggle('flip-mode', flip);
       if (flip !== wasFlip){
         wasFlip = flip;
         document.dispatchEvent(new CustomEvent('nx:flipmode', { detail: { on: flip } }));
       }
 
-      // 최소모드 — PC 전용. "미니보기"(=그냥 좁은 화면, 폰처럼 하단바가 뜨는 상태)와는 다른,
-      // 그보다 한 단계 더 좁은 상태다. "하단바가 펼쳐졌을 때 상단바를 가리지 않을 높이"가
-      // 기준이라, 상단바 높이의 2배(상단바·하단바가 거의 같은 높이)를 최소 필요 높이로 보고
-      // 그보다 낮으면 진입한다.
-      const topbarHNow = topbarEl.getBoundingClientRect().height || 46;
-      const isMin = isPointerFine && narrow && !flip && window.innerHeight < (topbarHNow * 2 + 40);
-      bodyEl.classList.toggle('min-mode', isMin);
-      if (isMin && !wasMin) setWorkspaceMode('hide'); // 최소모드 진입 순간엔 탐색기를 강제로 접어서 공간 확보
-      wasMin = isMin;
-
-      // 임시 디버그 배지 — 문제 해결 확인되면 이 블록과 #nxDebugBadge div 통째로 지우면 됨.
+      // 임시 디버그 배지 갱신 — 화면 좌상단에 지금 폭·단계·플립여부를 그대로 찍어준다.
       const debugBadge = document.getElementById('nxDebugBadge');
       if (debugBadge){
-        debugBadge.innerHTML = '[v10-simple] w:' + window.innerWidth + ' h:' + window.innerHeight
-          + ' stage:' + stage + ' flip:' + (flip ? 'ON' : 'off') + ' min:' + (isMin ? 'ON' : 'off')
-          + ' (기준:' + NARROW_BREAKPOINT + 'px/' + FLIP_MODE_MAX_WIDTH + 'px)';
+        debugBadge.textContent = 'w:' + window.innerWidth + ' stage:' + stage + ' flip:' + (flip ? 'ON' : 'off') + ' (기준:' + FLIP_MODE_MAX_WIDTH + ')';
       }
     }
 
@@ -2474,6 +2553,8 @@ graph TD
       rafPending = true;
       requestAnimationFrame(()=>{ rafPending = false; update(); });
     }
+
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(scheduleUpdate).observe(topbarEl);
     window.addEventListener('resize', scheduleUpdate);
     update(); // 초기 1회
 
@@ -2481,8 +2562,19 @@ graph TD
     // 그 공간을 채팅에 돌려준다 — 키보드가 올라오는 타이밍과 자연스럽게 맞물림.
     const chatInputForBottomBar = document.getElementById('chatInputEl');
     if (chatInputForBottomBar){
-      chatInputForBottomBar.addEventListener('focus', ()=> bodyEl.classList.add('bottombar-hidden'));
-      chatInputForBottomBar.addEventListener('blur', ()=> bodyEl.classList.remove('bottombar-hidden'));
+      chatInputForBottomBar.addEventListener('focus', ()=>{
+        bodyEl.classList.add('bottombar-hidden');
+        updateBottombarHeightVar();
+      });
+      chatInputForBottomBar.addEventListener('blur', ()=>{
+        bodyEl.classList.remove('bottombar-hidden');
+        // 하단바가 접힌 상태(0)에서 펼쳐지는 애니메이션(0.18초)이 막 시작된 시점이라,
+        // 지금 바로 재면 "다 펼쳐지기 전의 작은 값"이 잡혀서 여백이 부족하게 계산된다.
+        // 일단 한 번 재두고(즉시 반응하는 느낌은 유지), 애니메이션이 끝난 뒤 정확한 값으로
+        // 한 번 더 재서 덮어씌운다 — 그래야 입력창이 하단바에 가려지지 않는다.
+        updateBottombarHeightVar();
+        setTimeout(updateBottombarHeightVar, 220);
+      });
     }
   })();
 
@@ -2700,13 +2792,6 @@ graph TD
   document.getElementById('btnCloseSettings').addEventListener('click', closeSettingsModal);
   settingsOverlay.addEventListener('click', (e)=>{
     if (e.target === settingsOverlay) closeSettingsModal(); // 바깥(어두운 영역) 클릭 시 닫기
-  });
-  document.getElementById('btnOpenTaskbarMode').addEventListener('click', ()=>{
-    // 스크립트가 직접 크기를 조절할 수 있으려면 스크립트가 "직접 연" 창이어야 한다(브라우저 보안정책) —
-    // 그래서 지금 창을 줄이는 게 아니라, 이렇게 새로 작게 연 창 안에서 버튼 누를 때마다
-    // 그 창 스스로(window.resizeTo) 커지는 방식으로 만들었다.
-    const url = location.pathname + '?taskbar=1';
-    window.open(url, 'nx_taskbar', 'width=110,height=110,resizable=yes');
   });
   settingsAdvisor.addEventListener('change', ()=>{
     advisorModelRow.style.display = settingsAdvisor.checked ? 'block' : 'none';
@@ -3769,34 +3854,6 @@ graph TD
     // 지금 상태를 한 번 직접 확인해서 놓친 이벤트를 보정한다.
     if (document.body.classList.contains('flip-mode') && !voiceModeOn) toggleVoiceMode();
   }
-
-  // ============================================================
-  // 작업표시줄모드 (?taskbar=1 로 열린 별도의 작은 창에서만 동작) — 아이콘 3개짜리 초소형
-  // 상태에서, 버튼을 누를 때마다 이 창 자신을 window.resizeTo로 키워가며 단계적으로 펼친다.
-  // ============================================================
-  (function setupTaskbarMode(){
-    if (new URLSearchParams(location.search).get('taskbar') !== '1') return;
-
-    document.body.classList.add('taskbar-mode', 'taskbar-icons');
-
-    document.getElementById('taskbarMicBtn').addEventListener('click', ()=>{
-      try{ window.resizeTo(300, 320); }catch(e){}
-      document.body.classList.remove('taskbar-icons');
-      document.body.classList.add('taskbar-chat');
-      if (typeof toggleVoiceMode === 'function') toggleVoiceMode(); // 그 자리에서 바로 음성대화 시작
-    });
-    document.getElementById('taskbarKeyboardBtn').addEventListener('click', ()=>{
-      try{ window.resizeTo(380, 600); }catch(e){}
-      document.body.classList.remove('taskbar-icons');
-      document.body.classList.add('taskbar-chat');
-    });
-    document.getElementById('taskbarExpandBtn').addEventListener('click', ()=>{
-      try{ window.resizeTo(760, 820); }catch(e){}
-      // 탭모드 크기로 확대 = 더 이상 작업표시줄모드의 제약을 걸지 않고, 이제부터는
-      // 커진 창 크기 기준으로 기존 반응형(전체/그룹/압축)이 알아서 알맞은 화면을 고르게 둔다.
-      document.body.classList.remove('taskbar-mode', 'taskbar-icons', 'taskbar-chat');
-    });
-  })();
 
   // ============================================================
   // 문서 스캔 · PDF 조립

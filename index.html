@@ -2500,7 +2500,7 @@ graph TD
     }
 
     // desktop(=stage-full)에서 개별 표시할 도구버튼 목록(순서=우선순위, 뒤쪽부터 먼저 접힘).
-    const TOOL_BUTTON_COUNT = document.querySelectorAll('.tool-buttons-wide [data-tool-idx]').length;
+    const TOOL_BUTTON_COUNT = topbarEl.querySelectorAll('[data-tool-idx]').length;
 
     let lastMeasure = { available: 0, reqCore: 0, reqAll: 0 }; // 디버그 배지 표시용
 
@@ -2543,7 +2543,7 @@ graph TD
     function applyVisibleToolCount(n){
       if (n === appliedToolCount) return;
       appliedToolCount = n;
-      const realTools = Array.from(document.querySelectorAll('.tool-buttons-wide [data-tool-idx]'));
+      const realTools = Array.from(topbarEl.querySelectorAll('[data-tool-idx]'));
       const hidden = [];
       realTools.forEach((btn, i)=>{
         const show = i < n;
@@ -2574,7 +2574,7 @@ graph TD
     // 라벨을 몇 개까지 붙일 수 있는지 실측한다 — 도구버튼 "더보기"와 같은 원칙으로, 4개를
     // 한꺼번에 다 보이거나 다 없애는 대신 우선순위(탐색작업창이 최우선) 순서대로 하나씩만
     // 늘고 준다. 그래서 폰 화면 폭이 서서히 바뀌어도 라벨이 우르르 한꺼번에 사라지지 않는다.
-    const MODE_BTN_COUNT = document.querySelectorAll('[data-mode-btn-idx]').length;
+    const MODE_BTN_COUNT = topbarEl.querySelectorAll('[data-mode-btn-idx]').length;
 
     function measureModeLabelCount_(n){
       syncMeasureClone_();
@@ -2598,7 +2598,7 @@ graph TD
     function applyModeLabelCount(n){
       if (n === appliedModeLabelCount) return;
       appliedModeLabelCount = n;
-      const realModeBtns = Array.from(document.querySelectorAll('[data-mode-btn-idx]'));
+      const realModeBtns = Array.from(topbarEl.querySelectorAll('[data-mode-btn-idx]'));
       realModeBtns.forEach((btn, i)=>{
         const label = btn.querySelector('.tool-menu-label');
         if (label) label.style.display = (i < n) ? 'inline' : 'none';
@@ -2666,7 +2666,7 @@ graph TD
       // 임시 디버그 배지 — 문제 해결 확인되면 이 블록과 #nxDebugBadge div 통째로 지우면 됨.
       const debugBadge = document.getElementById('nxDebugBadge');
       if (debugBadge){
-        debugBadge.innerHTML = '[v6] w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
+        debugBadge.innerHTML = '[v7] w:' + window.innerWidth + ' h:' + window.innerHeight + ' stage:' + stage
           + ' tools:' + visibleToolCount + '/' + TOOL_BUTTON_COUNT
           + ' flip:' + (flip ? 'ON' : 'off') + ' mini:' + (mini ? 'ON' : 'off') + ' (flip기준:' + FLIP_MODE_MAX_WIDTH + ')'
           + '<br>available:' + lastMeasure.available + ' reqCore:' + lastMeasure.reqCore + ' reqAll:' + lastMeasure.reqAll;

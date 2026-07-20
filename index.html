@@ -1209,7 +1209,14 @@ graph TD
     return workspace.classList.contains('layout-col') ? SPLIT_KEY_COL : SPLIT_KEY_ROW;
   }
   // 저장된 비율이 있으면 그걸로, 없으면 CSS 기본값(40%, 상하는 auto+min/max-height)으로 되돌린다.
+  // 단, 채팅·탐색기 둘 중 하나만 보이는 상태(생략/띄우기/채팅끄기)에서는 절대 적용하지 않는다 —
+  // 인라인 flex 스타일이 CSS 클래스 규칙(flex:1 1 100%)보다 우선순위가 높아서, 그대로 두면
+  // "한쪽만 보여야 하는데 예전 분할비율이 남아서 나머지가 빈 여백으로 남는" 문제가 생긴다.
   function applySavedSplit(){
+    if (workspace.classList.contains('explorer-collapsed') || workspace.classList.contains('chat-collapsed')){
+      chatPanelEl.style.flex = '';
+      return;
+    }
     const saved = localStorage.getItem(currentSplitKey());
     chatPanelEl.style.flex = saved ? ('0 0 ' + saved + '%') : '';
   }

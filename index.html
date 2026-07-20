@@ -148,10 +148,10 @@
        화면 크기와 무관하게 항상 이 구성 그대로다(레이아웃을 4버튼으로 펼치는 기능은 없앴다 —
        순환버튼 하나로 항상 통일하는 게 훨씬 안정적이다).
      - 하단바: 검색·휴지통·현황판·경과지·계산기·관계도·스캔·캡처·편집. 상단바와 별개의
-       고정 요소로, 화면 크기와 무관하게 항상 존재한다. 넓으면(900px 초과) 9개가 개별로,
-       좁으면(900px 이하) 5개 그룹으로 묶여서 나온다 — 이 전환은 JS 실측이 아니라 순수
-       CSS 미디어쿼리 하나로만 결정된다. 넓을 때는 상단바 아래 평범한 두 번째 줄로 붙어있고,
-       좁을 때만 화면 맨 아래에 고정되고(입력 중엔 접힘) 5그룹으로 바뀐다.
+       고정 요소로, 화면 크기와 무관하게 "화면 맨 아래"에 항상 고정되어 있다(상단바 밑에
+       붙는 게 아니라 진짜 화면 하단!). 넓으면(900px 초과) 9개가 개별로, 좁으면(900px 이하)
+       5개 그룹으로 묶여서 나온다 — 이 전환은 JS 실측이 아니라 순수 CSS 미디어쿼리 하나로만
+       결정된다. 좁을 때만 추가로 "입력 중엔 접힘" 애니메이션이 붙는다.
      - 두 기준선(900px, 480px)은 JS의 NARROW_BREAKPOINT와 반드시 같은 값을 써야 한다. */
 
   .topbar{
@@ -162,10 +162,15 @@
   .bottombar{
     display:flex; align-items:center; gap:6px; flex-wrap:wrap;
     padding:8px 10px; background:var(--navy); flex-shrink:0;
+    position:fixed; left:0; right:0; bottom:0; z-index:95; /* 화면 크기와 무관하게 항상 진짜 화면 맨 아래 */
   }
   .tools-wide{ display:contents; }
   .tools-narrow{ display:none; }
   #btnVoiceInputFlip{ display:none; } /* 플립모드 전용 — 평소엔 숨김 */
+
+  /* 하단바가 화면 아래 고정으로 떠 있는 만큼, 본문(워크스페이스)에 여백을 줘서 채팅 입력창 등이
+     안 가리게 한다 — 실측 대신 넉넉한 고정값(60px)을 그냥 쓴다. 화면 크기와 무관하게 항상 적용. */
+  .workspace{ padding-bottom:60px; transition:padding-bottom 0.18s ease; }
 
   @media (max-width: 900px){
     .tools-wide{ display:none; }
@@ -176,12 +181,14 @@
     .tools-narrow .tool-menu-label{ display:none; } /* 폰 폭에서는 5그룹 라벨 항상 아이콘만 */
     #btnOpenSettings{ display:none; } /* 하단 5그룹의 "설정"과 중복이라 상단에서는 숨김 */
 
+    /* 좁은 화면에서만 "입력 중엔 하단바가 접힌다" 기능을 추가한다 — 넓은 화면은 세로 공간이
+       넉넉해서 굳이 접을 필요가 없다. */
     .bottombar{
-      position:fixed; left:0; right:0; bottom:0; z-index:95;
       overflow:hidden; max-height:64px; opacity:1;
       transition:max-height 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
     }
     body.bottombar-hidden .bottombar{ max-height:0; opacity:0; padding-top:0; padding-bottom:0; }
+    body.bottombar-hidden .workspace{ padding-bottom:0; }
     /* 좁은 화면의 팝업은 "그 버튼 기준"이 아니라 "화면 기준"으로 연다 — 버튼 기준으로 열면
        화면 오른쪽에 가까운 버튼(캡처·설정 등)을 눌렀을 때 팝업이 화면 밖으로 밀려나
        안 보이게 되는 문제가 있었다. */
@@ -189,10 +196,6 @@
       position:fixed; left:10px; right:10px; top:auto; bottom:72px;
       min-width:0; width:auto; max-height:60vh; overflow-y:auto;
     }
-    /* 하단바가 화면 아래 고정으로 떠 있는 만큼, 본문(워크스페이스)에 여백을 줘서 채팅
-       입력창이 안 가리게 한다 — 실측 대신 넉넉한 고정값(60px)을 그냥 쓴다. */
-    .workspace{ padding-bottom:60px; transition:padding-bottom 0.18s ease; }
-    body.bottombar-hidden .workspace{ padding-bottom:0; }
   }
 
   @media (max-width: 480px){

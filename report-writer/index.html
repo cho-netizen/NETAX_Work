@@ -1050,11 +1050,56 @@ function showToast(message, type){
   setTimeout(dismiss, duration);
 }
 
+// ============================================================
+// 문서함 저장소 — IndexedDB 우선, localStorage는 "빠른 첫 화면"용 캐시
+// ------------------------------------------------------------
+// 문서에 base64 이미지가 통째로 들어가는 경우가 실제로 있어서(예: 그림 붙임자료),
+// localStorage 한도(보통 5~10MB)에 실제로 걸릴 수 있다. IndexedDB는 통상 수백MB~
+// 수GB 여유가 있어 같은 데이터를 훨씬 안전하게 보관한다.
+// 다만 IndexedDB는 비동기라 페이지를 열 때마다 그만큼 첫 렌더링이 늦어지는 게 단점이라,
+// "화면은 localStorage 캐시로 즉시 그리고, 진짜 저장은 IndexedDB에 한다" 방식으로 절충했다.
+// ============================================================
+const IDB_NAME = 'nxReportWriterDB';
+const IDB_STORE = 'kv';
+let idbOpenPromise = null;
+
+function openIdb_(){
+  if (idbOpenPromise) return idbOpenPromise;
+  idbOpenPromise = new Promise((resolve, reject) => {
+    if (!window.indexedDB){ reject(new Error('이 브라우저는 IndexedDB를 지원하지 않습니다.')); return; }
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(IDB_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return idbOpenPromise;
+}
+
+async function idbGet_(key){
+  const db = await openIdb_();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbSet_(key, value){
+  const db = await openIdb_();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(value, key);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 function uid(){
   return 'doc-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7);
 }
 
-// ---------- 문서함(localStorage) 로드/저장 ----------
+// ---------- 문서함 초기 로드(동기, localStorage 캐시 — 화면을 즉시 그리기 위함) ----------
 function loadDocs(){
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1062,7 +1107,7 @@ function loadDocs(){
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length) return parsed;
     }
-  } catch (e) { console.warn('문서함 로드 실패, 기본 샘플로 초기화합니다.', e); }
+  } catch (e) { console.warn('문서함 캐시 로드 실패, 기본 샘플로 초기화합니다.', e); }
   // 최초 실행 또는 저장된 문서함이 비어있을 때: 기본 샘플 2건 제공
   return [
     { id: 'sample-appeal', name: '청구취지및이유서_송기종(샘플)', theme: 'appeal', format: 'md', md: MD_APPEAL },
@@ -1070,24 +1115,32 @@ function loadDocs(){
   ];
 }
 
-// 저장 성공 여부를 반환한다 — 실패(용량초과 등)를 호출부가 무시하지 않도록 하기 위함.
-// 과거에는 실패해도 console.error만 찍고 화면은 "저장됨"이라고 표시해서,
-// 사용자가 저장된 줄 알았는데 실제로는 저장 안 된 상태로 남는 위험이 있었다.
-function saveDocs(docs){
+// 저장 성공 여부를 반환한다(Promise) — 실패(용량초과 등)를 호출부가 무시하지 않도록 하기 위함.
+// IndexedDB에 우선 저장하고, localStorage에는 "다음 로딩을 빠르게 하기 위한 캐시"로만 시도한다
+// (캐시 저장이 용량 때문에 실패해도 IndexedDB가 살아있으면 데이터 자체는 안전하므로 에러로 취급하지 않음).
+async function saveDocs(docs){
+  let idbOk = true;
+  try {
+    await idbSet_(STORAGE_KEY, docs);
+  } catch (e) {
+    idbOk = false;
+    console.error('문서함 저장 실패(IndexedDB).', e);
+  }
+
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
-    return true;
   } catch (e) {
-    console.error('문서함 저장 실패(브라우저 저장공간 문제일 수 있습니다).', e);
-    const isQuota = e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
+    // 캐시 저장 실패는 IndexedDB가 성공했다면 조용히 넘어간다 — 데이터는 이미 안전하게 저장됨.
+    if (idbOk) console.warn('문서함 캐시(localStorage) 저장은 건너뜀(용량 초과 가능성) — IndexedDB에는 정상 저장됨.', e);
+  }
+
+  if (!idbOk) {
     showToast(
-      isQuota
-        ? '저장 공간이 가득 차서 저장하지 못했습니다. 문서함에서 큰 문서(이미지 포함)를 정리하거나, 이 문서를 HTML로 다운로드해 백업한 뒤 삭제해주세요.'
-        : '저장에 실패했습니다: ' + (e && e.message ? e.message : e),
+      '저장 공간이 가득 차서 저장하지 못했습니다. 문서함에서 큰 문서(이미지 포함)를 정리하거나, 이 문서를 HTML로 다운로드해 백업한 뒤 삭제해주세요.',
       'error'
     );
-    return false;
   }
+  return idbOk;
 }
 
 let docs = loadDocs();
@@ -1096,12 +1149,40 @@ if (!docs.find(d => d.id === selectedId)) selectedId = docs.length ? docs[0].id 
 
 function getSelected(){ return docs.find(d => d.id === selectedId) || null; }
 
-// 저장 성공 여부를 반환한다 — 호출부는 이 값을 보고 "저장됨" 표시 여부를 결정해야 한다.
-function persist(){
-  const ok = saveDocs(docs);
-  if (ok && selectedId) localStorage.setItem(SELECTED_KEY, selectedId);
+// 저장 성공 여부를 반환한다(Promise) — 호출부는 이 값을 보고 "저장됨" 표시 여부를 결정해야 한다.
+async function persist(){
+  const ok = await saveDocs(docs);
+  if (selectedId) localStorage.setItem(SELECTED_KEY, selectedId);
   return ok;
 }
+
+// ---------- 페이지를 열 때 한 번, IndexedDB의 최신 데이터로 조용히 갈아끼운다 ----------
+// (localStorage 캐시가 용량 문제로 최신 저장을 못 담았던 경우를 대비 + 최초 실행 시 마이그레이션)
+async function hydrateDocsFromIdb_(){
+  // NX 작업실에서 ?fileId=...로 열린 경우엔 loadFromUrlFileId()가 그 파일을 docs에 반영하는
+  // 중이거나 반영할 예정이므로, 여기서 docs를 통째로 교체하면 그 결과와 경합해 덮어쓸 수 있다 —
+  // 이 경우는 마이그레이션(비어있으면 채워넣기)까지만 하고 화면 교체는 하지 않는다.
+  const hasFileIdParam = new URLSearchParams(window.location.search).has('fileId');
+  try {
+    const idbDocs = await idbGet_(STORAGE_KEY);
+    if (Array.isArray(idbDocs) && idbDocs.length) {
+      // IndexedDB가 이미 더 최신/많은 데이터를 갖고 있으면 화면을 그걸로 다시 그린다.
+      if (!hasFileIdParam && JSON.stringify(idbDocs) !== JSON.stringify(docs)) {
+        docs = idbDocs;
+        if (!docs.find(d => d.id === selectedId)) selectedId = docs.length ? docs[0].id : null;
+        refreshDocSelect();
+        loadSelectedIntoEditor();
+        render();
+      }
+    } else {
+      // IndexedDB가 비어있다는 건 이 브라우저에서 처음 실행된다는 뜻 — 지금 있는(localStorage 캐시) 문서함을 그대로 옮겨 심는다.
+      await idbSet_(STORAGE_KEY, docs);
+    }
+  } catch (e) {
+    console.warn('IndexedDB 문서함 동기화 실패(localStorage 캐시로 계속 동작).', e);
+  }
+}
+hydrateDocsFromIdb_();
 
 // ---------- 문서 선택 드롭다운 ----------
 function refreshDocSelect(){
@@ -1294,7 +1375,7 @@ function addFilesFromInput(fileList){
   let firstNewId = null;
   files.forEach(file => {
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const isHtml = /\.(html?|htm)$/i.test(file.name);
         const name = file.name.replace(/\.(md|txt|html?|htm)$/i, '');
@@ -1325,7 +1406,7 @@ function addFilesFromInput(fileList){
         remaining -= 1;
         if (remaining === 0) {
           if (firstNewId !== null) selectedId = firstNewId;
-          const saved = persist();
+          const saved = await persist();
           refreshDocSelect();
           loadSelectedIntoEditor();
           render();
@@ -1342,7 +1423,7 @@ function addFilesFromInput(fileList){
 }
 
 // kind: 'blank'(백지) 또는 'case'(사건개요서 상담메모 골격)
-function createNewDoc(kind){
+async function createNewDoc(kind){
   const templates = {
     blank: {
       promptDefault: '새 문서',
@@ -1366,7 +1447,7 @@ function createNewDoc(kind){
   const newDoc = { id: uid(), name: name.trim() || tpl.fallbackName, theme: 'memo', format: 'md', md: tpl.md };
   docs.push(newDoc);
   selectedId = newDoc.id;
-  const saved = persist();
+  const saved = await persist();
   refreshDocSelect();
   loadSelectedIntoEditor();
   render();
@@ -1376,13 +1457,13 @@ function createNewDoc(kind){
 function addBlankDoc(){ createNewDoc('blank'); }
 function addCaseMemoDoc(){ createNewDoc('case'); }
 
-function deleteCurrentDoc(){
+async function deleteCurrentDoc(){
   const d = getSelected();
   if (!d) return;
   if (!window.confirm('"' + d.name + '" 문서를 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) return;
   docs = docs.filter(x => x.id !== d.id);
   selectedId = docs.length ? docs[0].id : null;
-  const saved = persist();
+  const saved = await persist();
   refreshDocSelect();
   loadSelectedIntoEditor();
   render();
@@ -2305,7 +2386,7 @@ document.getElementById('mdInput').addEventListener('input', () => {
   if (!d) return;
   d.md = document.getElementById('mdInput').value;
   clearTimeout(mdSaveTimer);
-  mdSaveTimer = setTimeout(() => { if (persist()) flashSaveState('저장됨'); }, 400);
+  mdSaveTimer = setTimeout(async () => { if (await persist()) flashSaveState('저장됨'); }, 400);
 });
 
 document.getElementById('btnDocPlus').addEventListener('click', (e) => {

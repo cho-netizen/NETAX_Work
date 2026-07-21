@@ -204,7 +204,7 @@
   /* 화면에서 편집하며 보는 미리보기(#renderOut)는 폭 제한을 풀어 미리보기창을 꽉 채운다.
      다운로드・새창으로 내보낸 완성본은 clone에서 id를 지우므로 이 규칙이 적용되지 않고
      실제 인쇄물/고객화면 폭(210mm・720px)을 그대로 유지한다. */
-  #renderOut.doc-appeal, #renderOut.doc-memo, #renderOut.md-content{
+  #renderOut.doc-appeal, #renderOut.doc-memo, #renderOut.md-content, #renderOut.doc-translation{
     max-width: none;
   }
   .doc-appeal{
@@ -293,14 +293,62 @@
   .doc-memo hr{ border:none; border-top:0.75pt dashed #b8bfcc; margin:5mm 0; }
   .doc-memo a{ color:#2c3e60; }
 
+  /* =========================================================
+     테마 4 : 첨부서류 번역본 (계약서・정산서 등 원문 재현형)
+     — 분석·설명용 장치(mermaid・차트・조문링크)를 쓰지 않고
+       원본 서식(표・체크박스・서명란)을 그대로 재현하는 데 집중.
+     ========================================================= */
+  .doc-translation{
+    background:#fff; max-width:210mm; margin:0 auto; padding:15mm 15mm 12mm 15mm;
+    box-shadow:0 0 14px rgba(0,0,0,0.18);
+    font-family:'Noto Sans KR','Malgun Gothic',sans-serif;
+    font-size:10.5pt; line-height:1.6; color:#111;
+    word-break:keep-all;
+  }
+  .doc-translation .translation-badge{
+    display:block; text-align:center; font-weight:700; font-size:9.5pt;
+    background:#fff4e5; border:1px solid #e8a33d; color:#8a5a00;
+    padding:2mm 3mm; margin:0 0 6mm 0; border-radius:3px;
+  }
+  .doc-translation h1{ text-align:center; font-size:16pt; font-weight:800; margin:0 0 5mm 0; }
+  .doc-translation h2{
+    font-size:12.5pt; font-weight:800; margin:7mm 0 3mm 0;
+    padding-bottom:1.5mm; border-bottom:1.5pt solid #333;
+  }
+  .doc-translation h3{ font-size:11pt; font-weight:700; margin:4mm 0 2mm 0; }
+  .doc-translation p{ margin:0 0 2.4mm 0; }
+  .doc-translation ul{ margin:0 0 2.4mm 0; padding-left:0; list-style:none; }
+  .doc-translation ul li{ position:relative; padding-left:4mm; margin-bottom:1mm; text-indent:-4mm; }
+  .doc-translation ul li::before{ content:"-"; padding-right:2mm; }
+  .doc-translation table{ border-collapse:collapse; width:100%; table-layout:auto; margin:2mm 0 3mm 0; font-size:9.6pt; }
+  .doc-translation table th, .doc-translation table td{
+    border:0.75pt solid #666; padding:1.4mm 2mm; vertical-align:top; overflow-wrap:break-word;
+  }
+  .doc-translation table th{ background:#eee; font-weight:700; text-align:center; }
+  .doc-translation blockquote{
+    margin:2mm 0 3mm 0; padding:2mm 3mm; border-left:3pt solid #999;
+    background:#fafafa; font-size:9.8pt; color:#333;
+  }
+  .doc-translation blockquote p{ margin:0 0 1mm 0; }
+  .doc-translation blockquote p:last-child{ margin-bottom:0; }
+  /* 판독 불가・추정 항목은 본문에서 <span class="uncertain">...</span> 로 감싸 강조 표시 */
+  .doc-translation .uncertain, .doc-translation code{
+    background:#fff4e5; color:#8a5a00; padding:0 1mm; border-radius:2px; font-family:inherit;
+  }
+  .doc-translation em{ color:#555; }
+  .doc-translation hr{ border:none; border-top:0.5pt solid #999; margin:5mm 0; }
+  .doc-translation img{ display:block; margin:0 0 4mm 0; max-width:100%; height:auto; border:0.5pt solid #ccc; }
+  .doc-translation a{ color:#0645AD; }
+
   /* ---------- 공통 : 페이지분리 ---------- */
-  .doc-appeal .doc-pagebreak, .doc-memo .doc-pagebreak{
+  .doc-appeal .doc-pagebreak, .doc-memo .doc-pagebreak, .doc-translation .doc-pagebreak{
     break-before:page; page-break-before:always;
     display:flex; align-items:center; gap:3mm;
     margin:9mm 0; color:#999; font-size:8pt; letter-spacing:0.2em;
   }
   .doc-appeal .doc-pagebreak::before, .doc-appeal .doc-pagebreak::after,
-  .doc-memo .doc-pagebreak::before, .doc-memo .doc-pagebreak::after{
+  .doc-memo .doc-pagebreak::before, .doc-memo .doc-pagebreak::after,
+  .doc-translation .doc-pagebreak::before, .doc-translation .doc-pagebreak::after{
     content:""; flex:1; border-top:0.75pt solid #bbb;
   }
 
@@ -335,10 +383,11 @@
     #paneDivider{display:none !important;}
     #previewPane{padding:0; background:#fff; overflow:visible;}
     #previewControls{display:none !important;}
-    .doc-appeal, .doc-memo{box-shadow:none; margin:0; max-width:none; padding:0;}
-    .doc-appeal .doc-pagebreak, .doc-memo .doc-pagebreak{ margin:0; height:0; overflow:hidden; }
+    .doc-appeal, .doc-memo, .doc-translation{box-shadow:none; margin:0; max-width:none; padding:0;}
+    .doc-appeal .doc-pagebreak, .doc-memo .doc-pagebreak, .doc-translation .doc-pagebreak{ margin:0; height:0; overflow:hidden; }
     .doc-appeal .doc-pagebreak::before, .doc-appeal .doc-pagebreak::after,
-    .doc-memo .doc-pagebreak::before, .doc-memo .doc-pagebreak::after{ border-top:none; }
+    .doc-memo .doc-pagebreak::before, .doc-memo .doc-pagebreak::after,
+    .doc-translation .doc-pagebreak::before, .doc-translation .doc-pagebreak::after{ border-top:none; }
     @page{ size:A4; margin:30mm 25mm 25mm 25mm; } /* 위 30 우 25 아래 25 좌 25 - 인쇄 대화상자 "사용자 지정" 클릭시 이 값이 기본 입력되도록 함 */
   }
 
@@ -925,6 +974,7 @@
     <option value="appeal">청구서</option>
     <option value="memo">검토서</option>
     <option value="external">용역서</option>
+    <option value="translation">번역본</option>
   </select>
   <button id="btnRender" class="primary iconbtn" title="렌더링 (편집한 내용을 미리보기에 반영)">⟳</button>
   <div id="layoutToggle" style="display:flex;">
@@ -1019,7 +1069,7 @@ const MD_APPEAL = "# 청구취지 및 이유서\n\n*(사건번호: 동안양-이
 
 const MD_MEMO = "# 과세자료 해명 검토보고서 (샘플)\n\n*작성일: 2026-07-14 / 작성자: 조송원 세무사 / 유형: 내부검토용 (샘플 골격 — 실제 사건 내용으로 교체하여 사용)*\n\n<table class=\"memo-meta\">\n<tr><td class=\"k\">수 신</td><td>OO세무서장 (또는 \"본인 검토용\")</td></tr>\n<tr><td class=\"k\">제 목</td><td>OOO 관련 과세자료 해명의 건</td></tr>\n<tr><td class=\"k\">근거자료</td><td>과세자료 해명 안내문 (20XX. X. X.자)</td></tr>\n<tr><td class=\"k\">작성일자</td><td>2026년 X월 X일</td></tr>\n</table>\n\n<div class=\"conclusion-box\">\n\n**결론 (요약)**\n\n이 사안은 [핵심 쟁점 한 줄 요약]에 관한 것으로, [실제거래/정상거래 등 핵심 판단]에 해당하여 [필요경비 인정 / 매입세액 공제 등 결론]되어야 함. 상세 근거는 아래 2항 참조.\n\n</div>\n\n## 1. 검토 배경\n\n- 수신한 과세자료 해명 안내문의 요지: [안내문 핵심 내용 요약]\n- 관련 거래 개요: [거래상대방, 기간, 금액 등 핵심 사실관계]\n- 쟁점: [쟁점을 한 문장으로 명시]\n\n## 2. 사실관계 및 쟁점별 검토\n\n### <a id=\"sec-a\">가. [쟁점 A] — 방향을 정하는 데 필요한 핵심 판단</a>\n\n핵심 판단 내용을 문단으로 서술. 표 안에는 사실관계 설명 문장을 넣지 않고, 실제로 나열되는 병렬 항목에만 목록을 사용합니다.\n\n| 구분 | 금액(원) | 근거자료 |\n|:--|--:|:--|\n| 항목 1 | 000,000,000 | 자료명 |\n| 항목 2 | 000,000,000 | 자료명 |\n| **합계** | **000,000,000** | |\n\n### 나. [쟁점 B]\n\n- 판단에 필요한 핵심 사실 1\n- 판단에 필요한 핵심 사실 2\n\n관련 근거는 [가항](#sec-a) 참조.\n\n## 3. 실행 디테일 (부록)\n\n방향 판단에는 불필요하지만 실무 처리를 위해 남겨두는 세부 사항.\n\n- 제출 자료 목록: [자료1], [자료2]\n- 담당자 연락: [내부 메모]\n\n## 4. 결론 및 향후 조치\n\n- [최종 결론 재확인]\n- 다음 조치: [해명서 제출 / 추가자료 확보 / 불복 검토 등]\n\n[PAGEBREAK]\n\n## 붙임\n\n- 붙임1. [자료명]\n- 붙임2. [자료명]\n";
 
-const THEME_CLASS = { appeal: 'doc-appeal', memo: 'doc-memo', external: 'md-content' };
+const THEME_CLASS = { appeal: 'doc-appeal', memo: 'doc-memo', external: 'md-content', translation: 'doc-translation' };
 const STORAGE_KEY = 'nxReportRenderer.docs.v1';
 const SELECTED_KEY = 'nxReportRenderer.selected.v1';
 
@@ -2688,6 +2738,15 @@ function downloadAsDoc(){
   // 페이지분리 표시는 문서 파일에서는 불필요하므로 실제 페이지나눔(워드 컨트롤 문자)으로 치환
   clone.querySelectorAll('div.doc-pagebreak').forEach(div => {
     div.outerHTML = '<br clear="all" style="page-break-before:always" />';
+  });
+
+  // 구분선(hr): border-top 스타일이 그대로 내보내지면 워드/한글에서 "단락 테두리" 속성으로 변환되어
+  // 조판부호로도 안 잡히고 지울 수도 없는 선이 생긴다. 테두리 없는 여백용 빈 문단으로 치환한다.
+  clone.querySelectorAll('hr').forEach(hr => {
+    const p = document.createElement('p');
+    p.style.cssText = 'margin:6mm 0; border:none; padding:0;';
+    p.innerHTML = '&nbsp;';
+    hr.replaceWith(p);
   });
 
   // 표: border 속성을 직접 부여하고 각 셀에도 인라인 테두리 지정

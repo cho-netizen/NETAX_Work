@@ -1084,7 +1084,12 @@ graph TD
   // config.js 로드 실패 시를 대비해 마지막에 쓰던 값을 폴백으로 남겨둡니다.
   const GAS_URL = (window.NX_CONFIG && window.NX_CONFIG.GAS_URL)
     || 'https://script.google.com/macros/s/AKfycbz9pam82WMSMKHYo6-6EtEguMbpZ0AaqHirVzwcW6ZFRsdq4WGluvhpPkYUoTE2l_bm/exec';
-  const REPORT_WRITER_URL = 'https://work.netax.kr/report-writer/'; // 독립 도메인으로 이전 후 경로
+  // 예전에는 'https://work.netax.kr/report-writer/'로 도메인을 고정해뒀었는데,
+  // 그러면 나중에 dev.netax.kr 같은 테스트용 사본 도메인에서 열어도 편집기는 항상
+  // 진짜 실서비스(work.netax.kr) 쪽을 열어버리는 문제가 있었다. location.origin으로
+  // "지금 이 페이지가 열려 있는 도메인"을 그대로 따라가게 하면, 사본 도메인에서 테스트할 때도
+  // 그 사본의 report-writer가 열려서 진짜 쌍둥이 테스트가 가능해진다.
+  const REPORT_WRITER_URL = location.origin + '/report-writer/';
 
   // ============================================================
   // 토스트 알림 (기존 alert 대체) — 앞으로 추가되는 기능도 이 함수 하나로 알림을 띄우면 됨.

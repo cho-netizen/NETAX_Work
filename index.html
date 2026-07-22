@@ -1002,6 +1002,7 @@ graph TD
           <button class="back-btn" id="btnBack" title="닫기">✕</button>
           <span class="editor-filename" id="editorFilename"></span>
           <div class="spacer"></div>
+          <button type="button" id="btnEditorReload" class="ghost-btn" title="탐색기 등 다른 곳에서 이 파일이 바뀌었으면 눌러서 최신 내용으로 다시 엽니다">🔄 새로고침</button>
           <button type="button" id="btnEditorRef" class="ghost-btn">📎 참조</button>
         </div>
         <iframe id="editorFrame" class="editor-frame" title="문서 편집기"></iframe>
@@ -1608,6 +1609,23 @@ graph TD
     explorerPanelHead.style.display = 'flex'; // 탐색 중일 때는 경로표시줄 다시 보이게
     currentOpenFile = null;
     isReportWriterOpen = false;
+  });
+
+  document.getElementById('btnEditorReload').addEventListener('click', ()=>{
+    if (!currentOpenFile){ showToast('열려 있는 파일이 없습니다.', 'warning'); return; }
+    if (isReportWriterOpen){
+      // 편집기 내용을 지금 화면 그대로 덮어쓰지 않고, 저장되어 있는 최신 파일 내용을 다시 불러온다.
+      // 편집 중이던 내용이 있으면 새로고침으로 사라질 수 있으니 먼저 확인한다.
+      if (!confirm('탐색기 등 다른 곳에서 바뀐 최신 내용으로 다시 엽니다.\n지금 편집창에 저장하지 않은 내용이 있다면 사라집니다. 계속할까요?')) return;
+      if (editorFrame.contentWindow){
+        editorFrame.contentWindow.postMessage({ type: 'nx-reload-file' }, '*');
+        showToast('최신 내용으로 새로고침했습니다.', 'success');
+      }
+    } else {
+      // 이미지·PDF 미리보기: 구글드라이브 미리보기 iframe을 그냥 다시 불러온다 (캐시 방지용 타임스탬프 포함)
+      editorFrame.src = 'https://drive.google.com/file/d/' + encodeURIComponent(currentOpenFile.id) + '/preview?_r=' + Date.now();
+      showToast('새로고침했습니다.', 'success');
+    }
   });
 
   document.getElementById('btnEditorRef').addEventListener('click', async ()=>{
@@ -4638,6 +4656,11 @@ graph TD
   }
 
   async function buildPdfBytes(){
+    // ①단계(귀퉁이 조절)까지만 마치고 "펴서 페이지에 담기"를 아직 안 눌렀어도,
+    // 다운로드/저장/요약 버튼을 누르면 지금 조절해둔 영역을 자동으로 담아준다.
+    if (scanImageEl && scanCorners && scanStageWrap.style.display !== 'none'){
+      try{ warpAndAddPage(); }catch(err){ /* 여기서 실패해도 아래 담긴 페이지 여부로 정상 처리됨 */ }
+    }
     if (!docPages.length) return null;
     const outDoc = await PDFLib.PDFDocument.create();
     for (const item of docPages){

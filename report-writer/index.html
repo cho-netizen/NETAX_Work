@@ -928,7 +928,7 @@
   .floating-panel-handle span:hover{ color:#333; }
   .floating-panel .statute-modal-body{ padding:16px 20px 20px; margin-bottom:0; }
 
-  /* ===== 토스트 알림 (NX 작업실 index.html과 동일 디자인) =====
+  /* ===== 토스트 알림 (NX-Work index.html과 동일 디자인) =====
      여러 파일을 한 번에 업로드할 때처럼 실패가 반복적으로 발생할 수 있는 곳에서
      alert()를 쓰면 브라우저가 반복 호출을 차단할 수 있어, 흐름을 막지 않는 알림으로 통일한다. */
   #nxToastHost{
@@ -957,6 +957,8 @@
 <div id="appRoot">
 
 <div id="toolbar">
+  <button id="btnCloseToParent" class="iconbtn" title="편집창 닫기 (NX-Work 안에서 열었을 때만 보임)" style="display:none;">✕</button>
+  <button id="btnRefToParent" class="iconbtn" title="지금 이 문서 내용을 채팅 참조로 가져오기 (NX-Work 안에서 열었을 때만 보임)" style="display:none;">📎</button>
   <div id="docStepper" style="position:relative; display:flex; border:1px solid #4a5268; border-radius:4px; overflow:visible;">
     <button id="btnDocMinus" class="stepper-btn" title="현재 문서 삭제">−</button>
     <span style="width:1px; background:#4a5268;"></span>
@@ -969,6 +971,7 @@
   </div>
   <select id="docSelect"></select>
   <input type="file" id="fileInput" accept=".md,.txt,.html,.htm" multiple style="display:none;">
+  <button id="btnReloadFromDrive" class="iconbtn" title="드라이브에 저장된 최신 내용으로 다시 불러오기 (fileId로 연 문서일 때만 동작)">🔄</button>
   <span class="sep"></span>
   <select id="themeSelect">
     <option value="appeal">청구서</option>
@@ -977,11 +980,7 @@
     <option value="translation">번역본</option>
   </select>
   <button id="btnRender" class="primary iconbtn" title="렌더링 (편집한 내용을 미리보기에 반영)">⟳</button>
-  <div id="layoutToggle" style="display:flex;">
-    <button id="layoutEditor" class="layout-btn" title="편집창">◧</button>
-    <button id="layoutBoth" class="layout-btn active" title="모아보기 (스크롤 동기화 켜짐)">◫</button>
-    <button id="layoutPreview" class="layout-btn" title="미리보기">◨</button>
-  </div>
+  <button id="btnLayoutToggle" class="iconbtn" title="창보기: 클릭할 때마다 편집창→모아보기→미리보기 순으로 전환 (모아보기 상태에서 더블클릭하면 스크롤 동기화 켜기/끄기)">◫</button>
   <button id="btnNewWindow" class="iconbtn" title="완성된 문서만 새 창(탭)에서 보기 (편집 도구 없이)">↗</button>
   <div id="downloadWrap" style="position:relative; display:inline-flex;">
     <button id="btnDownload" class="iconbtn" title="다운로드 (DOC・MD・HTML・Print)">⬇</button>
@@ -1073,9 +1072,9 @@ const THEME_CLASS = { appeal: 'doc-appeal', memo: 'doc-memo', external: 'md-cont
 const STORAGE_KEY = 'nxReportRenderer.docs.v1';
 const SELECTED_KEY = 'nxReportRenderer.selected.v1';
 
-// NX 작업실 파일탐색기에서 ?fileId=... 로 열었을 때, 그 드라이브 파일 내용을 실제로 읽어오기 위한 GAS 엔드포인트
+// NX-Work 파일탐색기에서 ?fileId=... 로 열었을 때, 그 드라이브 파일 내용을 실제로 읽어오기 위한 GAS 엔드포인트
 // (NX Assistant 프록시와 같은 배포 URL — listFolder/readFile 액션이 그 안에 있음)
-// GAS_URL은 /config.js(window.NX_CONFIG) 하나로 통합 관리됩니다 — index.html(NX 작업실)과 동일 파일을 참조.
+// GAS_URL은 /config.js(window.NX_CONFIG) 하나로 통합 관리됩니다 — index.html(NX-Work)과 동일 파일을 참조.
 const GAS_URL = (window.NX_CONFIG && window.NX_CONFIG.GAS_URL)
   || 'https://script.google.com/macros/s/AKfycbz9pam82WMSMKHYo6-6EtEguMbpZ0AaqHirVzwcW6ZFRsdq4WGluvhpPkYUoTE2l_bm/exec';
 
@@ -1209,7 +1208,7 @@ async function persist(){
 // ---------- 페이지를 열 때 한 번, IndexedDB의 최신 데이터로 조용히 갈아끼운다 ----------
 // (localStorage 캐시가 용량 문제로 최신 저장을 못 담았던 경우를 대비 + 최초 실행 시 마이그레이션)
 async function hydrateDocsFromIdb_(){
-  // NX 작업실에서 ?fileId=...로 열린 경우엔 loadFromUrlFileId()가 그 파일을 docs에 반영하는
+  // NX-Work에서 ?fileId=...로 열린 경우엔 loadFromUrlFileId()가 그 파일을 docs에 반영하는
   // 중이거나 반영할 예정이므로, 여기서 docs를 통째로 교체하면 그 결과와 경합해 덮어쓸 수 있다 —
   // 이 경우는 마이그레이션(비어있으면 채워넣기)까지만 하고 화면 교체는 하지 않는다.
   const hasFileIdParam = new URLSearchParams(window.location.search).has('fileId');
@@ -1318,7 +1317,7 @@ function safeSanitizeHtml(raw){
   return null;
 }
 
-// ---------- NX 작업실 탐색기에서 열었을 때: URL의 fileId로 드라이브 파일 실제 로드 ----------
+// ---------- NX-Work 탐색기에서 열었을 때: URL의 fileId로 드라이브 파일 실제 로드 ----------
 // 주의: alert()는 사용자 조작 없이 자동으로 반복 호출되면 브라우저(크롬 등)가 조용히 차단할 수 있어
 // (한 번 뜨고 나면 "이 페이지가 추가 대화상자를 만들지 못하게 차단" 상태가 될 수 있음) 쓰지 않는다.
 // 대신 에러를 편집창 문서 내용 자체에 직접 표시해서 반드시 눈에 보이게 한다.
@@ -1339,7 +1338,7 @@ function showLoadErrorInEditor(fileId, message){
   loadSelectedIntoEditor();
 }
 
-// ---------- NX 작업실(부모 창)과의 실시간 연동 ----------
+// ---------- NX-Work(부모 창)과의 실시간 연동 ----------
 // 부모가 "지금 편집창에 있는 내용 줘"라고 물으면 답하고,
 // 부모가 "이 내용으로 바꿔줘"라고 보내면 편집창을 실제로 갱신한다 (저장 전 상태도 반영).
 window.addEventListener('message', function(event){
@@ -2356,7 +2355,8 @@ async function render(){
       html = safeSanitizeHtml(src) ?? src;
     } else if (isExternal) {
       // 용역보고서(외부) 테마: rpt.netax.kr(index.html)과 완전히 동일한 전처리·렌더링 파이프라인 사용
-      const processedMd = preprocessBold(preprocessFootnotes(src));
+      // (2026.07: escapeLoneTildes가 빠져있어 "1~6번" 같은 홑물결표가 취소선으로 오인식되던 버그 수정)
+      const processedMd = escapeLoneTildes(preprocessBold(preprocessFootnotes(src)));
       html = marked.parse(processedMd);
       html = html.replace(/<table>/g, '<div class="table-scroll"><table>').replace(/<\/table>/g, '</table></div>');
     } else {
@@ -2511,8 +2511,61 @@ refreshDocSelect();
 loadSelectedIntoEditor();
 document.getElementById('btnRender').addEventListener('click', render);
 
+// ---------- 참조 버튼: NX-Work(부모창) 안에서 열렸을 때만 보이고, 지금 편집 중인 내용을
+// 부모창 채팅의 참조 첨부로 바로 넘긴다. 독립된 탭에서 report-writer만 단독으로 열었을 때는
+// 넘길 부모 채팅 자체가 없으므로 버튼을 아예 숨긴다. ----------
+(function(){
+  const btnRef = document.getElementById('btnRefToParent');
+  const isEmbedded = (window.self !== window.top);
+  if (!isEmbedded){ btnRef.style.display = 'none'; return; }
+  btnRef.style.display = '';
+  btnRef.addEventListener('click', () => {
+    const mdInputEl = document.getElementById('mdInput');
+    const d = docs.find(x => x.id === selectedId);
+    const name = (d && d.name) ? d.name : '문서';
+    window.parent.postMessage({
+      type: 'nx-request-attach',
+      name: name,
+      content: mdInputEl ? mdInputEl.value : ''
+    }, '*');
+    flashSaveState('채팅에 참조로 보냈습니다');
+  });
+})();
+
+// ---------- 닫기 버튼: NX-Work(부모창)의 폰 전체화면 편집기 오버레이 안에 열렸을 때만 보이고,
+// 누르면 그 오버레이를 닫아달라고 부모에게 요청한다(PC 새 창일 때는 그냥 OS 창닫기를 쓰면 되므로
+// 이 버튼 자체가 필요 없음 — embedded 상태에서만 노출되는 게 자연스럽게 그 구분을 대신한다). ----------
+(function(){
+  const btnClose = document.getElementById('btnCloseToParent');
+  const isEmbedded = (window.self !== window.top);
+  if (!isEmbedded){ btnClose.style.display = 'none'; return; }
+  btnClose.style.display = '';
+  btnClose.addEventListener('click', () => {
+    window.parent.postMessage({ type: 'nx-close-editor' }, '*');
+  });
+})();
+
+// ---------- 새로고침 버튼: 지금 열려 있는 문서가 fileId로 드라이브에서 불러온 것이면,
+// 탐색기 등 다른 경로에서 바뀐 최신 내용을 다시 읽어온다(부모창을 거치지 않고 report-writer가
+// 직접 처리 — 어느 화면(좁은 편집창/전체화면/독립탭)에서 열려도 항상 똑같이 동작한다). ----------
+document.getElementById('btnReloadFromDrive').addEventListener('click', () => {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.get('fileId')){
+    flashSaveState('드라이브에서 불러온 문서가 아니라 새로고침할 대상이 없습니다');
+    return;
+  }
+  if (!confirm('탐색기 등 다른 곳에서 바뀐 최신 내용으로 다시 불러옵니다.\n지금 편집창에 저장하지 않은 내용이 있다면 사라집니다. 계속할까요?')) return;
+  loadFromUrlFileId();
+});
+
 // ---------- 편집창/미리보기 레이아웃 3단계 전환 (편집창만 / 둘 다 / 미리보기만) ----------
+// 예전엔 버튼 3개(◧◫◨)가 각자 하나의 모드를 담당했는데, 버튼 하나로 통합해서 누를 때마다
+// editor → both → preview → editor 순서로 순환하도록 바꿨다. 아이콘 자체가 지금 모드를 보여준다.
+const LAYOUT_ICON = { editor: '◧', both: '◫', preview: '◨' };
+const LAYOUT_NEXT = { editor: 'both', both: 'preview', preview: 'editor' };
+let currentLayoutMode = 'both';
 function setLayoutMode(mode){
+  currentLayoutMode = mode;
   const ws = document.getElementById('workspace');
   ws.classList.remove('editor-only', 'preview-only');
   if (mode === 'editor') ws.classList.add('editor-only');
@@ -2525,27 +2578,21 @@ function setLayoutMode(mode){
     document.getElementById('editorPane').style.flex = '';
   }
 
-  document.getElementById('layoutEditor').classList.toggle('active', mode === 'editor');
-  document.getElementById('layoutBoth').classList.toggle('active', mode === 'both');
-  document.getElementById('layoutPreview').classList.toggle('active', mode === 'preview');
+  const btn = document.getElementById('btnLayoutToggle');
+  btn.textContent = LAYOUT_ICON[mode];
+  const modeLabel = mode === 'editor' ? '편집창' : (mode === 'preview' ? '미리보기' : ('모아보기 (스크롤 동기화 ' + (scrollSyncEnabled ? '켜짐' : '꺼짐') + ')'));
+  btn.title = '창보기: ' + modeLabel + ' (클릭하면 다음 모드로, 모아보기 중 더블클릭하면 스크롤 동기화 전환)';
 }
-document.getElementById('layoutEditor').addEventListener('click', () => setLayoutMode('editor'));
-document.getElementById('layoutBoth').addEventListener('click', () => {
-  const ws = document.getElementById('workspace');
-  const alreadyBoth = !ws.classList.contains('editor-only') && !ws.classList.contains('preview-only');
-  if (alreadyBoth) {
-    // 이미 "둘 다 보기"인 상태에서 다시 누르면 스크롤 동기화 켜기/끄기 토글
-    scrollSyncEnabled = !scrollSyncEnabled;
-    document.getElementById('layoutBoth').classList.toggle('sync-off', !scrollSyncEnabled);
-    document.getElementById('layoutBoth').title = scrollSyncEnabled
-      ? '모아보기 (스크롤 동기화 켜짐)'
-      : '모아보기 (스크롤 동기화 꺼짐)';
-    flashSaveState(scrollSyncEnabled ? '스크롤 동기화 켜짐' : '스크롤 동기화 꺼짐');
-  } else {
-    setLayoutMode('both');
-  }
+document.getElementById('btnLayoutToggle').addEventListener('click', () => {
+  setLayoutMode(LAYOUT_NEXT[currentLayoutMode]);
 });
-document.getElementById('layoutPreview').addEventListener('click', () => setLayoutMode('preview'));
+document.getElementById('btnLayoutToggle').addEventListener('dblclick', (e) => {
+  if (currentLayoutMode !== 'both') return; // 모아보기 상태일 때만 스크롤 동기화 토글 의미가 있음
+  e.preventDefault();
+  scrollSyncEnabled = !scrollSyncEnabled;
+  setLayoutMode('both'); // 제목·아이콘 갱신
+  flashSaveState(scrollSyncEnabled ? '스크롤 동기화 켜짐' : '스크롤 동기화 꺼짐');
+});
 
 // ---------- 편집창/미리보기 좌우 폭 드래그로 조절 (끝까지 밀면 전용모드로 자동전환) ----------
 (function(){

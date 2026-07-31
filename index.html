@@ -567,6 +567,14 @@
     display:flex; align-items:center; gap:8px; padding:8px 12px;
     border-top:1px solid var(--line); flex-shrink:0;
   }
+  .chat-input-row{ flex:1; min-width:0; display:flex; }
+  .chat-input-row input{ width:100%; }
+  .chat-tools-row{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  /* 폰(좁은 화면)에서는 아이콘 버튼이 너무 많이 붙어서 입력창이 한 글자 폭으로 눌리는
+     문제가 있었다 — 입력창 행과 버튼 행을 아예 분리해서, 입력창은 항상 전체 너비를 쓰고
+     버튼들은 그 아래 줄에서 필요하면 줄바꿈되게 한다. */
+  body.stage-compact .chat-input-wrap{ flex-direction:column; align-items:stretch; gap:6px; }
+  body.stage-compact .chat-tools-row{ flex-wrap:wrap; justify-content:flex-end; }
   #gemContextCount{
     flex-shrink:0; font-family:inherit; font-size:11px; padding:4px 2px; width:48px;
     border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--sub);
@@ -1324,21 +1332,25 @@
         <button type="button" id="btnExitTalkingMode" title="채팅모드로 돌아가기">⌨ 채팅모드로</button>
       </div>
       <div class="chat-input-wrap">
-        <input type="text" id="chatInputEl" placeholder="메시지 입력" aria-label="메시지 입력">
-        <button type="button" id="btnExtStatus" class="icon-round-btn" title="NX 외부조회 커넥터(확장프로그램) 연결상태 — 미설치/미연결">🔌</button>
-        <button type="button" id="btnPasteClipboard" class="icon-round-btn" title="클립보드 내용을 입력창에 붙여넣기 (외부조회 사이트에서 복사한 값을 바로 가져올 때)">📋</button>
-        <select id="gemContextCount" title="Gem에게 물어볼 때 직전 대화를 몇 개(턴) 같이 보낼지 선택 (0=입력창 내용만)">
-          <option value="0">0턴</option>
-          <option value="1">1턴</option>
-          <option value="2">2턴</option>
-          <option value="3">3턴</option>
-          <option value="4">4턴</option>
-          <option value="5">5턴</option>
-        </select>
-        <button type="button" id="btnAskGem" class="icon-round-btn" title="지금 입력창 내용을(선택한 개수만큼 직전 대화도 함께) 제미니 웹(Gem)에게 물어보고 의견을 받아옵니다 (외부조회 커넥터 확장프로그램 필요)">🔮</button>
-        <button type="button" id="btnAskBoth" class="icon-round-btn" title="같은 질문을 NX와 Gem에게 동시에 물어봅니다 — 서로 답을 보지 않은 채 독립적인 의견을 받고 싶을 때 (외부조회 커넥터 확장프로그램 필요)">⚖</button>
-        <button type="button" id="btnChatSend" class="icon-round-btn send" title="보내기">➤</button>
-        <button type="button" id="btnVoiceInput" class="icon-round-btn voice" title="음성모드 켜기/끄기">🎤</button>
+        <div class="chat-input-row">
+          <input type="text" id="chatInputEl" placeholder="메시지 입력" aria-label="메시지 입력">
+        </div>
+        <div class="chat-tools-row">
+          <button type="button" id="btnExtStatus" class="icon-round-btn" title="NX 외부조회 커넥터(확장프로그램) 연결상태 — 미설치/미연결">🔌</button>
+          <button type="button" id="btnPasteClipboard" class="icon-round-btn" title="클립보드 내용을 입력창에 붙여넣기 (외부조회 사이트에서 복사한 값을 바로 가져올 때)">📋</button>
+          <select id="gemContextCount" title="Gem에게 물어볼 때 직전 대화를 몇 개(턴) 같이 보낼지 선택 (0=입력창 내용만)">
+            <option value="0">0턴</option>
+            <option value="1">1턴</option>
+            <option value="2">2턴</option>
+            <option value="3">3턴</option>
+            <option value="4">4턴</option>
+            <option value="5">5턴</option>
+          </select>
+          <button type="button" id="btnAskGem" class="icon-round-btn" title="지금 입력창 내용을(선택한 개수만큼 직전 대화도 함께) 제미니 웹(Gem)에게 물어보고 의견을 받아옵니다 (외부조회 커넥터 확장프로그램 필요)">🔮</button>
+          <button type="button" id="btnAskBoth" class="icon-round-btn" title="같은 질문을 NX와 Gem에게 동시에 물어봅니다 — 서로 답을 보지 않은 채 독립적인 의견을 받고 싶을 때 (외부조회 커넥터 확장프로그램 필요)">⚖</button>
+          <button type="button" id="btnChatSend" class="icon-round-btn send" title="보내기">➤</button>
+          <button type="button" id="btnVoiceInput" class="icon-round-btn voice" title="음성모드 켜기/끄기">🎤</button>
+        </div>
       </div>
     </div>
 
@@ -5760,10 +5772,20 @@ graph TD
   let pendingSaveOnDone = null;  // 저장이 끝난 뒤 호출할 콜백(그 화면 닫기 등)
   let pendingSaveCustomHandler = null; // 설정돼 있으면 기본 저장 로직 대신 이 함수(customerName)=>boolean 를 쓴다(사건개시 등)
 
-  // "일반메모" 폴더 경로 — 고객사건 최상위(basePath)의 한 단계 위(예: "0 NETAX") 바로 아래.
-  // (업무관리자 폴더와 같은 위치, 즉 고객사건 폴더와 나란한 형제 폴더로 둔다.)
-  function generalMemoParentPath_(){ return basePath.slice(0, -1); }
-  function generalMemoPath_(){ return generalMemoParentPath_().concat(['일반메모']); }
+  // "일반메모" 폴더 위치 — 기본폴더(basePath, "0 NETAX") 바로 아래, 고객 폴더들과 나란히.
+  // basePath는 페이지가 열리자마자 비동기로 채워지는데, 메모 화면을 그 로딩이 끝나기 전에
+  // 아주 빨리 열면(예: 페이지 열자마자 바로 메모부터 쓰는 경우) 아직 빈 배열이어서 진짜
+  // 드라이브 루트에 폴더가 생겨버리는 문제가 있었다 — 비어있으면 한 번 더 확실하게 받아온
+  // 뒤에 쓰도록 만들었다.
+  async function generalMemoParentPath_(){
+    if (basePath && basePath.length) return basePath;
+    await loadCustomers();
+    return basePath;
+  }
+  async function generalMemoPath_(){
+    const parent = await generalMemoParentPath_();
+    return parent.concat(['일반메모']);
+  }
 
   function formatMemoTimestamp_(){
     const d = new Date();
@@ -5874,7 +5896,7 @@ graph TD
     let fileName = fileNameRaw.trim();
     if (!/\.md$/i.test(fileName)) fileName += '.md';
 
-    const parentPath = generalMemoParentPath_();
+    const parentPath = await generalMemoParentPath_();
     const parentListing = await listFolder(parentPath);
     const hasGeneralFolder = parentListing.folders.some(f => f.name === '일반메모');
     if (!hasGeneralFolder){
@@ -5882,15 +5904,16 @@ graph TD
       if (created.error) throw new Error(created.error);
     }
 
+    const targetPath = parentPath.concat(['일반메모']);
     const res = await callGas('uploadFile', {
-      path: generalMemoPath_(), name: fileName, mimeType: 'text/markdown',
+      path: targetPath, name: fileName, mimeType: 'text/markdown',
       base64Data: utf8ToBase64(content.trim() + '\n')
     });
     if (res.error) throw new Error(res.error);
 
     if (extraFile){
       const res2 = await callGas('uploadFile', {
-        path: generalMemoPath_(), name: extraFile.name, mimeType: extraFile.mimeType, base64Data: extraFile.base64Data
+        path: targetPath, name: extraFile.name, mimeType: extraFile.mimeType, base64Data: extraFile.base64Data
       });
       if (res2 && res2.error) showToast('본문은 저장됐지만, 첨부(' + extraFile.name + ') 저장은 실패했습니다: ' + res2.error, 'warning');
     }
@@ -5971,7 +5994,7 @@ graph TD
       comboEntries = [];
 
       try{
-        const listing = await listFolder(generalMemoPath_());
+        const listing = await listFolder(await generalMemoPath_());
         (listing.files || []).forEach(f=>{
           comboEntries.push({ label: '📄 ' + f.name.replace(/\.md$/i, ''), type: 'memo', file: f });
         });
@@ -5993,14 +6016,43 @@ graph TD
       quickMemoSearchDropdown.innerHTML = '';
       if (!results.length){ quickMemoSearchDropdown.style.display = 'none'; return; }
       results.slice(0, 8).forEach(entry=>{
-        const item = document.createElement('div');
-        item.textContent = entry.label;
-        item.style.cssText = 'padding:8px 10px; font-size:12.5px; cursor:pointer; color:var(--ink);';
-        item.addEventListener('mouseenter', ()=> item.style.background = '#f0f2f6');
-        item.addEventListener('mouseleave', ()=> item.style.background = '');
-        item.addEventListener('mousedown', (e)=>{ e.preventDefault(); }); // 입력창 blur로 드롭다운이 먼저 닫히는 것 방지
-        item.addEventListener('click', ()=> selectComboEntry_(entry));
-        quickMemoSearchDropdown.appendChild(item);
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:center; gap:6px; padding:8px 10px; font-size:12.5px; cursor:pointer; color:var(--ink);';
+        row.addEventListener('mouseenter', ()=> row.style.background = '#f0f2f6');
+        row.addEventListener('mouseleave', ()=> row.style.background = '');
+        row.addEventListener('mousedown', (e)=>{ e.preventDefault(); }); // 입력창 blur로 드롭다운이 먼저 닫히는 것 방지
+
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = entry.label;
+        labelSpan.style.cssText = 'flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+        labelSpan.addEventListener('click', ()=> selectComboEntry_(entry));
+        row.appendChild(labelSpan);
+
+        // 삭제는 일반메모(📄)만 지원한다 — 템플릿(🗂)은 사건개시템플릿 폴더에서 직접 관리하는 게 맞다.
+        if (entry.type === 'memo'){
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.textContent = '🗑';
+          delBtn.title = '이 메모 삭제(휴지통으로 이동)';
+          delBtn.style.cssText = 'flex-shrink:0; border:none; background:none; cursor:pointer; font-size:13px; padding:2px 4px; border-radius:4px; color:var(--sub);';
+          delBtn.addEventListener('mousedown', (e)=> e.preventDefault());
+          delBtn.addEventListener('click', async (e)=>{
+            e.stopPropagation();
+            if (!confirm('"' + entry.file.name + '" 메모를 삭제할까요?(휴지통으로 이동, 필요하면 복구 가능)')) return;
+            try{
+              const res = await callGas('deleteItem', { id: entry.file.id, type: 'file' });
+              if (res && res.error) throw new Error(res.error);
+              showToast('삭제했습니다.', 'success');
+              await refreshGeneralMemoList();
+              quickMemoGeneralSearch.dispatchEvent(new Event('input')); // 목록에서 방금 지운 항목이 바로 빠지도록 다시 검색
+            }catch(err){
+              showToast('삭제 실패: ' + (err && err.message ? err.message : err), 'error');
+            }
+          });
+          row.appendChild(delBtn);
+        }
+
+        quickMemoSearchDropdown.appendChild(row);
       });
       quickMemoSearchDropdown.style.display = 'block';
     }

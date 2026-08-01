@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 안드로이드 크롬 등의 "웹페이지 강제 다크모드"가 이 페이지 색상을 임의로 뒤집어서
+     서식 버튼(제목・굵게・목록 등)이 흰바탕에 흰 글씨로 보이는 문제를 막는다 — 이 페이지는
+     처음부터 라이트 테마 전용으로 만들어졌다는 걸 브라우저에 명시적으로 알려준다. -->
+<meta name="color-scheme" content="light">
 <title>보고서 렌더시스템</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231b2a41'/%3E%3Ctext x='32' y='45' font-family='Georgia,serif' font-size='34' font-weight='700' fill='%23c9a227' text-anchor='middle'%3EN%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,7 +26,7 @@
 <style>
   :root{ --bar-bg:#20242c; --bar-fg:#e8e8ec; --accent:#5b6b8c; --navy:#0D1B3D; --navy-deep:#081226; --gold:#C8A244; --gold-light:#DCC17E; }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:#e9eaee;font-family:'Noto Sans KR',sans-serif; height:100%;}
+  html,body{margin:0;padding:0;background:#e9eaee;font-family:'Noto Sans KR',sans-serif; height:100%; color-scheme:light;}
   body{ height:100vh; overflow:hidden; }
   #appRoot{ display:flex; flex-direction:column; height:100%; }
 
@@ -131,11 +135,11 @@
     background:#f7f8fa; border-bottom:1px solid #ddd;
   }
   #mdHelpBar button{
-    background:none; border:1px solid #d0d3d9; color:#444; cursor:pointer;
-    font-size:12.5px; font-weight:700; padding:3px 9px; border-radius:4px; font-family:inherit;
+    background:#dde3ee; border:1px solid #8b93a3; color:#1c2333; box-shadow:0 1px 2px rgba(20,25,40,0.10);
+    font-size:12.5px; font-weight:700; padding:3px 9px; border-radius:4px; font-family:inherit; cursor:pointer;
   }
-  #mdHelpBar button:hover{ background:#e8eaee; }
-  #mdHelpBar #btnMdHelp{ font-weight:400; border-color:#b8bfcc; }
+  #mdHelpBar button:hover{ background:#c7d0e0; border-color:#5b6b8c; }
+  #mdHelpBar #btnMdHelp{ font-weight:400; border-color:#8b93a3; }
   #findReplaceBar{
     display:flex; align-items:center; gap:5px; padding:6px 8px;
     background:#eef0f4; border-bottom:1px solid #ddd;
@@ -878,6 +882,17 @@
     position: relative;
     box-shadow: 0 12px 40px rgba(0,0,0,0.3);
   }
+  /* [패치 2026.08] report-writer가 독립 팝업창(window.open)으로 뜨면서, 법령 모달이
+     창을 거의 다 채워 보이는 경우 사용자가 "이 팝업만" 닫는 방법을 못 찾고 report-writer
+     자체 상단 툴바의 닫기 버튼을 눌러버려 보고서 창 전체가 닫히는 문제가 있었다(모달은
+     원래 배경 클릭/Esc로만 닫히고 눈에 보이는 닫기 버튼이 없었음). 모달 박스 자체에
+     명확한 ✕ 버튼을 두어 report-writer 창 닫기와 절대 혼동되지 않게 한다. */
+  .statute-modal-close {
+    position: absolute; top: 12px; right: 14px;
+    font-size: 16px; color: #999; cursor: pointer;
+    line-height: 1; padding: 4px; user-select: none;
+  }
+  .statute-modal-close:hover { color: #333; }
   .statute-modal-title {
     font-family: 'Noto Serif KR', serif;
     font-weight: 700;
@@ -1046,6 +1061,7 @@
 
 <div class="statute-modal-backdrop" id="statuteModal" onclick="if(event.target===this) closeStatuteModal()">
   <div class="statute-modal-box">
+    <span class="statute-modal-close" onclick="closeStatuteModal()" title="닫기">✕</span>
     <div class="statute-modal-title" id="statuteModalTitle"></div>
     <div class="statute-modal-body" id="statuteModalBody"></div>
     <a class="statute-modal-link" id="statuteModalLink" target="_blank" rel="noopener">국가법령정보센터에서 전문 보기 ↗</a>
@@ -2004,10 +2020,18 @@ function showStatutePopup(key) {
     : 'https://www.law.go.kr/LSW/lsSc.do?section=&menuId=1&subMenuId=15&tabMenuId=81&query=' + encodeURIComponent(lawFullName);
 
   document.getElementById('statuteModal').style.display = 'flex';
+  // [패치 2026.08] "새창으로 보기"로 연 완성본에는 좌상단에 '← 편집기로 돌아가기' 버튼이
+  // z-index:9999로 항상 최상단에 떠 있다. 법령 팝업(z-index:500)이 화면 대부분을 어둡게
+  // 덮어버리면 이 버튼만 유일하게 눈에 띄는 클릭 가능 요소로 남아, 사용자가 이걸 "팝업 닫기"로
+  // 착각해 누르면 보고서 창 전체가 닫혀버리는 사고가 있었다. 팝업이 떠 있는 동안은 숨긴다.
+  const backFloat = document.getElementById('nxBackFloat');
+  if (backFloat) backFloat.style.display = 'none';
 }
 
 function closeStatuteModal() {
   document.getElementById('statuteModal').style.display = 'none';
+  const backFloat = document.getElementById('nxBackFloat');
+  if (backFloat) backFloat.style.display = '';
 }
 
 // ===== 마크다운 문법 도움말 =====
@@ -2290,6 +2314,14 @@ document.getElementById('mdInput').addEventListener('keydown', (e) => {
     openFindBar();
     return;
   }
+  if (e.key === 'Tab' && !cmd) {
+    // 그냥 <textarea>는 Tab을 누르면 브라우저 기본 동작대로 다음 요소로 포커스가 넘어가버려서
+    // 탭 문자가 안 찍힌다. 탭으로 줄맞춰 표처럼 입력하는 걸 지원하려면(붙여넣기 때 표로 자동
+    // 인식하는 기능과 짝을 맞추려면) 직접 타이핑할 때도 탭이 찍혀야 한다.
+    e.preventDefault();
+    document.execCommand('insertText', false, '\t'); // execCommand로 넣어야 실행취소(Ctrl+Z)와 input 이벤트(자동저장)가 정상 동작한다
+    return;
+  }
   if (e.key === 'Enter') {
     const ta = e.target;
     const start = ta.selectionStart;
@@ -2373,6 +2405,17 @@ async function render(){
   out.className = currentTheme().cls;
   out.innerHTML = html;
 
+  // [패치 2026.08] 원인 확정: 보고서 본문에 마크다운으로 박힌 링크(법령 인용 등)가
+  // marked.js 기본 렌더링대로 target 지정 없이 <a href="...">로 나가서, 클릭하는 순간
+  // "지금 이 창"이 그대로 그 주소로 이동해버렸다. 독립창(window.open)으로 연 보고서든,
+  // 내보낸 완성본 HTML이든 다시 돌아올 방법이 없어 보고서 자체가 사라지는 것처럼 보였다.
+  // STATUTE_INFO 팝업 시스템(linkifyStatutes)과는 별개로, 본문에 존재하는 모든 링크를
+  // 테마 구분 없이 무조건 새 탭으로 강제해서 이 사고 자체를 원천 차단한다.
+  out.querySelectorAll('a[href]').forEach(a => {
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+  });
+
   if (isExternal) {
     // rpt.netax.kr의 showResult()와 동일한 순서로 후처리 (mermaid는 비동기라 완료를 기다린 뒤 나머지 실행)
     try {
@@ -2454,7 +2497,38 @@ document.getElementById('mdInput').addEventListener('input', () => {
 // text/html(선택한 셀 그대로의 <table> 구조)도 함께 담아준다. 지금까지는 text/plain만
 // 그대로 붙여써서 표 모양이 사라지고 AI에게 "표를 그려달라"고 다시 부탁해야 했는데,
 // 그 text/html 표를 가로채 마크다운 표 문법으로 직접 변환해서 붙여넣는다 — 엑셀에서 만든
-// 행・열 모양을 그대로 가져오는 게 목적이라, AI가 손대지 않는다. ----------
+// 행・열 모양을 그대로 가져오는 게 목적이라, AI가 손대지 않는다.
+// [패치 2026.07] 일반 텍스트 파일 안에서 탭으로 줄맞춰 만들어둔 "표처럼 보이는" 부분을 복사해
+// 붙여넣을 때도(=text/html에 표가 없고 text/plain에 탭만 있는 경우) 똑같이 표로 인식하도록 확장.
+// ----------
+
+// 이미 텍스트로 추출된 grid(문자열 2차원 배열)를 마크다운 표 문법으로 만든다 — HTML 표든
+// 탭으로 구분된 순수 텍스트든, 일단 grid로만 만들어지면 이 함수 하나로 처리한다.
+function gridToMarkdownTable_(grid){
+  if (!grid || !grid.length) return null;
+
+  function cellText(raw){
+    // 셀 안에 줄바꿈이 있으면 마크다운 표 한 줄이 깨지므로 <br>로 바꾸고, 파이프(|)는 이스케이프한다.
+    let t = String(raw == null ? '' : raw).replace(/\r\n|\r|\n/g, '<br>').trim();
+    t = t.replace(/\|/g, '\\|');
+    return t || ' ';
+  }
+
+  const cleaned = grid.map(row => row.map(cellText));
+  // 병합된 셀 등으로 행마다 열 개수가 다를 수 있어, 가장 긴 행 기준으로 빈 칸을 채워 맞춘다.
+  const colCount = Math.max.apply(null, cleaned.map(r => r.length));
+  cleaned.forEach(r => { while (r.length < colCount) r.push(' '); });
+
+  const header = cleaned[0];
+  const body = cleaned.slice(1);
+
+  const lines = [];
+  lines.push('| ' + header.join(' | ') + ' |');
+  lines.push('|' + header.map(() => ':--').join('|') + '|');
+  body.forEach(r => lines.push('| ' + r.join(' | ') + ' |'));
+  return lines.join('\n');
+}
+
 function htmlTableToMarkdown_(tableEl){
   const rows = Array.from(tableEl.querySelectorAll('tr'));
   if (!rows.length) return null;
@@ -2465,47 +2539,69 @@ function htmlTableToMarkdown_(tableEl){
   const totalCells = rows.reduce((sum, tr) => sum + cellsOf(tr).length, 0);
   if (totalCells <= 1) return null;
 
-  function cellText(cell){
-    // 셀 안에 줄바꿈이 있으면 마크다운 표 한 줄이 깨지므로 <br>로 바꾸고, 파이프(|)는 이스케이프한다.
-    let t = (cell.textContent || '').replace(/\r\n|\r|\n/g, '<br>').trim();
-    t = t.replace(/\|/g, '\\|');
-    return t || ' ';
-  }
+  const grid = rows.map(tr => cellsOf(tr).map(cell => cell.textContent));
+  return gridToMarkdownTable_(grid);
+}
 
-  const grid = rows.map(tr => cellsOf(tr).map(cellText));
-  // 병합된 셀 등으로 행마다 열 개수가 다를 수 있어, 가장 긴 행 기준으로 빈 칸을 채워 맞춘다.
-  // (셀 병합 자체(rowspan/colspan)까지 완벽히 재현하지는 못한다 — 필요하면 붙여넣은 뒤 직접 다듬어야 함)
-  const colCount = Math.max.apply(null, grid.map(r => r.length));
-  grid.forEach(r => { while (r.length < colCount) r.push(' '); });
+// 탭으로 구분된 순수 텍스트(엑셀이 아니라 일반 텍스트 파일에서 복사한 경우 등)가 진짜 "표처럼
+// 줄맞춰진 것"인지 판별해서 grid를 돌려준다 — 아니면(코드 들여쓰기에 우연히 탭이 섞인 경우 등)
+// null을 돌려줘서 평소처럼 기본 붙여넣기가 되게 한다. 오판을 막기 위한 조건:
+//  - 최소 2줄(헤더+데이터 1줄) 이상
+//  - 모든 줄에 탭이 최소 1개(=2열 이상) 있어야 함
+//  - 줄마다 열 개수가 들쭉날쭉하면(진짜 표라면 보통 열 개수가 맞음) 표로 보지 않음
+//    (가장 흔한 열 개수를 가진 줄이 80% 미만이면 포기)
+function parseTsvToGrid_(text){
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  while (lines.length && lines[lines.length - 1].trim() === '') lines.pop(); // 끝의 빈 줄 제거
+  if (lines.length < 2) return null;
 
-  const header = grid[0];
-  const body = grid.slice(1);
+  const rows = lines.map(l => l.split('\t'));
+  if (rows.some(r => r.length < 2)) return null; // 탭이 하나도 없는 줄이 섞여있으면 표가 아님
 
-  const lines = [];
-  lines.push('| ' + header.join(' | ') + ' |');
-  lines.push('|' + header.map(() => ':--').join('|') + '|');
-  body.forEach(r => lines.push('| ' + r.join(' | ') + ' |'));
-  return lines.join('\n');
+  const counts = {};
+  rows.forEach(r => { counts[r.length] = (counts[r.length] || 0) + 1; });
+  const mode = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+  if (counts[mode] / rows.length < 0.8) return null; // 열 개수가 너무 들쭉날쭉하면 표로 보지 않음
+
+  return rows;
 }
 
 document.getElementById('mdInput').addEventListener('paste', (e) => {
   const html = e.clipboardData && e.clipboardData.getData('text/html');
-  if (!html || !/<table[\s>]/i.test(html)) return; // 표가 아니면 원래대로 기본 붙여넣기 동작
+  if (html && /<table[\s>]/i.test(html)){
+    let table = null;
+    try{
+      const safeHtml = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(html) : html;
+      table = new DOMParser().parseFromString(safeHtml, 'text/html').querySelector('table');
+    }catch(err){ table = null; }
 
-  let table = null;
-  try{
-    const safeHtml = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(html) : html;
-    table = new DOMParser().parseFromString(safeHtml, 'text/html').querySelector('table');
-  }catch(err){ table = null; }
-  if (!table) return;
+    const md = table ? htmlTableToMarkdown_(table) : null;
+    if (md){
+      e.preventDefault();
+      document.execCommand('insertText', false, md); // insertText로 넣어야 실행취소(Ctrl+Z)와 input 이벤트(자동저장)가 정상 동작한다
+      flashSaveState('엑셀 표 모양대로 붙여넣었습니다');
+      return;
+    }
+    // 표 HTML은 있었는데 변환이 안 됐으면(셀 1개 이하 등) 아래 탭-텍스트 판별로 넘어가지 않고
+    // 그냥 평소처럼 기본 붙여넣기가 되게 둔다 — html이 있다는 건 이미 위에서 판단이 끝난 것이므로.
+    return;
+  }
 
-  const md = htmlTableToMarkdown_(table);
-  if (!md) return; // 셀 1개 이하 등 표로 볼 수 없는 경우엔 평소처럼 붙여넣게 둔다
-
-  e.preventDefault();
-  document.execCommand('insertText', false, md); // insertText로 넣어야 실행취소(Ctrl+Z)와 input 이벤트(자동저장)가 정상 동작한다
-  flashSaveState('엑셀 표 모양대로 붙여넣었습니다');
+  // text/html에 표가 없으면(엑셀이 아니라 일반 텍스트 파일 등에서 복사한 경우), 탭으로 줄맞춰진
+  // 텍스트인지 확인해서 표처럼 보이면 마크다운 표로 변환한다.
+  const plain = e.clipboardData && e.clipboardData.getData('text/plain');
+  if (plain && plain.indexOf('\t') !== -1){
+    const grid = parseTsvToGrid_(plain);
+    const md = grid ? gridToMarkdownTable_(grid) : null;
+    if (md){
+      e.preventDefault();
+      document.execCommand('insertText', false, md);
+      flashSaveState('탭으로 구분된 내용을 표로 붙여넣었습니다');
+    }
+    // 표로 안 보이면 아무것도 안 하고 기본 붙여넣기 그대로 둔다.
+  }
 });
+
 
 document.getElementById('btnDocPlus').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -2861,7 +2957,7 @@ function escapeHtml(s){
 
 // 편집 도구(툴바) 없이, 렌더링된 결과만 담은 완성본 HTML 문자열 생성
 // - 새창으로 보기, HTML 다운로드에서 공용으로 사용
-function buildStandaloneHtml(){
+function buildStandaloneHtml(includeBackButton){
   const d = getSelected();
   const title = d ? d.name : '문서';
   const liveRoot = document.getElementById('renderOut');
@@ -2913,8 +3009,14 @@ function buildStandaloneHtml(){
     + '    ? "https://www.law.go.kr/법령/" + encodeURIComponent(lawFullName) + "/" + encodeURIComponent(articlePath)\n'
     + '    : "https://www.law.go.kr/LSW/lsSc.do?section=&menuId=1&subMenuId=15&tabMenuId=81&query=" + encodeURIComponent(lawFullName);\n'
     + '  document.getElementById("statuteModal").style.display = "flex";\n'
+    + '  var backFloat = document.getElementById("nxBackFloat");\n'
+    + '  if (backFloat) backFloat.style.display = "none";\n'
     + '}\n'
-    + 'function closeStatuteModal(){ document.getElementById("statuteModal").style.display = "none"; }\n'
+    + 'function closeStatuteModal(){\n'
+    + '  document.getElementById("statuteModal").style.display = "none";\n'
+    + '  var backFloat = document.getElementById("nxBackFloat");\n'
+    + '  if (backFloat) backFloat.style.display = "";\n'
+    + '}\n'
     + 'document.querySelectorAll(".statute-link").forEach(function(span){\n'
     + '  const key = span.dataset.statuteKey;\n'
     + '  if (key) span.addEventListener("click", function(){ showStatutePopup(key); });\n'
@@ -2930,13 +3032,35 @@ function buildStandaloneHtml(){
     + '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">';
   return '<!DOCTYPE html>\n<html lang="ko">\n<head>\n<meta charset="UTF-8">\n'
     + '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+    + '<meta name="color-scheme" content="light">\n'
     + '<title>' + escapeHtml(title) + '</title>\n' + fonts + '\n'
     + '<style>\n' + styleText
     + '\n/* 이 완성본은 편집도구 화면이 아니라 독립 문서이므로, 툴 자체의 body 레이아웃(고정 높이・overflow 숨김)을 원래대로 되돌림 */'
     + '\nhtml,body{height:auto !important;}'
     + '\nbody{display:block !important; overflow:visible !important;}'
-    + '\n#standaloneWrap{overflow:auto; background:#e9eaee; padding:24px; min-height:100vh;}\n</style>\n'
-    + '</head>\n<body>\n<div id="standaloneWrap">\n' + articleHtml + '\n</div>\n'
+    + '\n#standaloneWrap{overflow:auto; background:#e9eaee; padding:24px; min-height:100vh;}'
+    + '\n#nxBackFloat{position:fixed; top:14px; left:14px; z-index:9999;}'
+    + '\n#nxBackFloat button{font-family:\'Noto Sans KR\',sans-serif; font-size:13px; font-weight:700; padding:9px 16px; border-radius:20px; border:1px solid #4a5268; background:#20242c; color:#e8e8ec; cursor:pointer; box-shadow:0 3px 10px rgba(0,0,0,0.25);}'
+    + '\n#nxBackFloat button:hover{background:#333a48;}'
+    + '\n@media print{ #nxBackFloat{display:none !important;} }\n</style>\n'
+    + '</head>\n<body>\n'
+    // 이 완성본은 editor-writer와 별개의 새 창(탭)으로 열리는데, 지금까지는 다시 편집기로 돌아갈
+    // 방법이 없어서(브라우저 자체 탭 닫기 말고는) 사용자가 직접 탭을 찾아 닫아야 했다.
+    // window.opener(이 창을 연 report-writer 탭)가 있으면 이 창만 닫아서 자동으로 편집기 탭으로
+    // 돌아가게 하고, 없으면(브라우저가 opener를 안 넘겨주는 특수한 경우) 이전 기록으로 이동을
+    // 시도한다. 다운로드해서 배포하는 HTML(고객에게 보내거나 rpt.netax.kr에 올리는 파일)에는
+    // opener가 있을 수 없고 사용자 본인 화면도 아니므로, "새 창으로 보기" 때만 넣는다.
+    + (includeBackButton
+      ? '<div id="nxBackFloat"><button type="button" id="nxBackBtn">← 편집기로 돌아가기</button></div>\n'
+        + '<script>\n'
+        + 'document.getElementById("nxBackBtn").addEventListener("click", function(){\n'
+        + '  if (window.opener && !window.opener.closed){ window.opener.focus(); window.close(); }\n'
+        + '  else if (history.length > 1){ history.back(); }\n'
+        + '  else { alert("이 창(탭)은 브라우저에서 직접 닫아주세요."); }\n'
+        + '});\n'
+        + '</' + 'script>\n'
+      : '')
+    + '<div id="standaloneWrap">\n' + articleHtml + '\n</div>\n'
     + statuteModalHtml + '\n' + statuteScript + '\n</body>\n</html>';
 }
 
@@ -3073,10 +3197,19 @@ async function downloadAsPdf(){
 
 function openInNewWindow(){
   if (!getSelected()) return;
-  const html = buildStandaloneHtml();
+  const html = buildStandaloneHtml(true); // true: "편집기로 돌아가기" 버튼 포함 (다운로드용과 구분)
   const blob = new Blob([html], {type:'text/html;charset=utf-8'});
   const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
+  // [패치 2026.07] window.open(url, '_blank')처럼 창 크기를 안 주면, 브라우저는 이걸 그냥 "새 탭"으로
+  // 취급해서 주소창・탭이 있는 일반 브라우저 창 쪽으로 열어버린다 — 지금 이 편집기 자체가 주소창・탭이
+  // 없는 팝업창이라 탭을 못 담기 때문. 그러면 완성본이 엉뚱한 브라우저 창으로 튀어나가고 편집기
+  // 팝업은 뒤로 가려져 "사라진 것처럼" 보이는 문제가 있었다. 편집기 팝업과 똑같이 크기를 지정해서
+  // 열면 이것도 진짜 독립 팝업창이 되어, 편집기 창과 나란히 남아있는다.
+  const w = Math.round(window.innerWidth * 0.9);
+  const h = Math.round(window.innerHeight * 0.9);
+  const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
+  const top = Math.round(window.screenY + (window.outerHeight - h) / 2);
+  window.open(url, 'nxStandaloneView', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes');
   // 새 창이 파일을 불러갈 시간을 준 뒤 임시 URL 정리 (바로 지우면 새 창에서 못 열 수 있음)
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }

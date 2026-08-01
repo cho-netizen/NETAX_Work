@@ -260,6 +260,7 @@
   .modal-overlay{
     position:fixed; inset:0; background:rgba(13,27,61,0.55);
     display:flex; align-items:center; justify-content:center; z-index:100;
+    overflow:hidden; /* 창을 아주 작게 줄여 쓸 때, 안의 내용이 넘쳐서 페이지 전체가 스크롤되는 걸 막는다 */
   }
   .modal-panel{
     width:min(420px, 92vw); max-height:86vh; overflow-y:auto;
@@ -291,6 +292,13 @@
   }
   .note-tb-range{ flex:0 0 60px; width:60px; }
   .note-tb-page{ flex:0 0 auto; color:#fff; font-size:12px; padding:0 2px; }
+  /* 메모창(quickMemo)의 타이틀바는 필기(note-taking)용과 달리 검색 입력창이 들어있어서, 창을 좁게
+     쓰면 가로 스크롤 대신 줄바꿈되게 한다 — 그래야 닫기 버튼 등이 화면 밖으로 밀려나지 않는다. */
+  #quickMemoTitlebar{ overflow-x:visible; white-space:normal; flex-wrap:wrap; row-gap:6px; }
+  #quickMemoTitlebar > div{ min-width:160px; } /* 검색창 래퍼 — 너무 좁아지면 줄바꿈되도록 최소폭 확보 */
+  /* 드롭다운 목록도 창 높이 자체가 작을 땐 그만큼 줄어들어야, 페이지가 밀려서 타이틀바가
+     스크롤되어 화면 밖으로 사라지는 문제(창을 아주 작게 썼을 때 보고된 문제)가 없어진다. */
+  #quickMemoSearchDropdown{ max-height:min(240px, 50vh) !important; }
   #noteCanvasWrap{
     flex:1 1 auto; position:relative; width:100%; min-height:0;
     background:#fff; overflow:hidden; touch-action:none;
@@ -908,7 +916,6 @@
       <button type="button" id="btnOpenCalc" class="tb-btn" title="이 폴더의 계산 워크시트 보기">🧮 계산기</button>
       <button type="button" id="btnOpenDiagram" class="tb-btn" title="이 폴더의 관계도/구조도 보기">🕸 관계도</button>
       <button id="btnOpenScan" class="tb-btn" title="문서 스캔 · PDF 조립">📷 스캔</button>
-      <button id="btnOpenFullEditor" class="tb-btn" title="전체화면으로 직접 편집 (AI 개입 없이)">🖋 편집</button>
     </div>
     <div class="topbar-item tool-group-narrow" id="toolGroup1Wrap">
       <button type="button" id="btnToolGroup1" class="tb-btn" title="검색 · 휴지통 · 현황판">🔍 <span class="tool-menu-label">도구1</span></button>
@@ -1257,11 +1264,11 @@
   <div class="modal-overlay" id="quickMemoOverlay" style="display:none; padding:0;">
     <div class="note-fullscreen-panel" id="quickMemoPanel" style="background:var(--panel);">
       <div class="note-titlebar" id="quickMemoTitlebar">
-        <span style="color:#fff; font-size:13px; padding-left:6px; white-space:nowrap;">📝 메모</span>
         <div style="position:relative; flex:1; min-width:0;">
           <input type="text" id="quickMemoGeneralSearch" autocomplete="off" placeholder="🔍 메모 열기 · 템플릿으로 사건개시 (오타 허용)" style="width:100%; box-sizing:border-box; font-family:inherit; font-size:12.5px; padding:5px 8px; border:1px solid rgba(255,255,255,0.25); border-radius:6px; background:rgba(255,255,255,0.08); color:#fff;">
           <div id="quickMemoSearchDropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,0.25); max-height:240px; overflow-y:auto; z-index:50;"></div>
         </div>
+        <button id="btnQuickMemoNew" class="note-tb-btn" title="새 메모 (지금 창을 안 닫고 바로 새로 시작)">🆕</button>
         <button id="btnQuickMemoSave" class="note-tb-btn note-tb-save" title="저장">💾</button>
         <button id="btnQuickMemoToNote" class="note-tb-btn" title="필기로 전환">✍</button>
         <button id="btnCloseQuickMemo" class="note-tb-btn note-tb-close" title="닫기">✕</button>
@@ -1285,34 +1292,10 @@
     </div>
   </div>
 
-  <!-- 📊 엑셀 열기 — 고객이 준 엑셀 파일을 드라이브 업로드 없이 브라우저에서 바로 표로 확인.
-       SheetJS(xlsx 라이브러리)로 전부 로컬에서 처리하고 서버로는 전송하지 않는다. -->
-  <div class="modal-overlay" id="excelViewerOverlay" style="display:none;">
-    <div class="modal-panel" id="excelViewerPanel" style="max-width:820px; width:92vw;">
-      <div class="modal-head">
-        <span>📊 엑셀 열기</span>
-        <span class="modal-close" id="btnCloseExcelViewer" title="닫기">✕</span>
-      </div>
-      <div class="modal-body">
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <input type="file" id="excelViewerFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
-          <button type="button" id="btnExcelViewerPick" class="ghost-btn">📁 엑셀 파일 선택</button>
-          <select id="excelViewerSheetSelect" style="display:none; font-family:inherit; font-size:12.5px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;"></select>
-          <button type="button" id="btnExcelViewerAttachChat" class="ghost-btn" style="display:none;" title="지금 보이는 시트 내용을 채팅에 텍스트로 첨부합니다">💬 채팅에 첨부</button>
-          <span id="excelViewerFileName" style="font-size:12px; color:var(--sub);"></span>
-        </div>
-        <div id="excelViewerTableWrap" style="margin-top:10px; overflow:auto; max-height:60vh; border:1px solid var(--line); border-radius:8px;">
-          <div style="padding:20px; text-align:center; color:var(--sub); font-size:12.5px;">엑셀 파일을 선택하면 여기에 표로 보여집니다.</div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <div class="floating-layer" id="fullEditorOverlay" style="display:none;">
-    <div class="full-editor-panel" id="fullEditorPanel">
-      <iframe id="fullEditorFrame" class="full-editor-frame" title="전체화면 문서 편집기"></iframe>
-    </div>
-  </div>
+  <!-- 📊 엑셀 열기는 이제 고정크기 모달이 아니라 excel-viewer.html을 독립창(window.open)으로
+       띄운다 — 크기조절이 안 되는 작은 창에 큰 엑셀시트를 욱여넣던 문제를 해결하기 위함.
+       (관련 스크립트: openExcelPopup, 하단부 "엑셀 열기" 그룹) -->
 
   <div class="workspace" id="workspace">
     <div class="explorer-float-backdrop" id="explorerFloatBackdrop"></div>
@@ -1409,20 +1392,20 @@ graph TD
       </div>
 
       <div id="explorerView" style="display:flex; flex:1; flex-direction:column; min-height:0;">
+        <!-- 이미지·PDF·워드·파워포인트 등(편집 대상이 아닌 파일)을 열면 여기 얇은 상태바만 뜨고,
+             실제 미리보기는 독립 리사이즈 창(팝업)으로 연다 — 예전엔 이 파일들도 좁고 고정된
+             패널(editorView, 최대 crop된 iframe)에 갇혀서 큰 PDF·고해상도 이미지를 보기 답답했다.
+             탐색기 자체는 항상 그대로 보이므로(팝업이 따로 뜨는 동안도) 화면 전환이 필요 없다. -->
+        <div class="editor-toolbar" id="openFileStatusBar" style="display:none;">
+          <span class="editor-filename" id="openFileStatusName"></span>
+          <div class="spacer"></div>
+          <button type="button" id="btnOpenFileReload" class="ghost-btn" title="독립창을 최신 내용으로 다시 불러옵니다">🔄 새로고침</button>
+          <button type="button" id="btnOpenFileRef" class="ghost-btn">📎 참조</button>
+          <button type="button" id="btnOpenFileClose" class="ghost-btn" title="닫기">✕ 닫기</button>
+        </div>
         <div class="explorer-body" id="explorerBody">
           <div class="explorer-status">불러오는 중…</div>
         </div>
-      </div>
-
-      <div id="editorView" style="display:none; flex:1; flex-direction:column; min-height:0;">
-        <div class="editor-toolbar">
-          <button class="back-btn" id="btnBack" title="닫기">✕</button>
-          <span class="editor-filename" id="editorFilename"></span>
-          <div class="spacer"></div>
-          <button type="button" id="btnEditorReload" class="ghost-btn" title="탐색기 등 다른 곳에서 이 파일이 바뀌었으면 눌러서 최신 내용으로 다시 엽니다">🔄 새로고침</button>
-          <button type="button" id="btnEditorRef" class="ghost-btn">📎 참조</button>
-        </div>
-        <iframe id="editorFrame" class="editor-frame" title="문서 편집기"></iframe>
       </div>
 
       <div id="calcView" style="display:none; flex:1; flex-direction:column; min-height:0;">
@@ -1836,17 +1819,20 @@ graph TD
   const coverPathLabel = document.getElementById('coverPathLabel'); // 커버화면모드 전용 — customerSelect 옆 작업폴더 표시
   const explorerBody = document.getElementById('explorerBody');
   const explorerView = document.getElementById('explorerView');
-  const editorView = document.getElementById('editorView');
   const explorerPanelHead = document.getElementById('explorerPanelHead');
-  const editorFrame = document.getElementById('editorFrame');
+  const openFileStatusBar = document.getElementById('openFileStatusBar');
+  const openFileStatusName = document.getElementById('openFileStatusName');
 
-  // 오른쪽 패널 안의 모든 하위 화면(탐색기/편집기/경과지/계산기/관계도/캡처확인)을 한 번에 숨김.
+  // 오른쪽 패널 안의 모든 하위 화면(탐색기/경과지/계산기/관계도/캡처확인)을 한 번에 숨김.
   // 각 화면을 열 때 이걸 먼저 호출한 뒤 자기 화면만 다시 보이게 해서, 뒤로가기 없이 다른 도구로
   // 바로 넘어가도 이전 화면이 안 겹쳐 보이게 한다. (logView 등은 아래에서 나중에 선언되지만
   // 함수 몸통 안 참조라 실행 시점엔 이미 선언이 끝나 있어 문제없음)
+  // [패치 2026.07] 예전엔 편집기(editorView)도 이 안에서 숨김/표시 대상이었지만, 이제 문서·엑셀·
+  // 기타 파일 모두 독립창으로 열려서 탐색기 자체를 가릴 필요가 없어졌다 — 그래서 editorView는
+  // 아예 없앴고, 이 함수는 explorerView를 숨기는 게 아니라 "다른 전용 화면(경과지 등)으로
+  // 전환할 때"만 쓰인다.
   function hideAllPanelViews(){
     explorerView.style.display = 'none';
-    editorView.style.display = 'none';
     if (typeof logView !== 'undefined' && logView) logView.style.display = 'none';
     if (typeof calcView !== 'undefined' && calcView) calcView.style.display = 'none';
     if (typeof diagramView !== 'undefined' && diagramView) diagramView.style.display = 'none';
@@ -1856,8 +1842,6 @@ graph TD
     if (typeof searchView !== 'undefined' && searchView) searchView.style.display = 'none';
     explorerPanelHead.style.display = 'none';
   }
-
-  const editorFilename = document.getElementById('editorFilename');
 
   // explorerPath: [고객명, 사건명, ...하위 폴더들] — 항상 최소 2단계(고객/사건) 유지
   let explorerPath = [];
@@ -2161,6 +2145,32 @@ graph TD
     return editorPopupWins[key] || null;
   }
 
+  // 이미지・PDF・워드・파워포인트・한글 등(편집 대상이 아니라 보기・참조만 하면 되는 파일) 전용
+  // 독립 팝업 관리 — report-writer/엑셀뷰어와 완전히 같은 파일별 재사용 패턴이다. 구글드라이브
+  // 자체 미리보기 URL을 그대로 새 창으로 열 뿐이라 별도 뷰어 페이지를 만들 필요가 없다.
+  const filePopupWins = {};
+  function filePopupKey(file){ return 'f_' + file.id; }
+  function driveFilePreviewUrl_(fileId, cacheBust){
+    return 'https://drive.google.com/file/d/' + encodeURIComponent(fileId) + '/preview' + (cacheBust ? ('?_r=' + Date.now()) : '');
+  }
+  function openFilePopup(file){
+    const key = filePopupKey(file);
+    const existing = filePopupWins[key];
+    if (existing && !existing.closed){ existing.focus(); return; }
+    const url = driveFilePreviewUrl_(file.id);
+    const w = Math.round(window.innerWidth * 0.85);
+    const h = Math.round(window.innerHeight * 0.85);
+    const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
+    const top = Math.round(window.screenY + (window.outerHeight - h) / 2);
+    const win = window.open(url, 'nxFileWindow_' + key, 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes');
+    if (!win){
+      showToast('새 창이 차단된 것 같습니다. 브라우저에서 이 사이트의 팝업 허용을 켜주세요.', 'warning');
+      return;
+    }
+    filePopupWins[key] = win;
+    win.focus();
+  }
+
   function openEditor(file){
     if (isTextRenderable(file.mimeType, file.name)){
       // 편집 대상 문서: 탐색창을 대체하지 않고 항상 독립창으로 연다.
@@ -2177,58 +2187,50 @@ graph TD
       }
       // 혹시라도 엑셀뷰어 초기화 전이면(스크립트 로드 순서 문제) 예전처럼 미리보기로 폴백.
     }
-    // 이미지・PDF・기타(편집이 아니라 보기만 하면 되는 파일)는 예전처럼 좁은 패널에 그대로 띄운다.
-    hideAllPanelViews();
-    editorView.style.display = 'flex';
-    editorFilename.textContent = file.name;
+    // 이미지・PDF・워드・파워포인트・한글 등: 이제 좁고 고정된 패널 대신 독립 리사이즈 창으로 연다
+    // ("작고 고정된 창으로 큰 PDF·이미지를 어떻게 보나" 지적 반영). 탐색창은 그대로 살아있고,
+    // 얇은 상태바에 파일명 + 새로고침・참조・닫기 버튼만 남는다.
     currentOpenFile = { id: file.id, name: file.name, mimeType: file.mimeType };
     isReportWriterOpen = false;
-    editorFrame.src = 'https://drive.google.com/file/d/' + encodeURIComponent(file.id) + '/preview';
-    document.getElementById('btnEditorReload').style.display = '';
-    document.getElementById('btnEditorRef').style.display = '';
+    openFilePopup(file);
+    openFileStatusName.textContent = file.name;
+    openFileStatusBar.style.display = 'flex';
   }
 
-  document.getElementById('btnBack').addEventListener('click', ()=>{
-    editorFrame.src = 'about:blank';
-    hideAllPanelViews();
-    explorerView.style.display = 'flex';
-    explorerPanelHead.style.display = 'flex'; // 탐색 중일 때는 경로표시줄 다시 보이게
+  document.getElementById('btnOpenFileClose').addEventListener('click', ()=>{
+    if (currentOpenFile){
+      const win = filePopupWins[filePopupKey(currentOpenFile)];
+      if (win && !win.closed) win.close();
+      delete filePopupWins[filePopupKey(currentOpenFile)];
+    }
+    openFileStatusBar.style.display = 'none';
     currentOpenFile = null;
     isReportWriterOpen = false;
   });
 
-  document.getElementById('btnEditorReload').addEventListener('click', ()=>{
+  document.getElementById('btnOpenFileReload').addEventListener('click', ()=>{
     if (!currentOpenFile){ showToast('열려 있는 파일이 없습니다.', 'warning'); return; }
-    if (isReportWriterOpen){
-      // 편집기 내용을 지금 화면 그대로 덮어쓰지 않고, 저장되어 있는 최신 파일 내용을 다시 불러온다.
-      // 편집 중이던 내용이 있으면 새로고침으로 사라질 수 있으니 먼저 확인한다.
-      if (!confirm('탐색기 등 다른 곳에서 바뀐 최신 내용으로 다시 엽니다.\n지금 편집창에 저장하지 않은 내용이 있다면 사라집니다. 계속할까요?')) return;
-      if (editorFrame.contentWindow){
-        editorFrame.contentWindow.postMessage({ type: 'nx-reload-file' }, '*');
-        showToast('최신 내용으로 새로고침했습니다.', 'success');
-      }
+    const key = filePopupKey(currentOpenFile);
+    const win = filePopupWins[key];
+    const url = driveFilePreviewUrl_(currentOpenFile.id, true); // 캐시 방지용 타임스탬프 포함
+    if (win && !win.closed){
+      win.location.href = url;
+      win.focus();
     } else {
-      // 이미지·PDF 미리보기: 구글드라이브 미리보기 iframe을 그냥 다시 불러온다 (캐시 방지용 타임스탬프 포함)
-      editorFrame.src = 'https://drive.google.com/file/d/' + encodeURIComponent(currentOpenFile.id) + '/preview?_r=' + Date.now();
-      showToast('새로고침했습니다.', 'success');
+      openFilePopup(currentOpenFile);
     }
+    showToast('새로고침했습니다.', 'success');
   });
 
-  document.getElementById('btnEditorRef').addEventListener('click', async ()=>{
+  document.getElementById('btnOpenFileRef').addEventListener('click', async ()=>{
     if (!currentOpenFile){ showToast('열려 있는 파일이 없습니다.', 'warning'); return; }
-    if (isReportWriterOpen){
-      // report-writer 문서: 저장 전이라도 지금 편집창에 실제로 타이핑되어 있는 내용을 그대로 가져옴
-      const content = await getEditorLiveContent();
-      if (content === null){ showToast('편집기 내용을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.', 'error'); return; }
-      addTextAttachment(currentOpenFile.name, content);
-    } else {
-      // 이미지·PDF 뷰어: 그 파일 자체를 이미지/문서 블록으로 가져옴
-      const block = await getOpenFileMediaBlock();
-      if (!block){ showToast('이 파일 형식은 아직 참조를 지원하지 않습니다 (이미지·PDF만 가능).', 'error'); return; }
-      if (pendingRefMedia.find(m => m.name === currentOpenFile.name)) return; // 중복 방지
-      pendingRefMedia.push({ id: 'ref' + Date.now(), name: currentOpenFile.name, block });
-      renderAttachBar();
-    }
+    // 이미지·PDF: 그 파일 자체를 이미지/문서 블록으로 가져와 AI 채팅에 첨부한다.
+    // (워드·파워포인트·한글 등은 아직 미지원 — getOpenFileMediaBlock이 이미지·PDF만 처리)
+    const block = await getOpenFileMediaBlock();
+    if (!block){ showToast('이 파일 형식은 아직 참조를 지원하지 않습니다 (이미지·PDF만 가능).', 'error'); return; }
+    if (pendingRefMedia.find(m => m.name === currentOpenFile.name)) return; // 중복 방지
+    pendingRefMedia.push({ id: 'ref' + Date.now(), name: currentOpenFile.name, block });
+    renderAttachBar();
   });
 
   // ---- 경과지 보드 ----
@@ -3092,11 +3094,6 @@ graph TD
       // 똑같이 여기서 처리된다(화면별로 따로 처리하지 않아도 됨).
       addTextAttachment(msg.name || (currentOpenFile && currentOpenFile.name) || '문서', msg.content || '');
     }
-    if (msg.type === 'nx-close-editor' && fullEditorOverlay.style.display !== 'none'){
-      // 폰 전체화면 편집기가 열려있을 때만 반응한다(그 외의 경우 — 예: 탐색기 안 좁은 편집창
-      // 임베드 — 에는 이 버튼이 눌려도 닫을 오버레이가 없으므로 아무 일도 하지 않음).
-      closeFullEditor();
-    }
     if (msg.type === 'nx-editor-window-closed'){
       // 편집창 독립 팝업 중 하나가 (자체 닫기 버튼이든 OS 창닫기 버튼이든 어떤 방법으로든) 닫혔다는
       // 신호 — report-writer가 unload 시점에 opener에게 직접 보내온다. fileId로 정확히 그 창만
@@ -3124,15 +3121,10 @@ graph TD
   });
 
   // 지금 편집기(report-writer)에 실제로 타이핑되어 있는(저장 전 포함) 내용을 물어봄
-  // 폰 전체화면(fullEditorFrame, iframe)과 PC·태블릿 독립창들(editorPopupWins) 중 지금
-  // "포커스 추적 중인"(currentOpenFile에 해당하는) 창을 골라주는 공통 헬퍼. 이걸 통해서
-  // 참조/새로고침/AI적용을 구현하면 어느 화면에서 열어도, 여러 창이 열려있어도 항상 정확한
-  // 대상에 반영된다.
-  function isFullEditorVisible(){
-    return !!(fullEditorOverlay && fullEditorOverlay.style.display !== 'none');
-  }
+  // PC・태블릿 독립창들(editorPopupWins) 중 지금 "포커스 추적 중인"(currentOpenFile에 해당하는)
+  // 창을 골라주는 공통 헬퍼. 이걸 통해서 참조/새로고침/AI적용을 구현하면 어느 화면에서 열어도,
+  // 여러 창이 열려있어도 항상 정확한 대상에 반영된다.
   function getActiveEditorTarget(){
-    if (isFullEditorVisible()) return fullEditorFrame.contentWindow || null;
     return getEditorWindowForFile(currentOpenFile);
   }
 
@@ -3217,8 +3209,7 @@ graph TD
     { icon: '🧮', label: '계산기', handler: openCalcView },
     { icon: '🕸', label: '관계도', handler: openDiagramView },
     { icon: '📷', label: '스캔', handler: openScanModal },
-    { icon: '📊', label: '엑셀 열기', handler: () => window.openExcelViewer() },
-    { icon: '🖋', label: '편집', handler: openFullEditor }
+    { icon: '📊', label: '엑셀 열기', handler: () => window.openExcelViewer() }
   ];
 
   // ---- 폰(compact 단계) 전용 하단 도구 5그룹 — 기능이 비슷한 것끼리 2개씩 묶음 ----
@@ -3236,8 +3227,7 @@ graph TD
   ];
   const MOBILE_GROUP_CONFIG = [
     { icon: '📷', label: '스캔', handler: openScanModal },
-    { icon: '📊', label: '엑셀 열기', handler: () => window.openExcelViewer() },
-    { icon: '🖋', label: '편집', handler: openFullEditor }
+    { icon: '📊', label: '엑셀 열기', handler: () => window.openExcelViewer() }
   ];
 
   function fillToolPopup(popupEl, items){
@@ -4650,16 +4640,6 @@ graph TD
   // 별도로 기억해뒀다가, 응답이 왔을 때 그 파일이 지금 안 열려 있어도 버튼은 항상 보여주고,
   // 클릭하면 그 파일을 다시 열어서 적용한다.
   function applyEditToTargetFile_(editTargetFile, content, applyBtn){
-    // 폰 전체화면 오버레이가 지금 이 파일을 보여주고 있으면 그쪽으로 (오버레이는 파일별 맵이 아니라
-    // 한 번에 하나만 뜨므로 이 경우만 별도 처리).
-    const fullEditorShowsThisFile = isFullEditorVisible() && isReportWriterOpen
-      && currentOpenFile && editTargetFile && currentOpenFile.id === editTargetFile.id;
-    if (fullEditorShowsThisFile){
-      fullEditorFrame.contentWindow.postMessage({ type: 'nx-set-content', content: content }, '*');
-      applyBtn.textContent = '✓ 적용됨';
-      applyBtn.disabled = true;
-      return;
-    }
     if (!editTargetFile){
       showToast('적용할 문서 정보를 찾을 수 없습니다 — 문서를 다시 열고 요청해주세요.', 'error');
       return;
@@ -4928,7 +4908,6 @@ graph TD
     { id: 'openScan', label: '스캔 열기', action: 'openScan', enabled: true, phrases: ['스캔열어', '스캔켜', '스캔시작'] },
     { id: 'capture', label: '화면 캡처', action: 'capture', enabled: true, phrases: ['화면캡처', '캡처해줘', '캡처시작'] },
     { id: 'openSettings', label: '설정 열기', action: 'openSettings', enabled: true, phrases: ['설정열어', '설정보여'] },
-    { id: 'openFullEditor', label: '전체화면 편집', action: 'openFullEditor', enabled: true, phrases: ['전체화면편집', '전체화면열어'] },
     { id: 'hideExplorer', label: '탐색창 접기', action: 'hideExplorer', enabled: true, phrases: ['탐색창접어', '탐색창숨겨', '탐색창생략'] },
     { id: 'showExplorer', label: '탐색창 펼치기', action: 'showExplorer', enabled: true, phrases: ['탐색창보여', '탐색창펼쳐'] },
     { id: 'darkOn', label: '다크모드 켜기', action: 'darkOn', enabled: true, phrases: ['다크모드켜', '다크모드시작'] },
@@ -4997,7 +4976,6 @@ graph TD
       case 'openScan': openScanModal(); return '스캔 열었습니다.';
       case 'capture': captureScreen(); return '화면 캡처를 시작합니다.';
       case 'openSettings': openSettingsModal(); return '설정 열었습니다.';
-      case 'openFullEditor': openFullEditor(); return '전체화면 편집 열었습니다.';
       case 'hideExplorer': setWorkspaceMode('hide'); return '탐색창을 접었습니다.';
       case 'showExplorer': setWorkspaceMode('row'); return '탐색창을 펼쳤습니다.';
       case 'darkOn': applyDarkMode(true); localStorage.setItem(DARK_MODE_KEY, '1'); return '다크모드를 켰습니다.';
@@ -5890,14 +5868,28 @@ graph TD
   let pendingSaveOnDone = null;  // 저장이 끝난 뒤 호출할 콜백(그 화면 닫기 등)
   let pendingSaveCustomHandler = null; // 설정돼 있으면 기본 저장 로직 대신 이 함수(customerName)=>boolean 를 쓴다(사건개시 등)
 
-  // "일반메모" 폴더 위치 — 기본폴더(basePath, "0 NETAX") 바로 아래, 고객 폴더들과 나란히.
-  // basePath는 페이지가 열리자마자 비동기로 채워지는데, 메모 화면을 그 로딩이 끝나기 전에
-  // 아주 빨리 열면(예: 페이지 열자마자 바로 메모부터 쓰는 경우) 아직 빈 배열이어서 진짜
-  // 드라이브 루트에 폴더가 생겨버리는 문제가 있었다 — 비어있으면 한 번 더 확실하게 받아온
-  // 뒤에 쓰도록 만들었다.
+  // "일반메모" 폴더 위치 — <고객사건>(사건 파일 전용, basePath가 가리키는 곳)이 아니라
+  // <0 NETAX>(넥스 시스템 환경설정 폴더) 바로 아래여야 한다. [패치 2026.07] 예전엔 이 함수가
+  // basePath(=고객사건)를 "0 NETAX"인 것처럼 잘못 가정해서, 일반메모가 엉뚱하게
+  // 고객사건/일반메모에 저장되고 있었다 — 서버의 getNetaxRootPath 액션으로 진짜 "0 NETAX"
+  // 경로를 물어보도록 고쳤다. 한 번 받아오면 이 세션 동안은 캐시해서 재사용한다.
+  let netaxRootPathCache = null;
   async function generalMemoParentPath_(){
-    if (basePath && basePath.length) return basePath;
-    await loadCustomers();
+    if (netaxRootPathCache && netaxRootPathCache.length) return netaxRootPathCache;
+    try{
+      const data = await callGas('getNetaxRootPath', {});
+      if (data && !data.error && Array.isArray(data.path)){
+        netaxRootPathCache = data.path;
+        return netaxRootPathCache;
+      }
+      console.error('[일반메모] "0 NETAX" 경로 조회 실패:', data && data.error);
+    }catch(err){
+      console.error('[일반메모] "0 NETAX" 경로 조회 중 오류:', err);
+    }
+    // 서버가 "0 NETAX" 경로를 못 줄 때(스크립트 속성 미설정 등)는, 저장 자체가 아예 실패하는 것보다
+    // 낫도록 예전처럼 기본 작업 폴더(고객사건) 아래로라도 폴백한다 — 다만 잘못된 위치이니 알린다.
+    showToast('"0 NETAX" 폴더 위치를 확인하지 못해 임시로 기본 작업 폴더 아래에 저장합니다. Code.gs의 NETAX_ROOT_FOLDER_ID(또는 BUSINESS_MANAGER_FOLDER_ID) 설정을 확인해주세요.', 'warning');
+    if (!basePath || !basePath.length) await loadCustomers();
     return basePath;
   }
   async function generalMemoPath_(){
@@ -6103,6 +6095,16 @@ graph TD
     const quickMemoSearchDropdown = document.getElementById('quickMemoSearchDropdown');
     const btnQuickMemoSave = document.getElementById('btnQuickMemoSave');
 
+    // 그냥 <textarea>는 Tab을 누르면 브라우저 기본 동작대로 다음 요소로 포커스가 넘어가버려서
+    // 탭 문자가 안 찍힌다. 통화 중 표처럼 탭으로 줄맞춰 메모해두면(나중에 report-writer 편집창에
+    // 붙여넣을 때 표로 자동 인식됨) 편하므로, Tab을 가로채 실제 탭 문자를 입력하게 한다.
+    quickMemoText.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab'){
+        e.preventDefault();
+        document.execCommand('insertText', false, '\t'); // execCommand로 넣어야 실행취소(Ctrl+Z)가 정상 동작한다
+      }
+    });
+
     let editingGeneralMemoFile = null; // 검색콤보로 기존 일반메모를 열어서 편집 중이면 그 파일 정보
     let currentTemplateMode = null; // 검색콤보로 사건개시 템플릿을 골랐으면 그 템플릿 정보(사건개시 모드)
     let comboEntries = []; // [{label, type:'memo'|'template', file?, tpl?}] — Fuse.js 검색 대상
@@ -6136,7 +6138,7 @@ graph TD
       results.slice(0, 8).forEach(entry=>{
         const row = document.createElement('div');
         row.style.cssText = 'display:flex; align-items:center; gap:6px; padding:8px 10px; font-size:12.5px; cursor:pointer; color:var(--ink);';
-        row.addEventListener('mouseenter', ()=> row.style.background = '#f0f2f6');
+        row.addEventListener('mouseenter', ()=> row.style.background = 'rgba(128,136,150,0.22)'); // 테마 무관 반투명 톤 — 라이트/다크 어디서도 글자와 항상 구분됨
         row.addEventListener('mouseleave', ()=> row.style.background = '');
         row.addEventListener('mousedown', (e)=>{ e.preventDefault(); }); // 입력창 blur로 드롭다운이 먼저 닫히는 것 방지
 
@@ -6175,16 +6177,20 @@ graph TD
       quickMemoSearchDropdown.style.display = 'block';
     }
 
-    quickMemoGeneralSearch.addEventListener('input', ()=>{
-      const val = quickMemoGeneralSearch.value.trim();
-      if (!val){ quickMemoSearchDropdown.style.display = 'none'; return; }
-      const results = comboFuse
+    // 검색어가 비어있으면 저장된 메모+템플릿 전체 목록을, 있으면 그 검색어로 걸러진 결과를 돌려준다.
+    function comboResultsFor_(val){
+      if (!val) return comboEntries;
+      return comboFuse
         ? comboFuse.search(val).map(r => r.item)
         : comboEntries.filter(en => en.label.indexOf(val) !== -1); // Fuse 로드 실패 시 단순 포함검색으로 대체
-      renderSearchDropdown_(results);
+    }
+    quickMemoGeneralSearch.addEventListener('input', ()=>{
+      renderSearchDropdown_(comboResultsFor_(quickMemoGeneralSearch.value.trim()));
     });
+    // 클릭(포커스)만 해도 바로 전체 목록이 보이도록 — 타이핑을 해야만 목록이 뜨던 예전 방식은
+    // "메모 열기·템플릿으로 사건개시를 그냥 클릭해서 봤었다"는 사용 방식과 안 맞았다.
     quickMemoGeneralSearch.addEventListener('focus', ()=>{
-      if (quickMemoGeneralSearch.value.trim()) quickMemoGeneralSearch.dispatchEvent(new Event('input'));
+      renderSearchDropdown_(comboResultsFor_(quickMemoGeneralSearch.value.trim()));
     });
     document.addEventListener('click', (e)=>{
       if (!quickMemoSearchDropdown.contains(e.target) && e.target !== quickMemoGeneralSearch){
@@ -6240,6 +6246,19 @@ graph TD
     document.getElementById('btnCloseQuickMemo').addEventListener('click', ()=>{
       if (quickMemoText.value.trim() && !confirm('저장하지 않은 내용이 있습니다. 그냥 닫을까요?')) return;
       closeQuickMemo();
+    });
+
+    // 새로 만들기 — 지금 메모를 불러온 상태에서 창을 닫았다가 다시 열 필요 없이, 바로 빈 메모로
+    // 초기화한다. 저장 안 한 내용이 있으면 한 번 확인한다(닫기 버튼과 동일한 안전장치).
+    document.getElementById('btnQuickMemoNew').addEventListener('click', ()=>{
+      if (quickMemoText.value.trim() && !confirm('저장하지 않은 내용이 있습니다. 새 메모를 시작할까요?')) return;
+      quickMemoText.value = '';
+      editingGeneralMemoFile = null;
+      currentTemplateMode = null;
+      quickMemoGeneralSearch.value = '';
+      quickMemoSearchDropdown.style.display = 'none';
+      quickMemoText.focus();
+      showToast('새 메모를 시작합니다.', 'success');
     });
 
     // 필기상담 화면으로 바로 전환 — 지금 메모 화면은 닫고 필기상담을 연다.
@@ -6306,35 +6325,6 @@ graph TD
     });
   })();
   document.getElementById('btnOpenMemo').addEventListener('click', ()=> window.openQuickMemo());
-
-  // ---- 전체화면 편집기 (AI 개입 없이, 드래그·크기조절·최대화 가능한 뜨는 창) ----
-  const fullEditorOverlay = document.getElementById('fullEditorOverlay');
-  const fullEditorFrame = document.getElementById('fullEditorFrame');
-
-  // 편집창: 폰(좁은 화면)에서는 상담메모창과 똑같이 페이지 안에서 전체화면으로 띄우고,
-  // PC·태블릿에서는 진짜 브라우저 새 창(window.open)으로 연다 — 크기조절·이동·최대화를
-  // 우리가 직접 흉내내는 대신 OS/브라우저에게 그대로 맡긴다(훨씬 더 자연스럽고 안정적).
-  function openFullEditor(){
-    if (document.body.classList.contains('stage-compact')){
-      const url = currentOpenFile
-        ? (REPORT_WRITER_URL + '?fileId=' + encodeURIComponent(currentOpenFile.id))
-        : REPORT_WRITER_URL;
-      fullEditorFrame.src = url;
-      fullEditorOverlay.style.display = 'block';
-      return;
-    }
-    // PC・태블릿: 탐색창 클릭으로 여는 것과 완전히 같은 독립창 로직을 공유한다(openEditorPopup).
-    // 이렇게 하나로 합쳐 놔야 어느 쪽으로 열어도 같은 창을 재사용하고, AI 적용·참조·새로고침이
-    // 항상 똑같이 동작한다(예전엔 이 버튼의 window.open이 지역변수였어서 전역에서 추적이 안 됐음).
-    openEditorPopup(currentOpenFile || null);
-  }
-  function closeFullEditor(){
-    fullEditorOverlay.style.display = 'none';
-    fullEditorFrame.src = 'about:blank';
-  }
-  document.getElementById('btnOpenFullEditor').addEventListener('click', openFullEditor);
-  // 닫기는 이제 report-writer 자체 툴바의 ✕ 버튼(embedded일 때만 보임)이 postMessage로
-  // 요청하면 위쪽 메시지 리스너에서 closeFullEditor()를 호출하는 방식으로 처리한다.
 
   document.getElementById('btnCloseScan').addEventListener('click', closeScanModal);
   // 바깥(어두운 배경) 클릭 시 자동으로 닫히는 동작은 일부러 안 넣는다 — 스캔 작업 중에는
@@ -7147,115 +7137,33 @@ graph TD
     }
   });
 
-  // ---- 📊 엑셀 열기 — 고객이 준 엑셀 파일을 드라이브 업로드 없이 브라우저에서 바로 표로 확인
-  // (SheetJS). 전부 로컬에서 처리하고 서버로는 아무것도 전송하지 않는다.
-  (function(){
-    const excelViewerOverlay = document.getElementById('excelViewerOverlay');
-    const excelViewerFileInput = document.getElementById('excelViewerFileInput');
-    const excelViewerSheetSelect = document.getElementById('excelViewerSheetSelect');
-    const excelViewerTableWrap = document.getElementById('excelViewerTableWrap');
-    const excelViewerFileName = document.getElementById('excelViewerFileName');
-    const btnExcelViewerAttachChat = document.getElementById('btnExcelViewerAttachChat');
-
-    let currentWorkbook = null;
-
-    function openExcelViewerImpl(){
-      excelViewerOverlay.style.display = 'flex';
+  // ---- 📊 엑셀 열기 — excel-viewer.html을 크기조절 가능한 독립창(window.open)으로 연다.
+  // [패치 2026.07] 예전엔 페이지 안 고정크기(최대너비 820px, 높이 60vh) 모달이라 큰 시트를
+  // 작업하기 어려웠다("작고 고정된 창으로 어떻게 작업하나" 지적) — report-writer 편집창과
+  // 완전히 같은 방식(파일별 독립 팝업, OS 창닫기/크기조절/최대화 그대로 지원)으로 바꿨다.
+  // 실제 렌더링·SheetJS 로직은 전부 excel-viewer.html로 옮겼고, 여기는 그 창을 열고
+  // 파일별로 재사용하는 역할만 한다.
+  const excelPopupWins = {};
+  function excelPopupKey(file){ return file ? ('f_' + file.id) : '__blank__'; }
+  function openExcelPopup(file){
+    const key = excelPopupKey(file);
+    const url = 'excel-viewer.html' + (file ? ('?fileId=' + encodeURIComponent(file.id) + '&name=' + encodeURIComponent(file.name)) : '');
+    const existing = excelPopupWins[key];
+    if (existing && !existing.closed){ existing.focus(); return; }
+    const w = Math.round(window.innerWidth * 0.85);
+    const h = Math.round(window.innerHeight * 0.85);
+    const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
+    const top = Math.round(window.screenY + (window.outerHeight - h) / 2);
+    const win = window.open(url, 'nxExcelWindow_' + key, 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes');
+    if (!win){
+      showToast('새 창이 차단된 것 같습니다. 브라우저에서 이 사이트의 팝업 허용을 켜주세요.', 'warning');
+      return;
     }
-    window.openExcelViewer = openExcelViewerImpl; // 도구 그룹 목록 등록 시점보다 이 함수가 나중에 정의되므로 전역에 걸어둔다
-
-    document.getElementById('btnCloseExcelViewer').addEventListener('click', ()=>{
-      excelViewerOverlay.style.display = 'none';
-    });
-    document.getElementById('btnExcelViewerPick').addEventListener('click', ()=> excelViewerFileInput.click());
-
-    function renderSheet(name){
-      if (!currentWorkbook) return;
-      const ws = currentWorkbook.Sheets[name];
-      if (!ws){ excelViewerTableWrap.innerHTML = '<div style="padding:20px; color:var(--sub);">시트를 찾을 수 없습니다.</div>'; return; }
-      const html = XLSX.utils.sheet_to_html(ws, { id: 'excelViewerTable' });
-      excelViewerTableWrap.innerHTML = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(html) : html;
-      // SheetJS 기본 표 스타일이 화면 톤과 안 맞아서 살짝 다듬는다.
-      const table = excelViewerTableWrap.querySelector('table');
-      if (table){
-        table.style.borderCollapse = 'collapse';
-        table.style.width = '100%';
-        table.style.fontSize = '12.5px';
-        table.querySelectorAll('td, th').forEach(cell=>{
-          cell.style.border = '1px solid var(--line)';
-          cell.style.padding = '4px 8px';
-          cell.style.whiteSpace = 'nowrap';
-        });
-      }
-    }
-
-    // 워크북을 읽은 뒤 시트 목록·표를 화면에 반영하는 공통 마무리 — 로컬 파일 선택이든
-    // 드라이브 파일(readFile)이든 이 함수 하나로 처리한다.
-    function loadWorkbookIntoViewer(workbook, displayName){
-      currentWorkbook = workbook;
-      excelViewerFileName.textContent = displayName;
-      excelViewerSheetSelect.innerHTML = '';
-      currentWorkbook.SheetNames.forEach(name=>{
-        const opt = document.createElement('option');
-        opt.value = name; opt.textContent = name;
-        excelViewerSheetSelect.appendChild(opt);
-      });
-      excelViewerSheetSelect.style.display = currentWorkbook.SheetNames.length > 1 ? '' : 'none';
-      btnExcelViewerAttachChat.style.display = '';
-      renderSheet(currentWorkbook.SheetNames[0]);
-    }
-
-    // 탐색창에서 엑셀 파일을 클릭했을 때 여기로 연다 — 예전엔 구글드라이브 자체 미리보기로 열려서
-    // 원본과 똑같이 보이긴 해도 셀 범위를 긁어 복사할 수 없었다. 여기서는 우리 페이지 안의 진짜
-    // <table> DOM으로 그리기 때문에 드래그 선택・복사가 그대로 되고, report-writer 편집창에
-    // 붙여넣으면 마크다운 표로 자동 변환된다(엑셀뷰어 자체와 완전히 같은 경험).
-    async function openExcelViewerFromDriveImpl(file){
-      excelViewerOverlay.style.display = 'flex';
-      excelViewerSheetSelect.style.display = 'none';
-      btnExcelViewerAttachChat.style.display = 'none';
-      excelViewerFileName.textContent = file.name + ' — 불러오는 중…';
-      excelViewerTableWrap.innerHTML = '<div style="padding:20px; color:var(--sub);">불러오는 중…</div>';
-      if (typeof XLSX === 'undefined'){ showToast('엑셀 처리 라이브러리를 불러오지 못했습니다.', 'error'); return; }
-      try{
-        const data = await callGas('readFile', { fileId: file.id });
-        if (data.error || !data.base64) throw new Error(data.error || '파일을 읽지 못했습니다.');
-        const binary = atob(data.base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        loadWorkbookIntoViewer(XLSX.read(bytes, { type: 'array' }), file.name);
-      }catch(err){
-        excelViewerTableWrap.innerHTML = '';
-        showToast('엑셀 파일을 여는 데 실패했습니다: ' + (err && err.message ? err.message : err), 'error');
-      }
-    }
-    window.openExcelViewerFromDriveFile = openExcelViewerFromDriveImpl; // openEditor(탐색창 클릭)에서 사용
-
-    excelViewerFileInput.addEventListener('change', async (e)=>{
-      const file = e.target.files[0];
-      excelViewerFileInput.value = '';
-      if (!file) return;
-      if (typeof XLSX === 'undefined'){ showToast('엑셀 처리 라이브러리를 불러오지 못했습니다.', 'error'); return; }
-      try{
-        const buf = await file.arrayBuffer();
-        loadWorkbookIntoViewer(XLSX.read(buf, { type: 'array' }), file.name);
-      }catch(err){
-        showToast('엑셀 파일을 여는 데 실패했습니다: ' + (err && err.message ? err.message : err), 'error');
-      }
-    });
-
-    excelViewerSheetSelect.addEventListener('change', ()=> renderSheet(excelViewerSheetSelect.value));
-
-    btnExcelViewerAttachChat.addEventListener('click', ()=>{
-      if (!currentWorkbook) return;
-      const name = excelViewerSheetSelect.value || currentWorkbook.SheetNames[0];
-      const ws = currentWorkbook.Sheets[name];
-      const csv = XLSX.utils.sheet_to_csv(ws);
-      const chunk = '[엑셀: ' + excelViewerFileName.textContent + ' - ' + name + ' 시트]\n' + csv;
-      chatInputEl.value = chatInputEl.value ? (chatInputEl.value + '\n\n' + chunk) : chunk;
-      showToast('시트 내용을 입력창에 첨부했습니다.', 'success');
-      excelViewerOverlay.style.display = 'none';
-    });
-  })();
+    excelPopupWins[key] = win;
+    win.focus();
+  }
+  window.openExcelViewer = function(){ openExcelPopup(null); }; // 도구 그룹 목록 등록 시점보다 나중에 정의되므로 전역에 걸어둠 (하단바 "📊 엑셀 열기" 버튼용)
+  window.openExcelViewerFromDriveFile = function(file){ openExcelPopup(file); }; // 탐색창에서 엑셀 파일 클릭했을 때(openEditor)
 
   document.getElementById('btnPdfMgrCheckAll').addEventListener('click', ()=>{
     if (!pdfMgrEntries.length) return;

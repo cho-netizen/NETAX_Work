@@ -87,12 +87,14 @@
   const workspaceModeLabel = document.getElementById('workspaceModeLabel');
   const WORKSPACE_MODE_KEY = 'nx_workspace_mode'; // 'row' | 'col' | 'hide' | 'float' | 'max'
   const WORKSPACE_MODES = ['row', 'col', 'hide', 'float', 'max'];
+  // [2026.08] label은 grouped·compact 단계의 균등폭 버튼(#workspaceModeLabel)에도 그대로 쓰인다 —
+  // full(넓은 PC)의 5개 개별 버튼(index.html에 직접 박힌 Row 등)과 항상 같은 풀네임으로 통일.
   const WORKSPACE_MODE_META = {
-    row:   { icon: '⬓', label: '좌우', title: '좌우 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기 → 최대)' },
-    col:   { icon: '⬒', label: '상하', title: '상하 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기 → 최대)' },
-    hide:  { icon: '💬', label: '생략', title: '탐색기 생략 · 채팅만 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기 → 최대)' },
-    float: { icon: '🗗', label: '띄우기', title: '탐색기 띄우기 · 채팅 위에 잠깐 보기 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기 → 최대)' },
-    max:   { icon: '⛶', label: '최대', title: '채팅 끄기 · 탐색작업창 최대화, 편집창을 크게 보는 용도 (클릭하면 다시 좌우 배치로)' }
+    row:   { icon: '⬓', label: 'Row', title: '좌우 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기 → 최대)' },
+    col:   { icon: '⬒', label: 'Col', title: '상하 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기 → 최대)' },
+    hide:  { icon: '💬', label: 'Hide', title: '탐색기 생략 · 채팅만 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기 → 최대)' },
+    float: { icon: '🗗', label: 'Float', title: '탐색기 띄우기 · 채팅 위에 잠깐 보기 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기 → 최대)' },
+    max:   { icon: '⛶', label: 'Max', title: '채팅 끄기 · 탐색작업창 최대화, 편집창을 크게 보는 용도 (클릭하면 다시 좌우 배치로)' }
   };
   // 넓은 화면에서 보이는 5개 버튼(직접 선택용) — 지금 모드에 해당하는 것만 강조 표시
   const layoutModeButtons = {
@@ -257,7 +259,7 @@
   // 탐색작업창 배치(좌우/상하/띄우기/최대 등)가 뭐였든, 커버화면모드 동안에는 항상 "생략"
   // (채팅만)으로 강제 표시한다. 안 그러면 큰 화면에서 좌우배치 등으로 쓰다가 폰을 접었을 때
   // 그 배치가 그대로 남아 탐색작업창이 비좁게 끼어 나오는데, 커버화면모드에서는 배치를 바꿀
-  // 버튼 자체가 화면이 좁아 다 숨겨져 있어서(#btnWorkspaceMode 등) 사용자가 스스로 되돌릴
+  // 버튼 자체가 화면이 좁아 다 숨겨져 있어서(#workspaceModeWrap 등) 사용자가 스스로 되돌릴
   // 방법이 없었다. applyWorkspaceMode만 호출하고 setWorkspaceMode(localStorage 저장)는 쓰지
   // 않으므로, 펼쳤을 때의 원래 배치 설정 자체는 그대로 보존되며 폰을 다시 펼치면 복원된다.
   document.addEventListener('nx:covermode', (e)=>{

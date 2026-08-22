@@ -65,6 +65,7 @@
     explorerView.style.display = 'none';
     if (typeof logView !== 'undefined' && logView) logView.style.display = 'none';
     if (typeof calcView !== 'undefined' && calcView) calcView.style.display = 'none';
+    if (typeof taxCalcView !== 'undefined' && taxCalcView) taxCalcView.style.display = 'none';
     if (typeof diagramView !== 'undefined' && diagramView) diagramView.style.display = 'none';
     if (typeof captureView !== 'undefined' && captureView) captureView.style.display = 'none';
     if (typeof trashView !== 'undefined' && trashView) trashView.style.display = 'none';
@@ -279,6 +280,101 @@
     renderSelectionBar();
   }
 
+  // [2026.08] 빈 공간을 마우스로 드래그해서 여러 항목을 한 번에 선택(러버밴드) — 지금까지는
+  // 체크박스를 하나씩 누르거나 Shift로 범위선택해야 했는데, 마우스로 쓱 긋는 동작 자체가 없었다.
+  // 드래그 시작 전에 이미 선택돼 있던 항목은 사각형 밖으로 나가도 그대로 유지하고(기존 선택 보존),
+  // 사각형이 새로 스치는 항목만 추가/해제한다(Windows 탐색기 등과 같은 방식).
+  (function setupRubberBandSelect_(){
+    // [2026.08 버그수정] 처음엔 mousedown/mousemove/mouseup으로 만들었는데, 드래그 도중 마우스가
+    // 이미 열려있는 파일 미리보기 팝업창 위나 브라우저 창 밖으로 나간 채로 버튼을 떼면 이 문서가
+    // mouseup을 아예 못 받아서 dragging 상태가 안 풀리고 선택 상자(overlayEl)가 화면에 계속
+    // 남아있는 문제가 있었다(여러 번 시도하면 상자가 겹겹이 쌓임). PDF 필기메모 캔버스와 같은
+    // 방식(pointer capture)으로 바꿔서, 캡처한 뒤엔 마우스가 어디로 나가도 이 요소가 계속
+    // pointermove/pointerup을 받도록 한다. 터치(pointerType:'touch')는 목록 스크롤과 겹치므로
+    // 제외 — 터치기기는 예전처럼 체크박스·길게 누르기로만 다중선택한다.
+    let dragging = false;
+    let moved = false;
+    let startX = 0, startY = 0;
+    let baseSelection = null; // 드래그 시작 전 선택 상태(id Set) — 이 안에 있던 항목은 사각형 밖이어도 유지
+    let overlayEl = null;
+    let activePointerId = null;
+
+    function currentRect(clientX, clientY){
+      const left = Math.min(startX, clientX), top = Math.min(startY, clientY);
+      const right = Math.max(startX, clientX), bottom = Math.max(startY, clientY);
+      return { left, top, right, bottom };
+    }
+    function intersects(a, b){
+      return !(b.right < a.left || b.left > a.right || b.bottom < a.top || b.top > a.bottom);
+    }
+    function removeOverlay(){
+      if (overlayEl){ overlayEl.remove(); overlayEl = null; }
+    }
+    function endDrag(){
+      if (!dragging) return;
+      dragging = false;
+      removeOverlay();
+      if (moved){
+        // 방금 만든 선택이 pointerup 직후의 click 이벤트(바깥 클릭 취급)로 바로 지워지지 않게 한다.
+        window.__nxSkipNextOutsideClearClick = true;
+      }
+      baseSelection = null;
+      moved = false;
+      activePointerId = null;
+    }
+
+    explorerBody.addEventListener('pointerdown', (e)=>{
+      if (e.pointerType === 'touch') return; // 터치는 스크롤 제스처와 겹쳐서 제외
+      if (e.button !== 0) return; // 왼쪽 버튼만
+      if (e.target.closest('.file-row, .folder-row')) return; // 항목 위에서 누르면(data-item-id 없는 ".." 상위폴더 행 포함) 기존 클릭 동작 그대로 — 러버밴드 선택을 시작하지 않는다
+      removeOverlay(); // 혹시 이전 드래그가 비정상 종료돼 안 지워진 상자가 남아있으면 먼저 치움
+      dragging = true;
+      moved = false;
+      startX = e.clientX; startY = e.clientY;
+      baseSelection = new Set(selectedItems.keys());
+      overlayEl = document.createElement('div');
+      overlayEl.style.cssText = 'position:fixed; z-index:400; border:1px solid var(--gold); background:rgba(200,162,68,0.15); pointer-events:none;';
+      document.body.appendChild(overlayEl);
+      activePointerId = e.pointerId;
+      explorerBody.setPointerCapture(e.pointerId);
+    });
+
+    explorerBody.addEventListener('pointermove', (e)=>{
+      if (!dragging || e.pointerId !== activePointerId) return;
+      if (e.buttons === 0){ endDrag(); return; } // 버튼이 이미 떼진 채로 들어오면(이벤트를 놓친 경우) 그 자리에서 바로 종료
+      if (!moved && (Math.abs(e.clientX - startX) < 4 && Math.abs(e.clientY - startY) < 4)) return; // 미세한 떨림은 드래그로 안 침
+      moved = true;
+      const rect = currentRect(e.clientX, e.clientY);
+      overlayEl.style.left = rect.left + 'px';
+      overlayEl.style.top = rect.top + 'px';
+      overlayEl.style.width = (rect.right - rect.left) + 'px';
+      overlayEl.style.height = (rect.bottom - rect.top) + 'px';
+
+      explorerBody.querySelectorAll('.file-row, .folder-row[data-item-id]').forEach(row=>{
+        const id = row.dataset.itemId;
+        const hit = intersects(rect, row.getBoundingClientRect());
+        if (hit){
+          if (!selectedItems.has(id)){
+            const meta = renderedItemOrder.find(it => it.id === id);
+            if (meta) selectedItems.set(id, meta);
+          }
+        } else if (!baseSelection.has(id)){
+          selectedItems.delete(id);
+        }
+      });
+      refreshSelectionUi();
+    });
+
+    explorerBody.addEventListener('pointerup', (e)=>{
+      if (e.pointerId !== activePointerId) return;
+      endDrag();
+    });
+    explorerBody.addEventListener('pointercancel', (e)=>{
+      if (e.pointerId !== activePointerId) return;
+      endDrag();
+    });
+  })();
+
   // 선택된 파일/폴더를 한 번에 채팅 첨부 목록으로 보냄
   function attachSelectedFiles(){
     selectedItems.forEach(item => addAttachment(item));
@@ -323,6 +419,9 @@
         + '<span class="icon">📁</span> ' + escapeHtml(f.name);
 
       row.addEventListener('click', (e)=>{
+        // [2026.08] Alt+클릭은 파일 전용 "바로 공유" 지름길이라, 폴더에서는 의미가 없다 —
+        // 조용히 아무 일도 안 하는 대신 이유를 알려준다(폴더 진입도 안 함).
+        if (e.altKey){ e.preventDefault(); e.stopPropagation(); showToast('폴더는 공유할 수 없습니다.', 'info'); return; }
         // [2026.08] Ctrl/⌘+클릭 = 그 항목만 선택 토글, Shift+클릭 = 마지막 선택 항목부터
         // 범위 선택 — 둘 다 눌려있으면 폴더 진입 대신 선택 동작으로 대신한다.
         if (e.ctrlKey || e.metaKey){ e.preventDefault(); e.stopPropagation(); toggleItemSelection_(itemMeta, row); return; }
@@ -369,6 +468,10 @@
         + escapeHtml(f.name) + '<span class="meta">' + escapeHtml(f.modifiedDate || '') + (f.sizeBytes !== undefined ? ' · ' + formatFileSize(f.sizeBytes) : '') + '</span>';
 
       row.addEventListener('click', (e)=>{
+        // [2026.08] Alt+클릭 — 체크해서 선택바를 거치는 절차 없이, 이 파일 하나만 바로 공유(공유
+        // 미지원이면 자동 다운로드로 폴백. shareSingleItem_는 chat.js에 있는 "공유" 버튼과 같은
+        // 함수를 재사용한다).
+        if (e.altKey){ e.preventDefault(); e.stopPropagation(); shareSingleItem_(itemMeta); return; }
         if (e.ctrlKey || e.metaKey){ e.preventDefault(); e.stopPropagation(); toggleItemSelection_(itemMeta, row); return; }
         if (e.shiftKey){
           e.preventDefault();
@@ -377,7 +480,35 @@
           else toggleItemSelection_(itemMeta, row);
           return;
         }
+        // PDF·이미지는 단일 클릭 시 선택창(PDF: 파일보기/파일관리, 이미지: 보기/스캔)이 뜨는데,
+        // 더블클릭으로는 바로 "보기"로 열리게 하려고 단일 클릭 처리를 살짝 지연시켜
+        // 더블클릭인지 구분한다.
+        const isImageFile = !!(f.mimeType && f.mimeType.indexOf('image/') === 0);
+        if (f.mimeType === 'application/pdf' || isImageFile){
+          if (row._openClickTimer){ return; } // 더블클릭의 두 번째 클릭 — dblclick 핸들러가 처리
+          row._openClickTimer = setTimeout(()=>{
+            row._openClickTimer = null;
+            openEditor(f);
+          }, 280);
+          return;
+        }
         openEditor(f);
+      });
+
+      row.addEventListener('dblclick', (e)=>{
+        const isImageFile = !!(f.mimeType && f.mimeType.indexOf('image/') === 0);
+        if (f.mimeType !== 'application/pdf' && !isImageFile) return;
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        if (row._openClickTimer){ clearTimeout(row._openClickTimer); row._openClickTimer = null; }
+        proceedToOpenFilePopup_(f);
+      });
+
+      // [2026.08] 휠클릭(가운데 버튼) — 지금 열려있는 창을 안 건드리고, 이 파일을 완전히
+      // 새로운 미리보기 창으로 하나 더 띄운다(두 문서를 나란히 비교할 때 유용).
+      row.addEventListener('auxclick', (e)=>{
+        if (e.button !== 1) return;
+        e.preventDefault();
+        openFileInNewWindow_(f);
       });
 
       const checkbox = row.querySelector('.file-check');
@@ -538,6 +669,24 @@
     win.focus();
   }
 
+  // [2026.08] 휠클릭 전용 — openFilePopup과 달리 filePopupWins에 등록하지 않고 창 이름도
+  // 매번 다르게(Date.now()) 줘서, 같은 파일이든 다른 파일이든 항상 새 창이 뜬다(재사용 안 함).
+  // "지금 열려있는 파일"(currentOpenFile) 취급도 안 해서 상태표시줄·AI 자동적용 대상과 무관한
+  // 순수 보기 전용 창이다 — 두 문서를 나란히 비교할 때처럼 잠깐 띄워놓고 보는 용도.
+  function openFileInNewWindow_(file){
+    const url = driveFilePreviewUrl_(file.id);
+    const w = Math.round(window.innerWidth * 0.85);
+    const h = Math.round(window.innerHeight * 0.85);
+    const left = Math.round(window.screenX + (window.outerWidth - w) / 2 + 24);
+    const top = Math.round(window.screenY + (window.outerHeight - h) / 2 + 24);
+    const win = window.open(url, 'nxFileWindowExtra_' + Date.now(), 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes');
+    if (!win){
+      showToast('새 창이 차단된 것 같습니다. 브라우저에서 이 사이트의 팝업 허용을 켜주세요.', 'warning');
+      return;
+    }
+    win.focus();
+  }
+
   function openEditor(file){
     if (isTextRenderable(file.mimeType, file.name)){
       // 편집 대상 문서: 탐색창을 대체하지 않고 항상 독립창으로 연다.
@@ -563,6 +712,12 @@
       showPdfOpenChoice_(file);
       return;
     }
+    // [2026.08] 이미지도 PDF와 마찬가지로 "그냥 보기"와 "스캔 작업(모서리 보정·흑백화 등)으로
+    // 바로 보내기" 둘 다 쓸모 있어서 클릭 한 번으로 정하지 않고 먼저 물어본다.
+    if (file.mimeType && file.mimeType.indexOf('image/') === 0){
+      showImageOpenChoice_(file);
+      return;
+    }
     proceedToOpenFilePopup_(file);
   }
 
@@ -580,6 +735,7 @@
   // PDF 클릭 시 "파일 열기" / "PDF 관리로 열기" 중 고르는 작은 선택창.
   function showPdfOpenChoice_(file){
     const overlay = document.createElement('div');
+    overlay.className = 'pdf-choice-overlay';	
     overlay.style.cssText = 'position:fixed; inset:0; z-index:6000; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center;';
     overlay.addEventListener('click', (e)=>{ if (e.target === overlay) overlay.remove(); });
 
@@ -603,6 +759,37 @@
         window.openExistingFileInPdfManager(file);
       } else {
         showToast('PDF 관리 도구를 아직 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', 'warning');
+      }
+    });
+  }
+
+  // 이미지 클릭 시 "보기" / "스캔" 중 고르는 작은 선택창. showPdfOpenChoice_와 같은 패턴.
+  function showImageOpenChoice_(file){
+    const overlay = document.createElement('div');
+    overlay.className = 'pdf-choice-overlay';
+    overlay.style.cssText = 'position:fixed; inset:0; z-index:6000; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center;';
+    overlay.addEventListener('click', (e)=>{ if (e.target === overlay) overlay.remove(); });
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--panel); color:var(--ink); border-radius:10px; width:min(320px, 88vw); padding:18px; box-shadow:0 8px 32px rgba(0,0,0,0.35);';
+    box.innerHTML = `
+      <div style="font-size:14px;font-weight:600;margin-bottom:14px;">${escapeHtml(file.name)}</div>
+      <button id="imgChoiceOpen" style="width:100%;padding:11px;margin-bottom:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;cursor:pointer;font-size:13.5px;">🖼 보기</button>
+      <button id="imgChoiceScan" style="width:100%;padding:11px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;cursor:pointer;font-size:13.5px;">📷 스캔</button>
+    `;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    document.getElementById('imgChoiceOpen').addEventListener('click', ()=>{
+      overlay.remove();
+      proceedToOpenFilePopup_(file);
+    });
+    document.getElementById('imgChoiceScan').addEventListener('click', ()=>{
+      overlay.remove();
+      if (typeof window.openExistingFileInScan === 'function'){
+        window.openExistingFileInScan(file);
+      } else {
+        showToast('스캔 도구를 아직 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', 'warning');
       }
     });
   }
@@ -805,7 +992,11 @@
         // [1], [2]처럼 대괄호+숫자로 참조 — 영문자를 아예 안 써서 한영전환·대소문자 신경 쓸 필요가 없음
         let expr = raw.slice(1).replace(/\[(\d+)\]/g, (m, n) => {
           return (n in results) ? String(results[n]) : '0';
-        }).replace(/%/g, '/100');
+        });
+        // 누진세(...)·장특공제율(...) 등 세무 계산 함수(tax-calc.js)를 먼저 실제 숫자로 치환한다.
+        // eval에 넘기기 전에 문자열 치환으로 끝내므로, 그 뒤 문자검증(아래 정규식)은 그대로 안전하게 통과시킬 수 있다.
+        if (typeof resolveCalcTaxFunctions === 'function') expr = resolveCalcTaxFunctions(expr);
+        expr = expr.replace(/%/g, '/100');
         if (/^[0-9+\-*/().\s]+$/.test(expr) && expr.trim()){
           try { val = Function('"use strict"; return (' + expr + ')')(); }
           catch(err){ val = NaN; }
@@ -1010,18 +1201,116 @@
 
   // ---- 계산기 템플릿 (자주 쓰는 세무 계산 패턴을 바로 불러오기) ----
   // formula가 숫자만 있는 건 "직접 입력하세요"용 자리표시 행, 실제 계산식(=[n]*...)이 있는 건 그대로 채움.
+  // 양도소득세·증여세·상속세는 누진세(...)·장특공제율(...) 등 tax-calc.js의 세무 함수를 써서
+  // 세율표·공제표를 자동으로 적용한다 — 사람이 세율·누진공제액을 직접 찾아 넣을 필요가 없다.
+  // 다만 관계(배우자/직계존속 등)·실제상속액처럼 사안마다 다른 값은 해당 행의 수식 안에 있는
+  // 괄호 안 값을 직접 고쳐서 써야 한다 (수식 예시를 그대로 남겨뒀으니 참고).
   const CALC_TEMPLATES = [
     {
-      name: '양도소득세 개산(기본)',
+      name: '양도소득세 개산(기본, 2년 이상 보유)',
       rows: [
         { label: '양도가액', formula: '' },
         { label: '취득가액', formula: '' },
         { label: '필요경비', formula: '' },
         { label: '양도차익', formula: '=[1]-[2]-[3]' },
-        { label: '장기보유특별공제(직접 계산해 입력)', formula: '' },
-        { label: '양도소득금액', formula: '=[4]-[5]' },
+        { label: '보유연수(만 단위, 직접 입력)', formula: '' },
+        { label: '장기보유특별공제율(일반)', formula: '=장특공제율([5])' },
+        { label: '장기보유특별공제액', formula: '=[4]*[6]' },
+        { label: '양도소득금액', formula: '=[4]-[7]' },
         { label: '기본공제', formula: '2500000' },
-        { label: '과세표준', formula: '=[6]-[7]' }
+        { label: '과세표준(0 미만이면 0)', formula: '=최댓값([8]-[9],0)' },
+        { label: '산출세액(기본세율)', formula: "=누진세([10],'양도')" },
+        { label: '지방소득세(10%)', formula: '=[11]*0.1' },
+        { label: '납부세액 합계', formula: '=[11]+[12]' }
+      ]
+    },
+    {
+      name: '양도소득세 개산(1세대1주택, 12억 초과분)',
+      rows: [
+        { label: '양도가액', formula: '' },
+        { label: '취득가액', formula: '' },
+        { label: '필요경비', formula: '' },
+        { label: '양도차익', formula: '=[1]-[2]-[3]' },
+        { label: '과세대상양도차익(12억 초과분 안분, 12억 이하면 전액 비과세이므로 이 템플릿 불필요)', formula: '=[4]*([1]-1200000000)/[1]' },
+        { label: '보유연수(만 단위, 직접 입력)', formula: '' },
+        { label: '거주연수(만 단위, 직접 입력)', formula: '' },
+        { label: '장기보유특별공제율(1세대1주택 특례)', formula: '=장특공제율1주택([6],[7])' },
+        { label: '장기보유특별공제액', formula: '=[5]*[8]' },
+        { label: '양도소득금액', formula: '=[5]-[9]' },
+        { label: '기본공제', formula: '2500000' },
+        { label: '과세표준(0 미만이면 0)', formula: '=최댓값([10]-[11],0)' },
+        { label: '산출세액(기본세율)', formula: "=누진세([12],'양도')" },
+        { label: '지방소득세(10%)', formula: '=[13]*0.1' },
+        { label: '납부세액 합계', formula: '=[13]+[14]' }
+      ]
+    },
+    {
+      name: '양도소득세 개산(다주택자 중과, 조정대상지역 2주택 이상)',
+      rows: [
+        { label: '양도가액', formula: '' },
+        { label: '취득가액', formula: '' },
+        { label: '필요경비', formula: '' },
+        { label: '양도차익(중과대상은 장기보유특별공제가 배제되므로 이 값이 곧 양도소득금액)', formula: '=[1]-[2]-[3]' },
+        { label: '기본공제', formula: '2500000' },
+        { label: '과세표준(0 미만이면 0)', formula: '=최댓값([4]-[5],0)' },
+        { label: '산출세액(기본세율)', formula: "=누진세([6],'양도')" },
+        { label: '중과가산율(조정대상지역 2주택이면 0.2, 3주택 이상이면 0.3 — 조정대상지역 지정·한시배제 여부는 신고 시점 기준으로 반드시 재확인)', formula: '0.2' },
+        { label: '중과가산액', formula: '=[6]*[8]' },
+        { label: '산출세액(중과 후)', formula: '=[7]+[9]' },
+        { label: '지방소득세(10%)', formula: '=[10]*0.1' },
+        { label: '납부세액 합계', formula: '=[10]+[11]' }
+      ]
+    },
+    {
+      name: '양도소득세 개산(비사업용토지, 기본세율+10%p)',
+      rows: [
+        { label: '양도가액', formula: '' },
+        { label: '취득가액', formula: '' },
+        { label: '필요경비', formula: '' },
+        { label: '양도차익', formula: '=[1]-[2]-[3]' },
+        { label: '보유연수(만 단위, 직접 입력)', formula: '' },
+        { label: '장기보유특별공제율(일반)', formula: '=장특공제율([5])' },
+        { label: '장기보유특별공제액', formula: '=[4]*[6]' },
+        { label: '양도소득금액', formula: '=[4]-[7]' },
+        { label: '기본공제', formula: '2500000' },
+        { label: '과세표준(0 미만이면 0)', formula: '=최댓값([8]-[9],0)' },
+        { label: '산출세액(기본세율)', formula: "=누진세([10],'양도')" },
+        { label: '비사업용토지 가산액(+10%p)', formula: '=[10]*0.1' },
+        { label: '산출세액(가산 후)', formula: '=[11]+[12]' },
+        { label: '지방소득세(10%)', formula: '=[13]*0.1' },
+        { label: '납부세액 합계', formula: '=[13]+[14]' }
+      ]
+    },
+    {
+      name: '양도소득세 개산(미등기양도자산, 70% 단일세율)',
+      rows: [
+        { label: '양도가액', formula: '' },
+        { label: '취득가액', formula: '' },
+        { label: '필요경비', formula: '' },
+        { label: '양도차익(장기보유특별공제·기본공제 전부 배제)', formula: '=[1]-[2]-[3]' },
+        { label: '산출세액(70% 단일세율, 0 미만이면 0)', formula: '=최댓값([4]*0.7,0)' },
+        { label: '지방소득세(10%)', formula: '=[5]*0.1' },
+        { label: '납부세액 합계', formula: '=[5]+[6]' }
+      ]
+    },
+    {
+      name: '양도소득세 개산(8년 자경농지 감면)',
+      rows: [
+        { label: '양도가액', formula: '' },
+        { label: '취득가액', formula: '' },
+        { label: '필요경비', formula: '' },
+        { label: '양도차익', formula: '=[1]-[2]-[3]' },
+        { label: '보유연수(만 단위, 직접 입력)', formula: '' },
+        { label: '장기보유특별공제율(일반)', formula: '=장특공제율([5])' },
+        { label: '장기보유특별공제액', formula: '=[4]*[6]' },
+        { label: '양도소득금액', formula: '=[4]-[7]' },
+        { label: '기본공제', formula: '2500000' },
+        { label: '과세표준(0 미만이면 0)', formula: '=최댓값([8]-[9],0)' },
+        { label: '산출세액(감면 전)', formula: "=누진세([10],'양도')" },
+        { label: '자경농지감면액(연 1억 한도 — 5년 합산 2억 한도는 다른 감면 이력과 별도로 직접 확인)', formula: '=자경농지감면([11])' },
+        { label: '산출세액(감면 후)', formula: '=[11]-[12]' },
+        { label: '지방소득세(10%)', formula: '=[13]*0.1' },
+        { label: '납부세액 합계', formula: '=[13]+[14]' }
       ]
     },
     {
@@ -1036,25 +1325,42 @@
       ]
     },
     {
-      name: '증여세 개산(누진공제 방식)',
+      name: '증여세 개산(자동계산, 부담부증여 포함)',
       rows: [
         { label: '증여재산가액', formula: '' },
-        { label: '증여재산공제(배우자6억/직계존비속5천만 등 사안별)', formula: '' },
-        { label: '과세표준', formula: '=[1]-[2]' },
-        { label: '세율(%, 구간별 확인 후 입력)', formula: '' },
-        { label: '누진공제액(구간표 확인 후 입력)', formula: '' },
-        { label: '산출세액', formula: '=[3]*([4]%)-[5]' }
+        { label: '인수채무액(부담부증여, 없으면 0 — 이 금액만큼은 증여자에게 별도로 양도소득세가 과세되니 위 양도소득세 템플릿으로 따로 계산할 것)', formula: '0' },
+        { label: '순수증여재산가액', formula: '=[1]-[2]' },
+        { label: '증여재산공제 (괄호 안 관계를 배우자/직계존속/직계비속/기타친족/기타 중 실제로 바꾸고, 미성년자면 뒤 숫자를 1로)', formula: '=증여공제(직계존속,0)' },
+        { label: '과세표준(0 미만이면 0)', formula: '=최댓값([3]-[4],0)' },
+        { label: '산출세액(할증 전)', formula: "=누진세([5],'증여상속')" },
+        { label: '세대생략할증률(해당 없으면 0, 손자녀 등 세대생략이면 0.3, 미성년자+20억 초과면 0.4)', formula: '0' },
+        { label: '산출세액(할증 후)', formula: '=[6]+[6]*[7]' },
+        { label: '기납부세액공제(10년 이내 동일인 기증여분에 이미 낸 세액, 없으면 0)', formula: '0' },
+        { label: '기납부세액공제 차감 후(0 미만이면 0)', formula: '=최댓값([8]-[9],0)' },
+        { label: '신고세액공제(3%)', formula: '=[10]*0.03' },
+        { label: '납부세액', formula: '=[10]-[11]' }
       ]
     },
     {
-      name: '상속세 개산(누진공제 방식)',
+      name: '상속세 개산(자동계산, 금융재산·동거주택·감정평가공제 포함)',
       rows: [
-        { label: '상속재산가액', formula: '' },
-        { label: '상속공제(일괄공제 5억 등 사안별 확인)', formula: '' },
-        { label: '과세표준', formula: '=[1]-[2]' },
-        { label: '세율(%, 구간별 확인 후 입력)', formula: '' },
-        { label: '누진공제액(구간표 확인 후 입력)', formula: '' },
-        { label: '산출세액', formula: '=[3]*([4]%)-[5]' }
+        { label: '상속세과세가액(총상속재산가액-공과금·장례비용·채무+10년내 사전증여 등 반영 후)', formula: '' },
+        { label: '인적공제 합계(자녀 5천만×인원 + 미성년 1천만×잔여연수 + 연로자 5천만×인원 + 장애인 1천만×잔여연수, 직접 계산해 입력)', formula: '' },
+        { label: '기초+인적공제 vs 일괄공제(5억) 중 큰 값', formula: '=일괄공제비교([2])' },
+        { label: '배우자공제 (괄호 안을 실제상속액,법정상속분으로 바꾸기 — 배우자가 없으면 이 행 전체를 0으로)', formula: '=배우자공제(0,0)' },
+        { label: '순금융재산가액(금융재산-금융채무, 없으면 0)', formula: '0' },
+        { label: '금융재산상속공제', formula: '=금융재산공제([5])' },
+        { label: '동거주택가액(10년 이상 동거·무주택 등 요건 충족 시만, 없으면 0)', formula: '0' },
+        { label: '동거주택상속공제(6억 한도)', formula: '=최소값([7],600000000)' },
+        { label: '감정평가수수료(부동산 감정평가 등, 없으면 0)', formula: '0' },
+        { label: '감정평가수수료공제(500만원 한도)', formula: '=최소값([9],5000000)' },
+        { label: '상속공제 합계', formula: '=[3]+[4]+[6]+[8]+[10]' },
+        { label: '과세표준(0 미만이면 0)', formula: '=최댓값([1]-[11],0)' },
+        { label: '산출세액', formula: "=누진세([12],'증여상속')" },
+        { label: '기납부증여세액공제(10년내 사전증여분에 이미 낸 증여세, 없으면 0)', formula: '0' },
+        { label: '기납부증여세액공제 차감 후(0 미만이면 0)', formula: '=최댓값([13]-[14],0)' },
+        { label: '신고세액공제(3%)', formula: '=[15]*0.03' },
+        { label: '납부세액', formula: '=[15]-[16]' }
       ]
     }
   ];
@@ -1063,13 +1369,21 @@
   const btnCalcTemplate = document.getElementById('btnCalcTemplate');
 
   function renderCalcTemplateMenu(){
-    calcTemplatePopup.innerHTML = '<div class="log-hint" style="padding:0 0 4px; font-size:11px;">기존 행 뒤에 이어서 추가됩니다. 세율·공제 구간은 사안별로 반드시 직접 확인해서 채워 넣으세요.</div>';
+    calcTemplatePopup.innerHTML = '<div class="log-hint" style="padding:0 0 4px; font-size:11px;">세율·공제는 자동 계산되지만, 관계·보유기간·실제상속액처럼 사안마다 다른 값은 해당 행의 수식을 직접 고쳐 넣어야 합니다. 다주택 중과·각종 감면 등은 포함되지 않으니 별도로 확인하세요.</div>';
     CALC_TEMPLATES.forEach(tpl=>{
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'tool-menu-item';
       btn.textContent = tpl.name;
       btn.addEventListener('click', ()=>{
+        // 이미 입력된 행이 있는 상태에서 다른 템플릿을 누르면 기존 행 뒤에 무한정 이어붙기만 해서
+        // 헷갈린다는 문제가 있었다 — 내용이 있으면 "지우고 새로 시작할지" 먼저 물어본다.
+        const hasContent = calcRows.some(r => (r.label && r.label.trim()) || (r.formula && r.formula.trim()));
+        if (hasContent){
+          if (confirm('기존 계산기 내용이 있습니다.\n확인 = 지우고 이 템플릿으로 새로 시작\n취소 = 기존 행 뒤에 이어붙이기')){
+            calcRows = [];
+          }
+        }
         const offset = calcRows.length;
         tpl.rows.forEach(r=>{
           // 템플릿 안의 [n] 참조는 "템플릿 자체 기준 n번째 행"이므로, 실제로 뒤에 이어붙일 때는

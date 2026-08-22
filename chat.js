@@ -92,33 +92,20 @@
     }
   });
 
-  loadCustomers();
+  // pwa.js가 "필기상담" 바로가기로 들어왔을 때 이 로딩이 끝날 때까지 기다렸다가 열 수 있도록,
+  // 완료 시점을 알 수 있는 프로미스를 전역에 걸어둔다.
+  window.__nxCustomersLoaded = loadCustomers();
 
 
-  // ---- 좁은 화면(PC/탭, grouped 단계)용 도구 그룹 팝업 — 도구1/도구2 2그룹 ----
-  const TOOL_GROUP_1 = [
-    { icon: '📊', label: '현황판', handler: openDashboardView }
-  ];
-  const TOOL_GROUP_2 = [
+  // ---- 업무도구 통합 팝업 — 예전엔 PC/탭(grouped)은 도구1/도구2 2그룹, 폰(compact)은 하단
+  // 고정바의 기록·분석·도구 3그룹으로 나뉘어 있었는데, 어차피 같은 기능들이라 하나로 합쳤다.
+  // (2026.08) 검색·휴지통은 여기 없다 — 탐색기 빈 공간 우클릭(길게 누르기) 메뉴로 옮겼다.
+  const WORK_TOOLS = [
+    { icon: '📊', label: '현황판', handler: openDashboardView },
     { icon: '📝', label: '경과지', handler: openLogView },
     { icon: '🧮', label: '계산기', handler: openCalcView },
+    { icon: '📐', label: '세액계산', handler: openTaxCalcView },
     { icon: '🕸', label: '관계도', handler: openDiagramView },
-    { icon: '📷', label: '스캔', handler: openScanModal },
-    { icon: '📊', label: '엑셀 열기', handler: () => window.openExcelViewer() }
-  ];
-
-  // ---- 폰(compact 단계) 전용 하단 도구 5그룹 — 기능이 비슷한 것끼리 2개씩 묶음 ----
-  // (2026.08) MOBILE_GROUP_FILES(검색·휴지통)는 없앴다 — 둘 다 탐색기 빈 공간
-  // 우클릭(길게 누르기) 메뉴로 옮겼다.
-  const MOBILE_GROUP_RECORDS = [
-    { icon: '📊', label: '현황판', handler: openDashboardView },
-    { icon: '📝', label: '경과지', handler: openLogView }
-  ];
-  const MOBILE_GROUP_ANALYSIS = [
-    { icon: '🧮', label: '계산기', handler: openCalcView },
-    { icon: '🕸', label: '관계도', handler: openDiagramView }
-  ];
-  const MOBILE_GROUP_CONFIG = [
     { icon: '📷', label: '스캔', handler: openScanModal },
     { icon: '📊', label: '엑셀 열기', handler: () => window.openExcelViewer() }
   ];
@@ -138,30 +125,18 @@
     });
   }
 
-  const toolGroup1Wrap = document.getElementById('toolGroup1Wrap');
-  const toolGroup2Wrap = document.getElementById('toolGroup2Wrap');
-  const btnToolGroup1 = document.getElementById('btnToolGroup1');
-  const btnToolGroup2 = document.getElementById('btnToolGroup2');
-  const toolGroup1Popup = document.getElementById('toolGroup1Popup');
-  const toolGroup2Popup = document.getElementById('toolGroup2Popup');
+  const btnWorkTools = document.getElementById('btnWorkTools');
+  const workToolsPopup = document.getElementById('workToolsPopup');
+  fillToolPopup(workToolsPopup, WORK_TOOLS);
 
-  const mgRecordsBtn = document.getElementById('btnMgRecords');
-  const mgAnalysisBtn = document.getElementById('btnMgAnalysis');
-  const mgConfigBtn = document.getElementById('btnMgConfig');
-  const mgRecordsPopup = document.getElementById('mgRecordsPopup');
-  const mgAnalysisPopup = document.getElementById('mgAnalysisPopup');
-  const mgConfigPopup = document.getElementById('mgConfigPopup');
-
-  fillToolPopup(toolGroup1Popup, TOOL_GROUP_1);
-  fillToolPopup(toolGroup2Popup, TOOL_GROUP_2);
-  fillToolPopup(mgRecordsPopup, MOBILE_GROUP_RECORDS);
-  fillToolPopup(mgAnalysisPopup, MOBILE_GROUP_ANALYSIS);
-  fillToolPopup(mgConfigPopup, MOBILE_GROUP_CONFIG);
+  // 모드 팝업(자동참조·웹서치·가져오기 체크박스 + 채팅기록지우기)은 체크박스 상태 반영을
+  // 이 아래(모드버튼 섹션)에서 따로 처리하지만, 열고 닫는 토글 자체는 다른 그룹 팝업들과
+  // 같은 방식(하나 열리면 나머지는 자동으로 닫힘)을 써야 하므로 여기 같이 등록한다.
+  const btnModeMenu = document.getElementById('btnModeMenu');
+  const modeMenuPopup = document.getElementById('modeMenuPopup');
 
   const ALL_GROUP_POPUPS = [
-    [toolGroup1Popup, btnToolGroup1], [toolGroup2Popup, btnToolGroup2],
-    [mgRecordsPopup, mgRecordsBtn], [mgAnalysisPopup, mgAnalysisBtn],
-    [mgConfigPopup, mgConfigBtn]
+    [workToolsPopup, btnWorkTools], [modeMenuPopup, btnModeMenu]
   ];
 
   function wireGroupToggle(btn, popup){
@@ -192,16 +167,10 @@
   (function setupTopbarResponsive(){
     const topbarEl = document.querySelector('.topbar');
     const bodyEl = document.body;
-    const cluster = document.getElementById('topbarActionCluster');
     // 플립폰 커버화면처럼 아주 작은 폰 판정 기준(가로 px). 실기기 실측 결과 커버화면 352px,
     // 펼친 상태 세로모드 360px로 확인되어(2026.07), 그 사이 값인 356으로 조정함.
     const COVER_MODE_MAX_WIDTH = 356;
     let wasCover = false; // 커버화면모드 여부가 "바뀔 때만" 이벤트를 쏘기 위한 이전 상태 기억
-    // max-height 트랜지션이 끝나는 순간에도 한 번 더 정확히 재서, setTimeout 타이밍이
-    // 살짝 어긋나는 경우(기기 성능 편차 등)까지 이중으로 보정한다.
-    cluster.addEventListener('transitionend', (e)=>{
-      if (e.propertyName === 'max-height') updateBottombarHeightVar();
-    });
 
     // 지금 stage를 candidateStage로 잠깐 바꿔서(화면엔 안 그려짐 — 아래 설명 참고) 그 상태로
     // 한 줄로 쭉 펼쳤을 때 실제로 몇 px가 필요한지(scrollWidth)를 재고 원래 상태로 되돌린다.
@@ -231,52 +200,51 @@
       return 'compact'; // 마지막 단계는 flex:1이 알아서 맞춰주므로 항상 채택
     }
 
-    // compact(폰) 단계에서, 상단 모드버튼 4개(탐색작업창·자동참조·웹서치·가져오기)에 글자
-    // 라벨을 붙일 여유가 있는지 실측한다 — 화면이 넓은 폰(가로모드 등)이면 라벨을 보여주고,
-    // 좁으면 아이콘만 남긴다. 고정폭 기준이 아니라 "customerSelect+이 4버튼이 실제로 한 줄에
-    // 들어가는지"를 매번 재서 판단하므로, 항상 지금 화면에 맞는 가장 넉넉한 크기가 나온다.
-    let modeButtonsLabeled = false;
-    function updateModeButtonsLabeled(){
-      if (currentStage !== 'compact'){
-        if (modeButtonsLabeled){ modeButtonsLabeled = false; bodyEl.classList.remove('mode-buttons-labeled'); }
-        return;
-      }
-      const prevBodyClass = bodyEl.className;
-      let required;
-      try {
-        bodyEl.className = prevBodyClass.includes('mode-buttons-labeled')
-          ? prevBodyClass
-          : prevBodyClass + ' mode-buttons-labeled';
-        topbarEl.classList.add('measuring');
-        required = topbarEl.scrollWidth;
-      } finally {
-        topbarEl.classList.remove('measuring');
-        bodyEl.className = prevBodyClass; // 예외가 나든 안 나든 반드시 원상복구
-      }
-
-      const fits = required <= topbarEl.clientWidth - 4;
-      if (fits !== modeButtonsLabeled){
-        modeButtonsLabeled = fits;
-        bodyEl.classList.toggle('mode-buttons-labeled', fits);
-      }
-    }
-
-    // compact일 때 #topbarActionCluster가 화면 아래 고정으로 떠 있는 만큼, 그 높이를 실측해서
-    // .workspace의 padding-bottom으로 넣어준다. 버퍼를 아예 없앴더니(0) 이번엔 너무 붙어
-    // 보인다는 피드백이 있어서, 살짝만(4px) 여유를 둔다 — 이전(8px)보다는 좁고 0보다는 넓게.
-    function updateBottombarHeightVar(){
-      if (bodyEl.classList.contains('stage-compact') && !bodyEl.classList.contains('bottombar-hidden')){
-        document.documentElement.style.setProperty('--bottombar-h', (cluster.getBoundingClientRect().height + 4) + 'px');
-      } else {
-        document.documentElement.style.setProperty('--bottombar-h', '0px');
-      }
-    }
-
     // 상단바 실제 높이도 실측해서 --topbar-h로 넣어준다 — "띄우기" 모드의 탐색기 패널처럼
     // position:fixed로 뜨는 것들이 막연히 "화면의 6%" 같은 값 대신 실제 상단바 높이만큼
     // 정확히 비켜서 그려지도록 하기 위함 (안 그러면 버튼이 상단바 뒤에 가려질 수 있음).
     function updateTopbarHeightVar(){
       document.documentElement.style.setProperty('--topbar-h', topbarEl.getBoundingClientRect().height + 'px');
+    }
+
+    // [2026.08] 탐색창·참조·도구·메모 4버튼(grouped·compact 공용)의 라벨(버튼명) 표시 여부 —
+    // "grouped면 항상 보이고 compact면 항상 숨김"으로 stage에 고정해뒀더니, 화면이 넓은데도
+    // (측정상 grouped 문턱을 못 넘어 compact로 판정된 경우) 라벨이 안 보이는 문제가 있었다.
+    // 그래서 stage와 별개로 "지금 이 4버튼이 라벨을 달고도 한 줄에 들어가는지"를 직접 재서
+    // body에 topbar-buttons-labeled를 붙였다 뗐다 한다 — 화면에 여유가 있으면 어느 stage든 보임.
+    // (다른 stage 판정처럼 topbarEl.scrollWidth로 재지 않는다 — scrollWidth는 내용이 컨테이너보다
+    // 작을 땐 그냥 clientWidth로 눌러앉아버려서 "얼마나 남는지"를 알 수 없다. 대신 이 5개 요소의
+    // 실제 폭을 직접 더해서 clientWidth와 비교한다.)
+    const LABEL_ROW_IDS = ['customerSelect', 'workspaceModeWrap', 'modeMenuWrap', 'workToolsWrap', 'memoWrap'];
+    let topbarButtonsLabeled = false;
+    function updateTopbarButtonsLabeled(){
+      if (currentStage === 'full'){
+        // full은 이 메커니즘과 무관하게 항상 라벨이 보이는 stage라 여기선 끄기만 한다.
+        if (topbarButtonsLabeled){ topbarButtonsLabeled = false; bodyEl.classList.remove('topbar-buttons-labeled'); }
+        return;
+      }
+      const prevBodyClass = bodyEl.className;
+      let required;
+      try {
+        bodyEl.className = prevBodyClass.includes('topbar-buttons-labeled')
+          ? prevBodyClass
+          : prevBodyClass + ' topbar-buttons-labeled';
+        topbarEl.classList.add('measuring'); // flex:0 0 max-content로 임시 고정되어(CSS 참고) 진짜 필요한 폭이 잡힘
+        let sum = 0;
+        LABEL_ROW_IDS.forEach(id=>{
+          const el = document.getElementById(id);
+          if (el) sum += el.getBoundingClientRect().width;
+        });
+        required = sum + (LABEL_ROW_IDS.length - 1) * 4; // 요소 사이 간격(column-gap:4px)까지 포함
+      } finally {
+        topbarEl.classList.remove('measuring');
+        bodyEl.className = prevBodyClass; // 예외가 나든 안 나든 반드시 원상복구
+      }
+      const fits = required <= topbarEl.clientWidth - 4;
+      if (fits !== topbarButtonsLabeled){
+        topbarButtonsLabeled = fits;
+        bodyEl.classList.toggle('topbar-buttons-labeled', fits);
+      }
     }
 
     let currentStage = null;
@@ -286,8 +254,7 @@
         currentStage = stage;
         bodyEl.className = bodyEl.className.replace(/\bstage-\S+/g, '').trim() + ' stage-' + stage;
       }
-      updateModeButtonsLabeled();
-      updateBottombarHeightVar();
+      updateTopbarButtonsLabeled();
       updateTopbarHeightVar();
 
       // 커버화면모드(아주 작은 폰) 판정 — compact 단계 안에서, 그보다도 더 좁을 때만.
@@ -401,6 +368,10 @@
   document.addEventListener('click', (e)=>{
     if (!selectedItems.size) return;
     if (e.target.closest('#selectionInline')) return;
+    // [2026.08] 빈 공간 드래그로 방금 여러 항목을 선택한 직후에는, 마우스를 뗄 때 브라우저가
+    // 자동으로 쏘는 click 이벤트가 이 리스너를 타고 방금 만든 선택을 바로 지워버린다 —
+    // 드래그선택 쪽에서 이 플래그를 한 번만 세워두고 여기서 소비한다.
+    if (window.__nxSkipNextOutsideClearClick){ window.__nxSkipNextOutsideClearClick = false; return; }
     selectedItems.clear();
     refreshSelectionUi();
   });
@@ -609,11 +580,11 @@
   // 공유 — 퀵쉐어(윈도우/안드로이드 OS 기능)는 웹사이트가 직접 지정할 수 없어서,
   // 대신 브라우저 표준 "공유하기"(Web Share API)를 띄운다. OS/기기가 지원하면 그 공유창 안에
   // 퀵쉐어·에어드롭 등이 옵션으로 나타날 수 있음 (지원 여부는 기기·브라우저에 따라 다름).
-  btnShareSelected.addEventListener('click', async ()=>{
-    const items = Array.from(selectedItems.values());
-    if (items.length !== 1 || items[0].type === 'folder') return;
-    const item = items[0];
-
+  // [2026.08] 선택바 "공유" 버튼뿐 아니라 탐색기 행 Alt+클릭(체크 없이 바로 공유)에서도 이
+  // 함수를 그대로 재사용한다 — explorer.js가 이 파일보다 먼저 로드되지만, 실제 호출은 사용자가
+  // Alt+클릭하는 시점(스크립트 로드가 전부 끝난 뒤)이라 문제없다.
+  async function shareSingleItem_(item){
+    if (!item || item.type === 'folder') return;
     try{
       const data = await callGas('readFile', { fileId: item.id });
       if (data.error){ showToast('공유용으로 파일을 불러오지 못했습니다: ' + data.error, 'error'); return; }
@@ -646,6 +617,11 @@
         showToast('공유 중 오류: ' + (err && err.message ? err.message : err), 'error');
       }
     }
+  }
+  btnShareSelected.addEventListener('click', ()=>{
+    const items = Array.from(selectedItems.values());
+    if (items.length !== 1 || items[0].type === 'folder') return;
+    shareSingleItem_(items[0]);
   });
 
   // ============================================================
@@ -751,6 +727,17 @@
   }
 
   document.getElementById('btnOpenSettings').addEventListener('click', openSettingsModal);
+  // [2026.08] Alt+S 단축키 — 마우스로 입력창 버튼줄까지 내려가지 않아도 바로 열 수 있게.
+  // 이미 열려있으면 다시 눌렀을 때 닫히게(저장 포함) 해서 토글처럼 쓸 수 있다.
+  document.addEventListener('keydown', (e)=>{
+    if (!e.altKey || e.key.toLowerCase() !== 's') return;
+    e.preventDefault();
+    if (settingsOverlay.style.display === 'none' || !settingsOverlay.style.display){
+      openSettingsModal();
+    } else {
+      saveSettingsAndClose();
+    }
+  });
   document.getElementById('btnCloseSettings').addEventListener('click', saveSettingsAndClose);
   settingsOverlay.addEventListener('click', (e)=>{
     if (e.target === settingsOverlay) saveSettingsAndClose(); // 바깥(어두운 영역) 클릭 시에도 저장 후 닫기
@@ -763,32 +750,30 @@
   });
   document.getElementById('btnSaveSettings').addEventListener('click', saveSettingsAndClose);
 
-  // ---- 폰 상단 모드버튼 4개(탐색작업창은 위에서 별도 처리 / 자동참조·웹서치·웹페이지가져오기는
-  // 여기서) — 설정모달을 안 열어도 바로 켜고 끌 수 있고, 켜져 있으면 금색으로 표시된다. ----
-  const btnModeAutoRef = document.getElementById('btnModeAutoRef');
-  const btnModeWebSearch = document.getElementById('btnModeWebSearch');
-  const btnModeWebFetch = document.getElementById('btnModeWebFetch');
+  // ---- 폰 상단 모드메뉴(탐색작업창은 위에서 별도 처리 / 자동참조·웹서치·웹페이지가져오기는
+  // 여기서) — [2026.08] 버튼 3개를 체크박스 팝업 하나로 합쳤다. 설정모달을 안 열어도 바로
+  // 켜고 끌 수 있는 건 그대로고, 체크박스라 하나 바꿔도 팝업이 안 닫혀서 연달아 여러 개를
+  // 토글할 수 있다(예전 버튼 방식은 누르는 즉시 바로 반영되는 대신 각자 따로 눌러야 했음). ----
+  const modeChkAutoRef = document.getElementById('modeChkAutoRef');
+  const modeChkWebSearch = document.getElementById('modeChkWebSearch');
+  const modeChkWebFetch = document.getElementById('modeChkWebFetch');
   function refreshModeButtonStates(){
-    btnModeAutoRef.classList.toggle('is-on', autoRefMode);
-    // 웹서치는 기본이 "켜짐"이라 다른 버튼과 반대로 표시한다: 켜져 있을 땐 특별한 색 없이
-    // 다른 버튼들과 똑같이 두고, 꺼졌을 때만 회색으로 흐리게 표시한다.
-    btnModeWebSearch.classList.toggle('is-off', aiSettings.enableWebSearch === false);
-    btnModeWebFetch.classList.toggle('is-on', !!aiSettings.enableWebFetch);
+    modeChkAutoRef.checked = autoRefMode;
+    // 웹서치는 기본이 "켜짐"이라, enableWebSearch가 명시적으로 false일 때만 체크 해제로 표시한다.
+    modeChkWebSearch.checked = aiSettings.enableWebSearch !== false;
+    modeChkWebFetch.checked = !!aiSettings.enableWebFetch;
   }
-  btnModeAutoRef.addEventListener('click', ()=>{
-    autoRefMode = !autoRefMode;
+  modeChkAutoRef.addEventListener('change', ()=>{
+    autoRefMode = modeChkAutoRef.checked;
     localStorage.setItem(AUTOREF_KEY, autoRefMode ? '1' : '0');
-    refreshModeButtonStates();
   });
-  btnModeWebSearch.addEventListener('click', ()=>{
-    aiSettings.enableWebSearch = !aiSettings.enableWebSearch;
+  modeChkWebSearch.addEventListener('change', ()=>{
+    aiSettings.enableWebSearch = modeChkWebSearch.checked;
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings));
-    refreshModeButtonStates();
   });
-  btnModeWebFetch.addEventListener('click', ()=>{
-    aiSettings.enableWebFetch = !aiSettings.enableWebFetch;
+  modeChkWebFetch.addEventListener('change', ()=>{
+    aiSettings.enableWebFetch = modeChkWebFetch.checked;
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings));
-    refreshModeButtonStates();
   });
   refreshModeButtonStates();
 
@@ -804,12 +789,11 @@
   };
   const EFFORT_LABELS = { low: '빠름', medium: '보통', high: '신중' };
   const btnOpenSettingsEl = document.getElementById('btnOpenSettings');
-  // 버튼 글자는 항상 "설정"으로 고정(폭이 늘어나 상단바가 줄바꿈되던 문제 방지) —
-  // 대신 지금 모델·강도는 마우스를 올렸을 때 보이는 title(툴팁)로 옮겨서 정보는 유지한다.
+  // 버튼은 ⚙ 아이콘 하나뿐이라, 지금 모델·강도는 마우스를 올렸을 때 보이는 title(툴팁)로 알려준다.
   function updateChatModelBadge(){
     const modelName = MODEL_LABELS[aiSettings.model] || aiSettings.model;
     const effortName = EFFORT_LABELS[aiSettings.effort] || aiSettings.effort;
-    btnOpenSettingsEl.title = 'AI 설정 · 현재: ' + modelName + ' · ' + effortName;
+    btnOpenSettingsEl.title = 'AI 설정 (Alt+S) · 현재: ' + modelName + ' · ' + effortName;
   }
   updateChatModelBadge();
 
@@ -1003,6 +987,16 @@
     });
   }
 
+  // 긴 문장을 썼다가 그냥 취소하고 싶을 때 드래그로 전체선택할 필요 없이 한 번에 비우는 버튼.
+  const btnClearInput = document.getElementById('btnClearInput');
+  if (btnClearInput){
+    btnClearInput.addEventListener('click', ()=>{
+      if (!chatInputEl.value) return;
+      chatInputEl.value = '';
+      chatInputEl.focus();
+    });
+  }
+
   // ============================================================
   // Gem — 채팅창에서 지금 검토 중인 쟁점을 제미니 웹(gemini.google.com)에게 그대로 물어보고
   // 의견을 받아온다. NX(넥스)의 답변과는 별개로 참고용으로만 쓰기 위해, 답변은 보라색
@@ -1097,6 +1091,14 @@
     return nxExtConnected && !!nxExtPort;
   }
 
+  // 안드로이드는 브라우저가 크롬 확장프로그램 자체를 지원하지 않아 아래의 확장프로그램
+  // 자동화 경로(NX_GEM_ASK)를 쓸 수 없다. 그 대신 안드로이드 공유 시트(navigator.share)로
+  // 질문을 Gemini 앱에 그대로 넘기고, 답변은 사용자가 Gemini 앱에서 "공유" 버튼으로
+  // NX에 다시 보내면 기존 공유받기 경로(manifest.json share_target → insertCapturedText)가
+  // 입력창에 자동으로 넣어준다. 완전 자동은 아니고 공유 버튼을 한 번씩 눌러줘야 하는
+  // 반자동 방식이지만, 안드로이드에는 확장프로그램을 쓸 방법 자체가 없어 이게 최선이다.
+  const isAndroid_ = /Android/i.test(navigator.userAgent || '');
+
   async function askGem(rawQuestion, opts){
     opts = opts || {};
     if (!rawQuestion){ showToast('제미니에게 물어볼 내용이 없습니다.', 'warning'); return; }
@@ -1124,21 +1126,35 @@
       delete pendingGemAnswerPrefix[requestId];
     }
 
-    const connected = await ensureExtConnected_();
-    if (!connected){
-      fail('외부조회 커넥터 확장프로그램과 연결하지 못했습니다. 🔌 버튼으로 다시 연결해보세요.');
-      return;
-    }
-
-    pendingBubble.textContent = '🔮 Gem에게 물어보는 중… (제미니 탭에서 답변이 끝날 때까지 잠시 기다려주세요)';
     const contextText = buildRecentContextText_(turnCount);
     const fullQuestion = contextText + rawQuestion;
 
-    try{
-      nxExtPort.postMessage({ type: 'NX_GEM_ASK', requestId: requestId, question: fullQuestion });
-    }catch(err){
-      fail('확장프로그램과 통신하지 못했습니다.');
+    const connected = await ensureExtConnected_();
+    if (connected){
+      pendingBubble.textContent = '🔮 Gem에게 물어보는 중… (제미니 탭에서 답변이 끝날 때까지 잠시 기다려주세요)';
+      try{
+        nxExtPort.postMessage({ type: 'NX_GEM_ASK', requestId: requestId, question: fullQuestion });
+      }catch(err){
+        fail('확장프로그램과 통신하지 못했습니다.');
+      }
+      return;
     }
+
+    if (isAndroid_ && navigator.share){
+      pendingBubble.classList.remove('gem-pending');
+      pendingBubble.classList.add('gem');
+      pendingBubble.textContent = answerPrefix + ': 공유 시트로 질문을 전달했습니다. Gemini 앱에서 답변을 받은 뒤, 그 답변을 다시 "공유"로 NX에 보내면 입력창에 자동으로 들어옵니다.';
+      delete pendingGemBubbles[requestId];
+      delete pendingGemAnswerPrefix[requestId];
+      try{
+        await navigator.share({ title: 'Gem에게 질문', text: fullQuestion });
+      }catch(err){
+        // 사용자가 공유 시트를 취소한 경우(AbortError)는 정상적인 취소이니 별도 처리하지 않는다.
+      }
+      return;
+    }
+
+    fail('외부조회 커넥터 확장프로그램과 연결하지 못했습니다. 🔌 버튼으로 다시 연결해보세요.');
   }
 
   if (btnAskGem){
@@ -1253,7 +1269,10 @@
           hint.className = 'chat-history-hint';
           hint.textContent = '— 이 사건의 지난 대화를 이어서 보여드립니다 —';
           chatBody.appendChild(hint);
-          loaded.forEach(m => appendBubble(m.role === 'assistant' ? 'assistant' : 'user', stripSignalMarkersForDisplay(m.content)));
+          loaded.forEach(m => {
+            const bubbleEl = appendBubble(m.role === 'assistant' ? 'assistant' : 'user', stripSignalMarkersForDisplay(m.content));
+            bubbleEl._nxMsgRef = m; // 지난 대화를 다시 불러온 말풍선도 복사·재생성 등 메뉴가 똑같이 동작하도록
+          });
         }
       }
     }catch(err){
@@ -1284,7 +1303,10 @@
     }
     showToast('새 대화를 시작합니다.', 'success');
   }
-  document.getElementById('btnNewChat').addEventListener('click', startNewConversation);
+  document.getElementById('btnNewChat').addEventListener('click', ()=>{
+    startNewConversation();
+    document.getElementById('modeMenuPopup').classList.remove('show'); // [2026.08] 모드 팝업 안으로 옮겨서, 눌렀으면 팝업도 같이 닫아준다
+  });
 
   function renderAttachBar(){
     attachBar.innerHTML = '';
@@ -1810,7 +1832,7 @@
       ? ' ' + refMediaForThisMessage.map(m => (m.block.type === 'document' ? '📕' : '🖼️') + m.name).join(', ')
       : '';
 
-    appendBubble('user', text + attachNote + captureNote + textAttachNote + refMediaNote);
+    const userBubbleEl = appendBubble('user', text + attachNote + captureNote + textAttachNote + refMediaNote);
     chatInputEl.value = '';
     nxCaptureCounter = 0; // 이번 메시지를 보냈으니, 다음 캡처는 다시 1번부터
     chatInputEl.disabled = true;
@@ -1855,7 +1877,9 @@
 
     // 대화 기록(chatMessages)에는 가벼운 텍스트만 남긴다 — 이미지를 기록에 박아두면
     // 다음 턴부터 대화 전체를 다시 보낼 때마다 그 이미지까지 매번 반복 전송되어 낭비가 누적된다.
-    chatMessages.push({ role: 'user', content: text });
+    const userMsgObj = { role: 'user', content: text };
+    chatMessages.push(userMsgObj);
+    userBubbleEl._nxMsgRef = userMsgObj; // 말풍선 클릭/우클릭 메뉴(복사·수정재전송·삭제 등)가 이 참조로 배열 위치를 찾는다
 
     // 실제 API 요청에는(이번 한 턴에 한해서만) 이미지/문서 블록을 살짝 끼워 보낸다.
     const requestMessages = chatMessages.slice();
@@ -1900,7 +1924,9 @@
         chatMessages.pop(); // 답을 못 받았으니 방금 push한 사용자 메시지도 취소된 걸로 취급(짝 없는 질문이 대화기록에 남지 않게)
       } else {
         renderAssistantReply(thinkingBubble, data.reply || '(빈 응답)', data.clientActions, editTargetFileSnapshot);
-        chatMessages.push({ role: 'assistant', content: data.reply || '' });
+        const aiMsgObj = { role: 'assistant', content: data.reply || '' };
+        chatMessages.push(aiMsgObj);
+        thinkingBubble._nxMsgRef = aiMsgObj;
         scheduleChatHistorySave();
         if (isVoiceTurn) speakReply(data.reply || '');
       }
@@ -1933,6 +1959,171 @@
       }
     }
   }
+
+  // ============================================================
+  // 채팅 말풍선 좌/우클릭 — [2026.08] 지금까지 말풍선엔 마우스 동작이 하나도 없어서
+  // 복사하려면 드래그로 선택한 뒤 Ctrl+C 해야 했다. 좌클릭은 가장 자주 쓸 만한 동작 하나
+  // (AI 답변=복사, 내 메시지=입력창에 다시 채우기)를 즉시 실행하고, 우클릭은 그 외 메뉴
+  // (재생성·삭제·되돌리기·메모저장)를 모은다. 각 말풍선에는 그 메시지가 가리키는
+  // chatMessages 배열의 실제 객체를 _nxMsgRef로 걸어둔다(인덱스가 아니라 객체 참조라, 중간에
+  // 다른 메시지를 지워도 위치가 안 꼬인다 — 필요할 때 chatMessages.indexOf(msgRef)로 찾는다).
+  // ============================================================
+
+  function copyMessageText_(msgRef){
+    if (!msgRef || !msgRef.content) return;
+    navigator.clipboard.writeText(msgRef.content)
+      .then(()=> showToast('메시지를 복사했습니다.', 'success'))
+      .catch(()=> showToast('복사에 실패했습니다(브라우저 권한을 확인해주세요).', 'error'));
+  }
+
+  function refillInputForEdit_(msgRef){
+    if (!msgRef) return;
+    chatInputEl.value = msgRef.content;
+    chatInputEl.focus();
+    chatInputEl.selectionStart = chatInputEl.selectionEnd = chatInputEl.value.length;
+    showToast('입력창에 불러왔습니다 — 수정한 뒤 다시 보내세요.', 'info');
+  }
+
+  // 이 메시지 하나만 대화기록에서 지운다(화면·chatMessages·저장 파일 전부 반영).
+  function deleteSingleMessage_(bubbleEl, msgRef){
+    if (!confirm('이 메시지를 대화기록에서 삭제할까요? 되돌릴 수 없습니다.')) return;
+    const idx = chatMessages.indexOf(msgRef);
+    if (idx !== -1) chatMessages.splice(idx, 1);
+    bubbleEl.remove();
+    scheduleChatHistorySave();
+  }
+
+  // 이 메시지부터(포함) 그 뒤에 오는 모든 메시지를 지운다 — 대화를 이 지점 이전으로 되돌림.
+  function revertFrom_(bubbleEl, msgRef){
+    if (!confirm('이 메시지부터 이후 대화가 전부 사라집니다. 계속할까요?')) return;
+    const idx = chatMessages.indexOf(msgRef);
+    if (idx !== -1) chatMessages.length = idx;
+    let sib = bubbleEl;
+    while (sib){ const next = sib.nextSibling; sib.remove(); sib = next; }
+    scheduleChatHistorySave();
+    showToast('이 지점으로 대화를 되돌렸습니다.', 'success');
+  }
+
+  function saveMsgAsMemo_(msgRef){
+    if (!msgRef || typeof window.openMemoSaveDialog !== 'function') return;
+    window.openMemoSaveDialog(msgRef.content, null);
+  }
+
+  // AI 답변 하나를 다시 만든다 — 그 답변(과 그 뒤 대화)을 지우고, 그 앞까지의 대화 기록으로
+  // 새로 요청한다. sendChatMessage와 요청 로직이 겹치지만, sendChatMessage는 "지금 입력창에
+  // 새로 타이핑한 메시지"를 위한 함수라 여기서는 작게 따로 구성했다 — 캡처·첨부처럼 그
+  // 턴에서만 한 번 실려가던 것들은 애초에 chatMessages에 안 남아있어서 재생성 시 다시
+  // 붙이지 못한다(가벼운 한계로 감수 — 텍스트 맥락은 그대로 유지된다).
+  async function regenerateFrom_(bubbleEl, msgRef){
+    if (!msgRef || msgRef.role !== 'assistant') return;
+    if (!confirm('이 답변을 다시 만들까요? 이 답변 이후의 대화는 모두 사라집니다.')) return;
+    const idx = chatMessages.indexOf(msgRef);
+    if (idx === -1) return;
+    chatMessages.length = idx;
+    let sib = bubbleEl;
+    while (sib){ const next = sib.nextSibling; sib.remove(); sib = next; }
+
+    const thinkingBubble = appendBubble('assistant', '생각 중…');
+    try{
+      const liveContent = await getEditorLiveContent();
+      const openFileCtx = currentOpenFile
+        ? Object.assign({}, currentOpenFile, (liveContent !== null ? { liveContent } : {}))
+        : null;
+      const editTargetFileSnapshot = (isReportWriterOpen && currentOpenFile) ? Object.assign({}, currentOpenFile) : null;
+      const openDiagramCtx = (typeof diagramView !== 'undefined' && diagramView.style.display !== 'none')
+        ? { liveContent: diagramInput.value } : null;
+
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({
+          messages: chatMessages.slice(),
+          context: {
+            currentPath: explorerPath,
+            openFile: openFileCtx,
+            openDiagram: openDiagramCtx,
+            attachedItems: [],
+            attachedTexts: [],
+            voiceTurn: false
+          },
+          autoRef: autoRefMode
+        }, buildAiSettingsPayload(false)))
+      });
+      const data = await res.json();
+      if (data.error){
+        thinkingBubble.textContent = '오류: ' + data.error;
+        return;
+      }
+      renderAssistantReply(thinkingBubble, data.reply || '(빈 응답)', data.clientActions, editTargetFileSnapshot);
+      const newMsgObj = { role: 'assistant', content: data.reply || '' };
+      chatMessages.push(newMsgObj);
+      thinkingBubble._nxMsgRef = newMsgObj;
+      scheduleChatHistorySave();
+    }catch(err){
+      thinkingBubble.textContent = '네트워크 오류: ' + (err && err.message ? err.message : err);
+    }
+  }
+
+  chatBody.addEventListener('click', (e)=>{
+    const bubbleEl = e.target.closest('.msg');
+    if (!bubbleEl || !bubbleEl._nxMsgRef) return;
+    if (e.target.closest('button, a, input, textarea')) return; // 편집기 적용 버튼 등은 그 버튼 동작이 우선
+    const sel = window.getSelection();
+    if (sel && sel.toString().length > 0) return; // 드래그로 텍스트를 선택하던 중이면 클릭 동작을 건너뜀
+    const msgRef = bubbleEl._nxMsgRef;
+    if (msgRef.role === 'assistant') copyMessageText_(msgRef);
+    else refillInputForEdit_(msgRef);
+  });
+
+  (function setupChatMessageContextMenu_(){
+    let menuEl = null;
+    function closeMenu(){
+      if (menuEl){ menuEl.remove(); menuEl = null; }
+      document.removeEventListener('click', closeMenu);
+      document.removeEventListener('scroll', closeMenu, true);
+    }
+    function showMenuAt_(x, y, items){
+      closeMenu();
+      menuEl = document.createElement('div');
+      menuEl.style.cssText = 'position:fixed; z-index:5000; background:var(--panel); color:var(--ink);'
+        + 'border:1px solid var(--line); border-radius:6px; box-shadow:0 4px 16px rgba(0,0,0,0.28);'
+        + 'padding:4px; min-width:170px; font-size:13.5px; font-family:inherit;';
+      items.forEach(it=>{
+        const row = document.createElement('div');
+        row.textContent = it.label;
+        row.style.cssText = 'padding:8px 12px; border-radius:4px; cursor:pointer; white-space:nowrap; color:var(--ink);';
+        row.addEventListener('mouseenter', ()=> row.style.background = 'var(--bg)');
+        row.addEventListener('mouseleave', ()=> row.style.background = '');
+        row.addEventListener('click', ()=>{ closeMenu(); it.action(); });
+        menuEl.appendChild(row);
+      });
+      document.body.appendChild(menuEl);
+      const menuW = menuEl.offsetWidth, menuH = menuEl.offsetHeight;
+      menuEl.style.left = Math.min(x, window.innerWidth - menuW - 8) + 'px';
+      menuEl.style.top = Math.min(y, window.innerHeight - menuH - 8) + 'px';
+      setTimeout(()=>{
+        document.addEventListener('click', closeMenu);
+        document.addEventListener('scroll', closeMenu, true);
+      }, 0);
+    }
+
+    chatBody.addEventListener('contextmenu', (e)=>{
+      const bubbleEl = e.target.closest('.msg');
+      if (!bubbleEl || !bubbleEl._nxMsgRef) return;
+      e.preventDefault();
+      const msgRef = bubbleEl._nxMsgRef;
+      const items = [{ label: '📋 복사', action: ()=> copyMessageText_(msgRef) }];
+      if (msgRef.role === 'assistant'){
+        items.push({ label: '🔄 이 답변 다시 만들기', action: ()=> regenerateFrom_(bubbleEl, msgRef) });
+        items.push({ label: '📝 메모로 저장', action: ()=> saveMsgAsMemo_(msgRef) });
+      } else {
+        items.push({ label: '✏️ 수정 후 재전송', action: ()=> refillInputForEdit_(msgRef) });
+      }
+      items.push({ label: '🗑 이 메시지만 삭제', action: ()=> deleteSingleMessage_(bubbleEl, msgRef) });
+      items.push({ label: '⏪ 이 지점부터 대화 되돌리기', action: ()=> revertFrom_(bubbleEl, msgRef) });
+      showMenuAt_(e.clientX, e.clientY, items);
+    });
+  })();
 
   btnChatSend.addEventListener('click', ()=>{
     if (currentChatAbortController){

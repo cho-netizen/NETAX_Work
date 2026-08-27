@@ -2726,6 +2726,14 @@ function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
 
+    // [2026.08] 이 웹앱 배포가 "모든 사용자"(로그인 불필요) 접근으로 되어 있어서, URL만 알면
+    // 누구나 파일 조회/업로드/삭제 등을 호출할 수 있는 상태였다. 프론트엔드(config.js)가 매 요청에
+    // 같이 실어 보내는 비밀값과 스크립트 속성 API_SECRET을 대조해서, 값이 없거나 틀리면 거부한다.
+    const expectedKey = PropertiesService.getScriptProperties().getProperty('API_SECRET');
+    if (!expectedKey || body._key !== expectedKey) {
+      return jsonResponse({ error: '인증 실패' });
+    }
+
     if (body.action === 'listFolder') {
       return jsonResponse(handleListFolder(body));
     }

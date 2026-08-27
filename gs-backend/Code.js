@@ -2734,6 +2734,19 @@ function doPost(e) {
       return jsonResponse({ error: '인증 실패' });
     }
 
+    // [2026.08] booking 모듈 — 원래 NETAX_Card 프로젝트에 있던 상담예약 기능(netax.kr 랜딩페이지가
+    // 실제 신청 접수처, Admin이 승인·관리). card.netax.kr(명함 페이지)과는 무관해서 booking_ 접두사로
+    // 분류. SMS는 이 프로젝트에 이미 있는 sendSolapiSms_/스크립트 속성을 그대로 재사용(계정 동일 확인됨).
+    if (body.action === 'apply') {
+      return jsonResponse(booking_createApplication(body));
+    }
+    if (body.action === 'approve') {
+      return jsonResponse(booking_approveApplication(body));
+    }
+    if (body.action === 'reject') {
+      return jsonResponse(booking_rejectApplication(body));
+    }
+
     if (body.action === 'listFolder') {
       return jsonResponse(handleListFolder(body));
     }
@@ -13277,9 +13290,240 @@ function installNightlySystemAuditTrigger() {
 }
 
 function doGet(e) {
+  // [2026.08] booking 모듈의 GET 액션(예약가능시간 조회, 신청목록 조회) — netax.kr 랜딩페이지와
+  // Admin이 쿼리스트링으로 호출한다(POST body가 아니라 e.parameter).
+  const action = e && e.parameter && e.parameter.action;
+  if (action === 'availability') {
+    return booking_getAvailability(e.parameter.date);
+  }
+  if (action === 'getBookings') {
+    return booking_getBookings();
+  }
   return ContentService
     .createTextOutput(JSON.stringify({ status: 'ok', message: 'NX Assistant 프록시가 정상 동작 중입니다.' }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// =========================================================
+// booking 모듈 — 원래 NETAX_Card 프로젝트의 상담예약 기능(2026.08 이관)
+// =========================================================
+const BOOKING_CALENDAR_ID = 'primary';
+const BOOKING_CONSULT_DURATION_MIN = 60;
+const BOOKING_BUSINESS_HOURS = { start: 9, end: 18 };
+const BOOKING_SHEET_ID = '1HMMKMd0bp7kjK7Z8oSMJy2TSXFKB0EUC1XCIjSsfrmQ';
+const BOOKING_OWNER_PHONE = '01050419639';
+const BOOKING_COLOR_PENDING = '11';    // 신청 대기 (토마토, 붉은 계통)
+const BOOKING_COLOR_CONFIRMED = '9';   // 확정 처리 시 자동으로 지정할 색(블루베리)
+
+/** SOLAPI 발송 — 이 프로젝트에 이미 있는 sendSolapiSms_/스크립트 속성(SOLAPI_API_KEY 등)을 그대로 재사용. */
+function booking_sendSMS(to, message) {
+  const props = PropertiesService.getScriptProperties();
+  const apiKey = props.getProperty('SOLAPI_API_KEY');
+  const apiSecret = props.getProperty('SOLAPI_API_SECRET');
+  const senderPhone = props.getProperty('SOLAPI_SENDER_PHONE');
+  if (!apiKey || !apiSecret || !senderPhone || !to) return;
+  try {
+    sendSolapiSms_(apiKey, apiSecret, senderPhone, to, message);
+  } catch (err) {
+    console.error('상담예약 SMS 발송 실패: ' + err.message);
+  }
+}
+
+// ===== 예약 가능 시간 조회 (신청 시점 기준 24시간 이후만 노출) =====
+function booking_getAvailability(dateStr) {
+  const cal = CalendarApp.getCalendarById(BOOKING_CALENDAR_ID);
+  const date = new Date(dateStr + 'T00:00:00+09:00');
+  const dow = date.getDay();
+  if (dow === 0 || dow === 6) return jsonResponse({ date: dateStr, slots: [] });
+
+  const allowedHours = [10, 11, 14, 15, 16];
+
+  const dayStart = new Date(date); dayStart.setHours(BOOKING_BUSINESS_HOURS.start, 0, 0, 0);
+  const dayEnd = new Date(date); dayEnd.setHours(BOOKING_BUSINESS_HOURS.end, 0, 0, 0);
+
+  const busy = cal.getEvents(dayStart, dayEnd)
+    .filter(ev => ev.getTransparency() !== CalendarApp.EventTransparency.TRANSPARENT)
+    .map(ev => {
+      if (ev.isAllDayEvent()) {
+        return { start: dayStart, end: dayEnd };
+      }
+      return { start: ev.getStartTime(), end: ev.getEndTime() };
+    });
+
+  const slots = [];
+  const now = new Date();
+  const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  allowedHours.forEach(hour => {
+    const cursor = new Date(date); cursor.setHours(hour, 0, 0, 0);
+    const slotEnd = new Date(cursor.getTime() + BOOKING_CONSULT_DURATION_MIN * 60000);
+    const overlap = busy.some(b => cursor < b.end && slotEnd > b.start);
+    if (!overlap && cursor > cutoff) {
+      slots.push(Utilities.formatDate(cursor, 'Asia/Seoul', 'HH:mm'));
+    }
+  });
+
+  return jsonResponse({ date: dateStr, slots });
+}
+
+// ===== 신청 생성 =====
+function booking_createApplication(body) {
+  const { date, time, name, phone, type, situation, statuses } = body;
+  const cal = CalendarApp.getCalendarById(BOOKING_CALENDAR_ID);
+  const start = new Date(`${date}T${time}:00+09:00`);
+  const end = new Date(start.getTime() + BOOKING_CONSULT_DURATION_MIN * 60000);
+
+  const conflict = cal.getEvents(start, end).length > 0;
+  if (conflict) {
+    return { success: false, error: '방금 다른 신청이 접수되어 마감된 시간입니다. 다시 선택해 주세요.' };
+  }
+
+  const desc = [
+    `연락처: ${phone}`,
+    `고객유형: ${type}`,
+    `현재 세무처리: ${(statuses || []).join(', ') || '-'}`,
+    `상황: ${situation}`,
+    `출처: netax.kr 랜딩페이지`
+  ].join('\n');
+
+  const event = cal.createEvent(`${name}`, start, end, { description: desc });
+  event.setColor(BOOKING_COLOR_PENDING);
+
+  const ss = SpreadsheetApp.openById(BOOKING_SHEET_ID);
+  const sheet = ss.getSheetByName('Applications') || ss.insertSheet('Applications');
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['신청일시', '성함', '전화', '고객유형', '현재 세무처리', '상황', '예약일', '예약시간', '출처', '상태', '확정일', '이벤트ID']);
+  }
+  if (sheet.getRange(1, 12).getValue() === '') {
+    sheet.getRange(1, 12).setValue('이벤트ID');
+  }
+
+  sheet.appendRow([new Date(), name, phone, type, (statuses || []).join(', '), situation, date, time, 'netax.kr', '신청', '', event.getId()]);
+
+  const ownerMsg = `[새 상담신청] ${name} (${phone})\n${date} ${time}\n상황: ${situation}`;
+  booking_sendSMS(BOOKING_OWNER_PHONE, ownerMsg);
+
+  return { success: true, eventId: event.getId() };
+}
+
+// ===== 신청 목록 조회 =====
+function booking_getBookings() {
+  const ss = SpreadsheetApp.openById(BOOKING_SHEET_ID);
+  const sheet = ss.getSheetByName('Applications');
+  if (!sheet) return jsonResponse({ bookings: [] });
+
+  const data = sheet.getDataRange().getValues();
+  const bookings = [];
+
+  for (let i = 1; i < data.length; i++) {
+    bookings.push({
+      date: data[i][0] ? Utilities.formatDate(new Date(data[i][0]), 'Asia/Seoul', 'yyyy-MM-dd HH:mm') : '',
+      name: data[i][1],
+      phone: data[i][2],
+      type: data[i][3],
+      statuses: data[i][4],
+      situation: data[i][5],
+      reservedDate: data[i][6],
+      reservedTime: data[i][7],
+      source: data[i][8],
+      status: data[i][9],
+      approvedDate: data[i][10],
+      eventId: data[i][11] || ''
+    });
+  }
+
+  return jsonResponse({ bookings });
+}
+
+// ===== 신청 승인 (공통 처리 로직) =====
+function booking_finalizeApproval(rowIndex, eventId, phone, reservedDate, reservedTime) {
+  const ss = SpreadsheetApp.openById(BOOKING_SHEET_ID);
+  const sheet = ss.getSheetByName('Applications');
+
+  sheet.getRange(rowIndex, 10).setValue('확정');
+  sheet.getRange(rowIndex, 11).setValue(new Date());
+
+  if (eventId) {
+    const cal = CalendarApp.getCalendarById(BOOKING_CALENDAR_ID);
+    const event = cal.getEventById(eventId);
+    if (event && event.getColor() === BOOKING_COLOR_PENDING) {
+      event.setColor(BOOKING_COLOR_CONFIRMED);
+    }
+  }
+
+  const message = `상담신청이 신청하신대로 확정되었습니다. ${reservedDate} ${reservedTime}`;
+  booking_sendSMS(phone, message);
+
+  const customerName = sheet.getRange(rowIndex, 2).getValue();
+  const ownerMsg = `[확정] ${customerName} (${phone})\n${reservedDate} ${reservedTime}`;
+  booking_sendSMS(BOOKING_OWNER_PHONE, ownerMsg);
+}
+
+function booking_approveApplication(body) {
+  const { rowIndex, eventId, phone, reservedDate, reservedTime } = body;
+  booking_finalizeApproval(rowIndex, eventId, phone, reservedDate, reservedTime);
+  return { success: true, message: '승인되었습니다.' };
+}
+
+// ===== 신청 거절 =====
+function booking_rejectApplication(body) {
+  const { rowIndex, phone } = body;
+  const ss = SpreadsheetApp.openById(BOOKING_SHEET_ID);
+  const sheet = ss.getSheetByName('Applications');
+
+  sheet.getRange(rowIndex, 10).setValue('거절');
+
+  const message = '상담신청이 취소되었습니다. 다음 기회에 이용하여 주세요.';
+  booking_sendSMS(phone, message);
+
+  return { success: true, message: '거절되었습니다.' };
+}
+
+// =========================================================
+// 캘린더 수동 색상 변경 감지 (시간기반 트리거) — booking 모듈
+// =========================================================
+function booking_checkCalendarSync() {
+  const ss = SpreadsheetApp.openById(BOOKING_SHEET_ID);
+  const sheet = ss.getSheetByName('Applications');
+  if (!sheet) return;
+
+  const data = sheet.getDataRange().getValues();
+  const cal = CalendarApp.getCalendarById(BOOKING_CALENDAR_ID);
+
+  for (let i = 1; i < data.length; i++) {
+    const status = data[i][9];
+    const eventId = data[i][11];
+    if (status !== '신청' || !eventId) continue;
+
+    const event = cal.getEventById(eventId);
+    if (!event) continue;
+
+    const currentColor = event.getColor();
+    if (currentColor && currentColor !== BOOKING_COLOR_PENDING) {
+      const rowIndex = i + 1;
+      const phone = data[i][2];
+      const reservedDate = data[i][6];
+      const reservedTime = data[i][7];
+      booking_finalizeApproval(rowIndex, eventId, phone, reservedDate, reservedTime);
+    }
+  }
+}
+
+/**
+ * 최초 1회만: Apps Script 편집기에서 이 함수를 선택하고 "실행" 버튼을 눌러주세요.
+ * 이후 10분마다 booking_checkCalendarSync()가 자동으로 실행됩니다.
+ */
+function booking_installCalendarSyncTrigger() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'booking_checkCalendarSync') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger('booking_checkCalendarSync')
+    .timeBased()
+    .everyMinutes(10)
+    .create();
 }
 
 function jsonResponse(obj) {

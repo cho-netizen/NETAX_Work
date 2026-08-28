@@ -102,6 +102,8 @@
   // (2026.08) 검색·휴지통은 여기 없다 — 탐색기 빈 공간 우클릭(길게 누르기) 메뉴로 옮겼다.
   const WORK_TOOLS = [
     { icon: '📊', label: '현황판', handler: openDashboardView },
+    { icon: '🗂', label: '작업관리', handler: openWorkManageView },
+    { icon: '👤', label: '고객관리', handler: openClientManageView },
     { icon: '📝', label: '경과지', handler: openLogView },
     { icon: '🧮', label: '계산기', handler: openCalcView },
     { icon: '📐', label: '세액계산', handler: openTaxCalcView },
@@ -129,14 +131,8 @@
   const workToolsPopup = document.getElementById('workToolsPopup');
   fillToolPopup(workToolsPopup, WORK_TOOLS);
 
-  // 모드 팝업(자동참조·웹서치·가져오기 체크박스 + 채팅기록지우기)은 체크박스 상태 반영을
-  // 이 아래(모드버튼 섹션)에서 따로 처리하지만, 열고 닫는 토글 자체는 다른 그룹 팝업들과
-  // 같은 방식(하나 열리면 나머지는 자동으로 닫힘)을 써야 하므로 여기 같이 등록한다.
-  const btnModeMenu = document.getElementById('btnModeMenu');
-  const modeMenuPopup = document.getElementById('modeMenuPopup');
-
   const ALL_GROUP_POPUPS = [
-    [workToolsPopup, btnWorkTools], [modeMenuPopup, btnModeMenu]
+    [workToolsPopup, btnWorkTools]
   ];
 
   function wireGroupToggle(btn, popup){
@@ -215,7 +211,7 @@
     // (다른 stage 판정처럼 topbarEl.scrollWidth로 재지 않는다 — scrollWidth는 내용이 컨테이너보다
     // 작을 땐 그냥 clientWidth로 눌러앉아버려서 "얼마나 남는지"를 알 수 없다. 대신 이 5개 요소의
     // 실제 폭을 직접 더해서 clientWidth와 비교한다.)
-    const LABEL_ROW_IDS = ['customerSelect', 'workspaceModeWrap', 'modeMenuWrap', 'workToolsWrap', 'memoWrap'];
+    const LABEL_ROW_IDS = ['customerSelect', 'workspaceModeWrap', 'workToolsWrap', 'memoWrap'];
     let topbarButtonsLabeled = false;
     function updateTopbarButtonsLabeled(){
       if (currentStage === 'full'){
@@ -307,10 +303,11 @@
 
 
   // ============================================================
-  // 자동참조 (ON: AI가 알아서 판단해 폴더/파일을 읽음 / OFF: 명시적으로 요청했을 때만) — 상단 🔗자동참조 버튼으로 관리
-  // ============================================================
-  const AUTOREF_KEY = 'nx_autoref_mode';
-  let autoRefMode = localStorage.getItem(AUTOREF_KEY) === '1';
+  // 자동참조 — [2026.08] 예전엔 켜고끄기 토글이 있었는데, AI가 폴더/파일을 스스로 판단해서
+  // 읽을지는 이제 항상 AI 판단에 맡긴다(gs-backend 시스템프롬프트도 이제 무조건 이 지시를
+  // 준다 — 다른 130개 넘는 도구를 AI가 알아서 쓰는 것과 동일하게 취급). 이 변수는 화면캡처
+  // 자동첨부·열린 이미지/PDF 자동전송 같은 나머지 동작에만 계속 쓰이므로 항상 켜진 채로 둔다.
+  let autoRefMode = true;
 
   // 다크모드 체크박스 — 저장 버튼 안 기다리고 체크하는 즉시 바로 적용
   const settingsDarkMode = document.getElementById('settingsDarkMode');
@@ -629,13 +626,13 @@
   // ============================================================
   const AI_SETTINGS_KEY = 'nx_ai_settings';
   const DEFAULT_AI_SETTINGS = {
-    model: 'claude-sonnet-5',
-    effort: 'medium',
+    model: 'auto', // [2026.08] 질문 내용을 보고 Sonnet(높음)/Haiku(보통) 중 자동으로 고름 — pickAutoModel_ 참고
+    // [2026.08] "보통"과 "높음"을 실제 세무 질문으로 비교해본 결과, 가장 까다로운 판단 지점에서
+    // "높음"만 정확한 근거조문까지 짚어주는 차이가 확인돼 기본값을 올림. 이미 설정을 저장해둔
+    // 브라우저(localStorage)에는 소급 적용되지 않으니, 기존 사용자는 설정에서 한 번 바꿔야 함.
+    effort: 'high',
     temperature: null,          // null이면 요청에 아예 안 실어서 모델 기본값 사용
     maxTokens: null,            // null이면 강도(effort)별 기본 상한 사용
-    enableWebSearch: true,  // 서버가 명시적으로 false를 안 보내면 항상 웹검색을 켜므로, 화면 기본 표시도 "켜짐"에 맞춘다.
-                             // 이 버튼은 이제 "켜는 버튼"이 아니라 "끄는 버튼"이다 — 기본은 항상 노랗게(켜짐), 눌러야 회색(꺼짐)이 된다.
-    enableWebFetch: false,
     enableCodeExecution: false,
     enableAdvisor: false,
     advisorModel: 'claude-opus-4-8',
@@ -647,15 +644,10 @@
       const raw = localStorage.getItem(AI_SETTINGS_KEY);
       if (raw){
         const parsed = JSON.parse(raw);
-        // 웹서치 기본값이 false→true로 바뀌면서, 예전에 저장해둔 enableWebSearch:false가
-        // 새 기본값(true)을 덮어써 버리면 오히려 "항상 꺼짐"으로 굳어버린다. 이걸 막기 위해
-        // 딱 한 번, 예전 설정을 새 기본값으로 밀어준다(사용자가 이후에 버튼을 직접 눌러 끄면
-        // 그 뒤로는 정상적으로 그 선택이 유지된다).
-        const MIGRATION_FLAG = 'nx_websearch_default_migrated_v1';
-        if (!localStorage.getItem(MIGRATION_FLAG)){
-          delete parsed.enableWebSearch; // 있던 값 버리고 DEFAULT_AI_SETTINGS의 새 기본값(true)을 따르게 함
-          localStorage.setItem(MIGRATION_FLAG, '1');
-        }
+        // [2026.08] 웹서치·웹페이지 가져오기는 이제 서버가 항상 켜두고 AI가 알아서 판단한다 —
+        // 화면에 켜고 끄는 값 자체가 없어졌으므로, 예전에 저장해둔 값이 남아있어도 무시한다.
+        delete parsed.enableWebSearch;
+        delete parsed.enableWebFetch;
         return Object.assign({}, DEFAULT_AI_SETTINGS, parsed);
       }
     }catch(err){ console.warn('AI 설정 로드 실패, 기본값 사용', err); }
@@ -665,23 +657,19 @@
   let aiSettings = loadAiSettings();
 
   const settingsOverlay = document.getElementById('settingsOverlay');
-  const settingsModel = document.getElementById('settingsModel');
   const settingsEffort = document.getElementById('settingsEffort');
   const settingsTemperature = document.getElementById('settingsTemperature');
   const settingsMaxTokens = document.getElementById('settingsMaxTokens');
   const settingsCodeExec = document.getElementById('settingsCodeExec');
-  const settingsAdvisor = document.getElementById('settingsAdvisor');
   const advisorModelRow = document.getElementById('advisorModelRow');
   const settingsAdvisorModel = document.getElementById('settingsAdvisorModel');
   const settingsSystemPrompt = document.getElementById('settingsSystemPrompt');
 
   function populateSettingsForm(s){
-    settingsModel.value = s.model;
     settingsEffort.value = s.effort;
     settingsTemperature.value = (s.temperature === null || s.temperature === undefined) ? '' : s.temperature;
     settingsMaxTokens.value = (s.maxTokens === null || s.maxTokens === undefined) ? '' : s.maxTokens;
     settingsCodeExec.checked = !!s.enableCodeExecution;
-    settingsAdvisor.checked = !!s.enableAdvisor;
     settingsAdvisorModel.value = s.advisorModel;
     advisorModelRow.style.display = s.enableAdvisor ? 'block' : 'none';
     settingsSystemPrompt.value = s.systemPrompt || '';
@@ -691,16 +679,15 @@
     const tempRaw = settingsTemperature.value.trim();
     const maxTokRaw = settingsMaxTokens.value.trim();
     return {
-      model: settingsModel.value,
+      // [2026.08] 모델(고정/자동)과 어드바이저 켜고끄기는 이제 채팅 입력창 아래 도구줄에서
+      // 바로 관리한다(mainModelSelect/mainModelLock/mainAdvisor) — 이 폼을 저장해도 그 값들을
+      // 덮어쓰지 않도록 지금 값을 그대로 유지한다(웹서치·웹페이지가져오기와 같은 방식).
+      model: aiSettings.model,
+      enableAdvisor: aiSettings.enableAdvisor,
       effort: settingsEffort.value,
       temperature: tempRaw === '' ? null : Math.max(0, Math.min(1, Number(tempRaw))),
       maxTokens: maxTokRaw === '' ? null : Math.max(256, Math.min(64000, Math.floor(Number(maxTokRaw)))),
-      // 웹서치·웹페이지가져오기는 이 폼이 아니라 상단 모드버튼(🌐🔗)이 직접 관리한다 —
-      // 저장 시 이 폼이 덮어쓰지 않도록 지금 값을 그대로 유지한다.
-      enableWebSearch: aiSettings.enableWebSearch,
-      enableWebFetch: aiSettings.enableWebFetch,
       enableCodeExecution: settingsCodeExec.checked,
-      enableAdvisor: settingsAdvisor.checked,
       advisorModel: settingsAdvisorModel.value,
       systemPrompt: settingsSystemPrompt.value.trim()
     };
@@ -742,43 +729,62 @@
   settingsOverlay.addEventListener('click', (e)=>{
     if (e.target === settingsOverlay) saveSettingsAndClose(); // 바깥(어두운 영역) 클릭 시에도 저장 후 닫기
   });
-  settingsAdvisor.addEventListener('change', ()=>{
-    advisorModelRow.style.display = settingsAdvisor.checked ? 'block' : 'none';
-  });
   document.getElementById('btnResetSettings').addEventListener('click', ()=>{
     populateSettingsForm(DEFAULT_AI_SETTINGS);
   });
   document.getElementById('btnSaveSettings').addEventListener('click', saveSettingsAndClose);
 
-  // ---- 폰 상단 모드메뉴(탐색작업창은 위에서 별도 처리 / 자동참조·웹서치·웹페이지가져오기는
-  // 여기서) — [2026.08] 버튼 3개를 체크박스 팝업 하나로 합쳤다. 설정모달을 안 열어도 바로
-  // 켜고 끌 수 있는 건 그대로고, 체크박스라 하나 바꿔도 팝업이 안 닫혀서 연달아 여러 개를
-  // 토글할 수 있다(예전 버튼 방식은 누르는 즉시 바로 반영되는 대신 각자 따로 눌러야 했음). ----
-  const modeChkAutoRef = document.getElementById('modeChkAutoRef');
-  const modeChkWebSearch = document.getElementById('modeChkWebSearch');
-  const modeChkWebFetch = document.getElementById('modeChkWebFetch');
-  function refreshModeButtonStates(){
-    modeChkAutoRef.checked = autoRefMode;
-    // 웹서치는 기본이 "켜짐"이라, enableWebSearch가 명시적으로 false일 때만 체크 해제로 표시한다.
-    modeChkWebSearch.checked = aiSettings.enableWebSearch !== false;
-    modeChkWebFetch.checked = !!aiSettings.enableWebFetch;
+  // ---- 채팅 입력창 아래 도구줄의 모델선택+🔒잠금+어드바이저(+) — [2026.08] "설정 모달에 들어가야만
+  // 바꿀 수 있는 건 자동이 아니다"는 지적으로 여기로 꺼냈다. 콤보박스는 항상 실제 모델 이름을
+  // 보여준다("자동"이라는 값 자체는 화면에 안 보임) — 🔒를 체크하면 그 표시된 모델로 고정되고,
+  // 체크를 풀면 매 질문마다 pickAutoModel_이 고른 모델을 콤보에 실시간으로 반영만 한다.
+  const mainModelSelect = document.getElementById('mainModelSelect');
+  const mainModelLock = document.getElementById('mainModelLock');
+  const mainModelLockLabel = document.getElementById('mainModelLockLabel');
+  const mainAdvisor = document.getElementById('mainAdvisor');
+  const mainAdvisorLabel = document.getElementById('mainAdvisorLabel');
+  let lastAutoPickedModel = 'claude-sonnet-5'; // 자동모드일 때 콤보박스에 보여줄, 마지막으로 실제 쓰인 모델
+
+  function refreshMainModelUi(){
+    const locked = aiSettings.model !== 'auto';
+    mainModelLock.checked = locked;
+    mainModelSelect.disabled = !locked;
+    mainModelSelect.value = locked ? aiSettings.model : lastAutoPickedModel;
+    mainAdvisor.checked = !!aiSettings.enableAdvisor;
+    // [2026.08] 체크박스만으로는 지금 고정/자동인지, 어드바이저가 켜졌는지 헷갈린다는
+    // 피드백 — 둘 다 글자/색으로 분명히 표시.
+    if (mainModelLockLabel){
+      mainModelLockLabel.textContent = locked ? 'F' : 'V';
+      mainModelLockLabel.className = 'model-lock-label ' + (locked ? 'locked' : 'auto');
+    }
+    if (mainAdvisorLabel){
+      mainAdvisorLabel.className = 'advisor-label' + (mainAdvisor.checked ? ' on' : '');
+    }
   }
-  modeChkAutoRef.addEventListener('change', ()=>{
-    autoRefMode = modeChkAutoRef.checked;
-    localStorage.setItem(AUTOREF_KEY, autoRefMode ? '1' : '0');
-  });
-  modeChkWebSearch.addEventListener('change', ()=>{
-    aiSettings.enableWebSearch = modeChkWebSearch.checked;
+  refreshMainModelUi();
+
+  mainModelLock.addEventListener('change', ()=>{
+    aiSettings.model = mainModelLock.checked ? mainModelSelect.value : 'auto';
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings));
+    refreshMainModelUi();
+    updateChatModelBadge();
   });
-  modeChkWebFetch.addEventListener('change', ()=>{
-    aiSettings.enableWebFetch = modeChkWebFetch.checked;
+  mainModelSelect.addEventListener('change', ()=>{
+    if (!mainModelLock.checked) return; // 잠금 해제 상태에선 disabled라 사실상 여기 안 옴(방어용)
+    aiSettings.model = mainModelSelect.value;
     localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings));
+    updateChatModelBadge();
   });
-  refreshModeButtonStates();
+  mainAdvisor.addEventListener('change', ()=>{
+    aiSettings.enableAdvisor = mainAdvisor.checked;
+    localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings));
+    advisorModelRow.style.display = aiSettings.enableAdvisor ? 'block' : 'none'; // 설정모달이 열려있는 중이었다면 그쪽도 즉시 반영
+    if (mainAdvisorLabel) mainAdvisorLabel.className = 'advisor-label' + (mainAdvisor.checked ? ' on' : '');
+  });
 
   // 입력창 아래 "모델 · 강도" 뱃지 표시 갱신
   const MODEL_LABELS = {
+    'auto': '자동(질문별 선택)',
     'claude-sonnet-5': 'Sonnet 5',
     'claude-opus-4-8': 'Opus 4.8',
     'claude-haiku-4-5-20251001': 'Haiku 4.5',
@@ -792,29 +798,120 @@
   // 버튼은 ⚙ 아이콘 하나뿐이라, 지금 모델·강도는 마우스를 올렸을 때 보이는 title(툴팁)로 알려준다.
   function updateChatModelBadge(){
     const modelName = MODEL_LABELS[aiSettings.model] || aiSettings.model;
+    // 자동 모드는 질문마다 모델/강도가 달라지므로(pickAutoModel_) 고정된 강도를 같이 보여주면
+    // 오히려 헷갈린다 — 모델명만 표시.
+    if (aiSettings.model === 'auto'){
+      btnOpenSettingsEl.title = 'AI 설정 (Alt+S) · 현재: ' + modelName;
+      return;
+    }
     const effortName = EFFORT_LABELS[aiSettings.effort] || aiSettings.effort;
     btnOpenSettingsEl.title = 'AI 설정 (Alt+S) · 현재: ' + modelName + ' · ' + effortName;
   }
   updateChatModelBadge();
 
   // 채팅 전송 시 GAS로 실어보낼 AI 설정 payload 조립 (값이 기본값/공백이면 아예 안 실어서 서버 기본값이 적용되게 함)
-  // 메시지 안에 URL이 있는지 감지 — 사용자가 매번 "가져오기" 버튼을 켰다 껐다 하지 않아도,
-  // URL을 붙여넣은 순간에는 이번 요청 한정으로 자동으로 웹페이지 가져오기 도구를 켜준다.
-  // (평소엔 꺼둔 채로 두고, 필요할 때만 켜지는 게 자연스럽다는 판단)
-  const URL_DETECT_RE = /https?:\/\/[^\s]+/i;
-  function messageContainsUrl(text){
-    return URL_DETECT_RE.test(text || '');
+
+  // [2026.08] "모델을 매번 사람이 수동으로 바꿔야 하냐"는 요청으로 추가 — 세무 조문·계산 등
+  // 어려운 판단이 필요해 보이면 Sonnet 5(높음)로, 그 외(문서 다듬기·간단한 질문 등)는 저렴한
+  // Haiku(보통)로 자동으로 고른다. 간단한 키워드 규칙이라 완벽하진 않지만, 애매하면 비싼 쪽
+  // (Sonnet)으로 보내도록 만들어서 "쉬운 질문에 비싼 모델 쓰는 건" 손해가 적고 "어려운 질문을
+  // 싼 모델로 잘못 보내는" 위험은 최대한 피했다. 설정에서 "자동" 대신 특정 모델을 직접 고르면
+  // 이 판단을 안 거치고 항상 그 모델을 쓴다.
+  const AUTO_MODEL_COMPLEX_RE = /(양도소득세|증여세|상속세|취득세|재산세|종합소득세|법인세|부가가치세|세법|시행령|시행규칙|판례|예규|조문|§|비과세|감면|공제|과세표준|세율|절세|불복|경정청구|가업승계|명의신탁|특수관계자|평가액|법정상속분|유류분|부담부증여|이월과세|양도차익)/;
+  function pickAutoModel_(text){
+    if (AUTO_MODEL_COMPLEX_RE.test(text || '')) return { model: 'claude-sonnet-5', effort: 'high' };
+    return { model: 'claude-haiku-4-5-20251001', effort: 'medium' };
+  }
+  // [2026.08] 제미니웹(확장프로그램으로 gemini.google.com에 대신 물어봄, 무료)을 "정말 간단하고
+  // NX 자료·도구가 전혀 필요 없는" 질문에 한해 Haiku보다도 먼저 시도한다 — 성공하면 API 비용이
+  // 0원이다. 실패(미연결·시간초과·오류)하면 조용히 원래 경로(Haiku)로 넘어가므로 손해가 없다.
+  // 대상은 일부러 매우 좁게 잡았다: 파일·일정·고객·사건·이메일처럼 NX의 실제 자료가 필요할
+  // 가능성이 조금이라도 있는 질문, 그리고 세금 관련 질문은 전부 제외한다. 제미니는 NX의
+  // 드라이브·캘린더·계산기에 접근할 방법이 전혀 없어서, 그런 질문을 던지면 모른다고 하는 대신
+  // 그럴싸하게 지어낸 답(할루시네이션)을 낼 위험이 있고, 이건 이 시스템이 가장 경계하는
+  // 부분이다 — 비용을 아끼려다 그 원칙을 깨면 안 된다.
+  const GEM_UNSAFE_SIGNAL_RE = /(파일|폴더|저장|불러|읽어|열어|찾아|검색|조회|일정|캘린더|할일|메일|이메일|보내|발송|사건|고객|상담|기억해|등록|계산|세액|세금|양도|증여|상속|취득세|재산세|법인세|소득세|부가가치세|세법|시행령|시행규칙|판례|예규|조문|비과세|감면|공제|세율|공시가격|시세|등기|사업자|주소|건축물|첨부|반영|수정|고쳐|삭제)/;
+  function isGemWebSafeMessage_(text){
+    if (!text || text.length > 200) return false; // 길면 복잡한 요청일 가능성 — 대상에서 제외
+    if (GEM_UNSAFE_SIGNAL_RE.test(text)) return false;
+    if (AUTO_MODEL_COMPLEX_RE.test(text)) return false;
+    return true;
   }
 
-  function buildAiSettingsPayload(forceWebFetch){
-    const payload = { model: aiSettings.model, effort: aiSettings.effort };
+  // [2026.08] 세무사님이 캘린더로 직접 확인(2026-08-27): Gem에게 "@"로 시작하는 질문을 보내면
+  // 확장프로그램이 제미니웹의 "@구글캘린더" 앱 연동을 정상 처리해서 실제 원문을 그대로
+  // 가져온다. 지시에 따라 캘린더에 국한하지 않고 구글 생태계 전체(Gmail·드라이브)로 넓힌다 —
+  // 단, 각 앱마다 "조회" 신호가 있을 때만, 그리고 아래 두 가지에 걸리면 무조건 제외한다:
+  // (1) 쓰기 의도(추가·삭제·수정 등 — @는 참조만 가능하고 실제로 고치지 못함),
+  // (2) 사건·고객·세액계산처럼 NX 고유의 구조화된 데이터가 필요한 질문(제미니는 NX의
+  // 사건폴더 구조·고객DB·계산엔진을 전혀 모르므로, 이런 건 그럴싸한 오답 위험이 있다).
+  const GEM_ECOSYSTEM_ROUTES_ = [
+    { app: 'calendar', label: '구글캘린더', re: /(일정|캘린더|스케줄|미팅|약속|몇\s*시|언제)/ },
+    { app: 'gmail', label: 'Gmail', re: /(메일|이메일|편지함|받은편지)/ },
+    { app: 'drive', label: '드라이브', re: /(드라이브|파일|폴더|문서)/ }
+  ];
+  const GEM_WRITE_INTENT_RE = /(추가|등록|삭제|취소|변경|수정|만들어|잡아|저장|고쳐|반영|보내|발송|답장|이동|복사|공유|이름\s*바꿔)/;
+  const GEM_STRUCTURED_EXCLUDE_RE = /(사건|고객|상담|기억해|계산|세액|세금|양도|증여|상속|취득세|재산세|법인세|소득세|부가가치세|세법|시행령|시행규칙|판례|예규|조문|비과세|감면|공제|세율|공시가격|시세|등기|사업자|주소|건축물|첨부)/;
+  function detectGemEcosystemRoute_(text){
+    if (!text || text.length > 200) return null;
+    if (GEM_WRITE_INTENT_RE.test(text)) return null;
+    if (GEM_STRUCTURED_EXCLUDE_RE.test(text)) return null;
+    if (AUTO_MODEL_COMPLEX_RE.test(text)) return null;
+    for (let i = 0; i < GEM_ECOSYSTEM_ROUTES_.length; i++){
+      if (GEM_ECOSYSTEM_ROUTES_[i].re.test(text)) return GEM_ECOSYSTEM_ROUTES_[i];
+    }
+    return null;
+  }
+
+  const pendingGemSilent_ = {}; // requestId -> {resolve, reject} — 화면에 별도 말풍선을 만들지 않는 조용한 요청용
+  // askGem()과 같은 확장프로그램 경로(NX_GEM_ASK)를 쓰지만, Promise로 감싸서 sendChatMessage가
+  // "성공하면 그 답을 이번 턴의 정식 답변으로 쓰고, 실패하면 Haiku로 넘어간다"처럼 판단할 수 있게 한다.
+  function askGemSilent_(question, timeoutMs){
+    return new Promise((resolve, reject) => {
+      ensureExtConnected_().then((connected) => {
+        if (!connected){ reject(new Error('not_connected')); return; }
+        const requestId = 'gemsilent_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        const timer = setTimeout(() => {
+          delete pendingGemSilent_[requestId];
+          reject(new Error('timeout'));
+        }, timeoutMs || 20000);
+        pendingGemSilent_[requestId] = {
+          resolve: (answer) => { clearTimeout(timer); resolve(answer); },
+          reject: (err) => { clearTimeout(timer); reject(err); }
+        };
+        try{
+          nxExtPort.postMessage({ type: 'NX_GEM_ASK', requestId: requestId, question: question });
+        }catch(err){
+          clearTimeout(timer);
+          delete pendingGemSilent_[requestId];
+          reject(err);
+        }
+      });
+    });
+  }
+
+  // regenerateFrom_처럼 "지금 입력창"이 아니라 이미 쌓인 대화기록에서 자동모델 판단용 텍스트를 뽑을 때 사용.
+  function lastUserText_(messages){
+    for (let i = messages.length - 1; i >= 0; i--){
+      if (messages[i].role === 'user') return typeof messages[i].content === 'string' ? messages[i].content : '';
+    }
+    return '';
+  }
+
+  function buildAiSettingsPayload(messageTextForAutoModel){
+    const resolved = (aiSettings.model === 'auto')
+      ? pickAutoModel_(messageTextForAutoModel)
+      : { model: aiSettings.model, effort: aiSettings.effort };
+    // 자동모드면 방금 고른 모델을 도구줄 콤보박스에 바로 반영해서, "지금 실제로 뭘 쓰고 있는지"가
+    // 항상 눈에 보이게 한다.
+    if (aiSettings.model === 'auto'){
+      lastAutoPickedModel = resolved.model;
+      if (typeof refreshMainModelUi === 'function') refreshMainModelUi();
+    }
+    updateChatModelBadge();
+    const payload = { model: resolved.model, effort: resolved.effort };
     if (aiSettings.temperature !== null && aiSettings.temperature !== undefined) payload.temperature = aiSettings.temperature;
     if (aiSettings.maxTokens !== null && aiSettings.maxTokens !== undefined) payload.maxTokens = aiSettings.maxTokens;
-    // 웹서치는 이제 서버 기본값이 "항상 켜짐"이라, 켜진 상태(true)는 굳이 안 보내도 되지만
-    // 꺼진 상태(false)는 반드시 명시적으로 보내야 서버가 진짜로 꺼준다(값을 아예 안 보내면
-    // 서버는 "명시적으로 끄지 않았다"고 판단해서 계속 켠 채로 처리하기 때문).
-    if (aiSettings.enableWebSearch === false) payload.enableWebSearch = false;
-    if (aiSettings.enableWebFetch || forceWebFetch) payload.enableWebFetch = true;
     if (aiSettings.enableCodeExecution) payload.enableCodeExecution = true;
     if (aiSettings.enableAdvisor){
       payload.enableAdvisor = true;
@@ -1048,18 +1145,35 @@
       return true;
     }
     if (msg.type === 'NX_GEM_ANSWER'){
+      if (pendingGemSilent_[msg.requestId]){
+        pendingGemSilent_[msg.requestId].resolve({ answer: msg.answer || '', sources: msg.sources || [] });
+        delete pendingGemSilent_[msg.requestId];
+        return true;
+      }
       const bubble = pendingGemBubbles[msg.requestId];
       if (bubble){
         const prefix = pendingGemAnswerPrefix[msg.requestId] || '🔮 Gem';
         bubble.classList.remove('gem-pending');
         bubble.classList.add('gem');
-        bubble.textContent = prefix + ': ' + (msg.answer || '(빈 응답)');
+        // [2026.08] sources — 제미니가 실제 구글앱(캘린더·Gmail·드라이브 등) 데이터를 근거로
+        // 답했으면 확장프로그램이 그 출처 카드를 찾아 앱 이름을 알려준다. 있으면 확인됐다고,
+        // 없으면 근거 없이(일반 지식으로) 답했을 수 있다고 구분해서 보여준다 — 사용자가 이
+        // 답을 얼마나 믿어도 될지 스스로 판단할 수 있게.
+        const sourceNote = (msg.sources && msg.sources.length)
+          ? ('\n\n✅ 실제 ' + msg.sources.join(', ') + ' 데이터 확인됨')
+          : '\n\n⚠️ 출처 확인 안 됨 — 일반 지식으로 답했을 수 있습니다';
+        bubble.textContent = prefix + ': ' + (msg.answer || '(빈 응답)') + sourceNote;
         delete pendingGemBubbles[msg.requestId];
         delete pendingGemAnswerPrefix[msg.requestId];
       }
       return true;
     }
     if (msg.type === 'NX_GEM_ERROR'){
+      if (pendingGemSilent_[msg.requestId]){
+        pendingGemSilent_[msg.requestId].reject(new Error(msg.error || 'gem_error'));
+        delete pendingGemSilent_[msg.requestId];
+        return true;
+      }
       const bubble = pendingGemBubbles[msg.requestId];
       if (bubble){
         const prefix = pendingGemAnswerPrefix[msg.requestId] || '🔮 Gem';
@@ -1305,7 +1419,7 @@
   }
   document.getElementById('btnNewChat').addEventListener('click', ()=>{
     startNewConversation();
-    document.getElementById('modeMenuPopup').classList.remove('show'); // [2026.08] 모드 팝업 안으로 옮겨서, 눌렀으면 팝업도 같이 닫아준다
+    settingsOverlay.style.display = 'none'; // [2026.08] 설정 모달 안으로 옮겼으므로, 눌렀으면 모달도 같이 닫아준다
   });
 
   function renderAttachBar(){
@@ -1751,6 +1865,9 @@
     target.addEventListener('load', onLoad);
   }
 
+  // "반영했습니다/저장했습니다"류 완료 주장 표현 — renderAssistantReply의 미검증 저장 경고에 사용.
+  const COMPLETION_CLAIM_RE = /(반영했|저장했|업데이트했|갱신했|추가했습니다|생성했|파일을?\s*만들었)/;
+
   function renderAssistantReply(bubbleEl, replyText, clientActions, editTargetFile){
     const actions = Array.isArray(clientActions) ? clientActions : [];
     const diagramOpen = (typeof diagramView !== 'undefined' && diagramView.style.display !== 'none');
@@ -1768,6 +1885,22 @@
       navigateTo(explorerPath);
     }
 
+    // AI가 작업관리 사건/하위업무를 만들거나 바꿨을 때, 지금 작업관리 화면이 열려 있으면
+    // 목록을 새로고침해서 바로 반영되게 한다.
+    const workManageChangedAction = actions.find(a => a && a.type === 'work_manage_changed');
+    if (workManageChangedAction && typeof workManageView !== 'undefined' && workManageView
+        && workManageView.style.display !== 'none') {
+      loadWorkCases();
+    }
+
+    // AI가 고객관리 명단/자문내역을 만들거나 바꿨을 때도 마찬가지로, 지금 고객관리 화면이
+    // 열려 있으면 새로고침한다.
+    const clientManageChangedAction = actions.find(a => a && a.type === 'client_manage_changed');
+    if (clientManageChangedAction && typeof clientManageView !== 'undefined' && clientManageView
+        && clientManageView.style.display !== 'none') {
+      loadClients();
+    }
+
     // [패치] isReportWriterOpen(지금 이 순간의 화면 상태)로 게이트하지 않는다 — clientActions에
     // 실제로 들어있으면 무조건 버튼을 보여준다. diagramOpen도 마찬가지로 완화.
     const editAction = actions.find(a => a && a.type === 'edit_document');
@@ -1780,17 +1913,31 @@
       textPart.textContent = replyText.trim() || '문서에 대한 수정안을 준비했습니다.';
       bubbleEl.appendChild(textPart);
 
+      // [2026.08] "반영했다"고 답은 하는데 실제로는 안 바뀌어 있다는 문제 대응 — AI의 말이
+      // "저장했습니다"처럼 이미 끝난 것처럼 들려도, apply_document_edit은 이 버튼을 눌러야만
+      // 실제로 반영되는 도구다. AI 말투에 기대지 않고 항상 고정 문구로 한 번 더 못박아둔다.
+      const notice = document.createElement('div');
+      notice.className = 'apply-pending-notice';
+      notice.textContent = '⚠️ 아직 저장되지 않았습니다 — 아래 버튼을 눌러야 실제 문서에 반영됩니다.';
+      bubbleEl.appendChild(notice);
+
       const applyBtn = document.createElement('button');
       applyBtn.className = 'apply-edit-btn';
       applyBtn.textContent = '📝 편집기에 적용하기';
       applyBtn.addEventListener('click', ()=>{
         applyEditToTargetFile_(editTargetFile, editAction.content || '', applyBtn);
+        notice.remove();
       });
       bubbleEl.appendChild(applyBtn);
     } else if (diagramAction){
       const textPart = document.createElement('div');
       textPart.textContent = replyText.trim() || '관계도 초안을 준비했습니다.';
       bubbleEl.appendChild(textPart);
+
+      const notice = document.createElement('div');
+      notice.className = 'apply-pending-notice';
+      notice.textContent = '⚠️ 아직 저장되지 않았습니다 — 아래 버튼을 눌러야 실제 관계도에 반영됩니다.';
+      bubbleEl.appendChild(notice);
 
       const applyBtn = document.createElement('button');
       applyBtn.className = 'apply-edit-btn';
@@ -1801,14 +1948,122 @@
         saveDiagram();
         applyBtn.textContent = '✓ 적용됨';
         applyBtn.disabled = true;
+        notice.remove();
       });
       bubbleEl.appendChild(applyBtn);
     } else {
       bubbleEl.textContent = replyText;
     }
+
+    // [2026.08] AI 말(환각 가능)이 아니라, 서버가 실제 파일쓰기 성공을 확인했을 때만 만드는
+    // 확인 배지 — save_file_to_folder/export_to_google_doc이 진짜 성공했을 때만 존재한다.
+    // "반영했다고 답은 하는데 실제로는 안 바뀐" 경우, 이 배지가 없다는 것 자체가 신호가 된다.
+    const savedActions = actions.filter(a => a && a.type === 'file_saved');
+    savedActions.forEach(a => {
+      const badge = document.createElement('div');
+      badge.className = 'file-saved-badge';
+      const label = a.updated ? '기존 파일에 덮어썼습니다' : '새 파일로 저장했습니다';
+      if (a.url){
+        badge.innerHTML = '✅ ' + label + ': <a href="' + a.url + '" target="_blank" rel="noopener">' + escapeHtml(a.name || '') + '</a>';
+      } else {
+        badge.textContent = '✅ ' + label + ': ' + (a.name || '');
+      }
+      bubbleEl.appendChild(badge);
+    });
+
+    // [2026.08] "반영했습니다/저장했습니다"라고 말은 하는데 실제로는 아무 도구도 호출 안 한 채
+    // 말로만 지어내는 경우가 실사용 중 재확인됐다(마스터프로필에 2026-08-17에 이미 "절대 금지"로
+    // 적어뒀는데도 재발) — 지침만으로는 AI가 안 지키면 그만이라, 화면이 직접 검증한다. 완료를
+    // 주장하는 말투가 있는데 위에서 실제 저장/적용 신호(editAction·diagramAction·file_saved)가
+    // 하나도 없었다면, AI 말과 무관하게 경고를 띄운다.
+    const claimedCompletion = COMPLETION_CLAIM_RE.test(replyText || '');
+    const hasRealSaveSignal = !!editAction || !!diagramAction || savedActions.length > 0;
+    if (claimedCompletion && !hasRealSaveSignal){
+      const warn = document.createElement('div');
+      warn.className = 'unverified-save-warning';
+      warn.textContent = '⚠️ AI가 저장/반영했다고 답했지만, 실제로 저장 도구를 호출한 기록이 이번 응답에 없습니다. 직접 파일을 열어 확인해주세요.';
+      bubbleEl.appendChild(warn);
+    }
   }
 
   let currentChatAbortController = null; // 요청 중 '중지' 버튼으로 취소하기 위한 컨트롤러
+
+  // [2026.08] 예전엔 도구를 여러 번 연쇄 호출하는 대화도 서버(gs-backend)가 요청 1건 안에서
+  // 전부 끝내려고 했는데, Apps Script는 요청 1건당 실행시간이 약 6분으로 제한돼 있어서 그
+  // 시간을 넘기면 응답 자체를 못 받고 "네트워크 오류: Failed to fetch"만 떴다(실제로는 서버가
+  // 끝까지 일하다 죽은 것인데 화면에서는 원인을 알 길이 없었음). 이제는 서버가 한 번의 요청마다
+  // Claude API를 딱 1번만 부르고, 도구를 더 불러야 하면 done:false로 지금까지 진행상황(이번
+  // 라운드의 assistant 응답 + 도구실행 결과)만 돌려준다 — 이 함수가 그걸 받아서 대화에 이어붙여
+  // 즉시 다음 라운드를 요청한다. 그래서 전체 대화가 몇 분 걸려도 낱개 요청은 항상 짧다.
+  // sendChatMessage와 regenerateFrom_ 둘 다 이 함수를 통해서만 서버와 통신한다.
+  const CLIENT_MAX_TOOL_ROUNDS = 14; // 예전 서버쪽 MAX_TOOL_LOOPS를 그대로 승계
+
+  async function runChatTurn_(initialMessages, opts){
+    let turnMessages = initialMessages.slice();
+    let accumulatedActions = [];
+    let round = 0;
+
+    while (true){
+      const forceWrapUp = round >= CLIENT_MAX_TOOL_ROUNDS;
+      opts.thinkingBubble.textContent = round === 0 ? '생각 중…'
+        : (forceWrapUp ? '마무리하는 중…' : '🔧 확인하는 중… (' + (round + 1) + '단계)');
+
+      const requestBody = JSON.stringify(Object.assign({
+        _key: (window.NX_CONFIG && window.NX_CONFIG.API_SECRET) || '',
+        messages: turnMessages,
+        context: opts.context,
+        autoRef: opts.autoRef,
+        forceWrapUp: forceWrapUp
+      }, opts.aiSettingsPayload));
+
+      // [2026.08] 순수 네트워크 오류(요청이 서버에 닿기도 전에 끊기는 경우 — 회선 순간 끊김,
+      // 모바일 전환 중 등)는 이미 답을 받았는데 화면 표시만 실패한 경우와 달리 재시도해도
+      // 안전하다(서버가 이번 요청을 처리했다는 흔적 자체가 없으므로 중복 과금 위험이 없음).
+      // 사용자가 매번 직접 알아채고 다시 입력해야 했던 걸 없애기 위해 1회 자동 재시도한다.
+      // data.error(서버가 응답은 했지만 오류를 실어보낸 경우, 예: 키 오류·API 한도)는 재시도해도
+      // 안 될 가능성이 높아 그대로 즉시 오류로 보여준다(여기서 재시도 대상이 아님).
+      let data;
+      for (let netAttempt = 0; netAttempt < 2; netAttempt++) {
+        try{
+          const res = await fetch(GAS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            signal: opts.signal,
+            body: requestBody
+          });
+          data = await res.json();
+          break;
+        }catch(err){
+          if (err && err.name === 'AbortError'){ opts.onAbort(); return; }
+          if (netAttempt === 0){
+            opts.thinkingBubble.textContent = '네트워크가 불안정해서 다시 시도하는 중…';
+            await new Promise(r => setTimeout(r, 1500));
+            continue;
+          }
+          opts.onError('네트워크 오류: ' + (err && err.message ? err.message : err));
+          return;
+        }
+      }
+
+      if (data.error){ opts.onError('오류: ' + data.error); return; }
+
+      accumulatedActions = accumulatedActions.concat(data.clientActions || []);
+
+      // done:false가 명시된 경우에만 다음 라운드로 이어간다 — 구버전 서버 응답(done 필드가
+      // 아예 없는 경우)도 안전하게 "완료"로 취급해서 무한대기하지 않는다.
+      if (data.done === false){
+        turnMessages = turnMessages.concat([
+          { role: 'assistant', content: data.assistantContent },
+          { role: 'user', content: data.toolResults }
+        ]);
+        round++;
+        continue;
+      }
+
+      opts.onDone(data.reply || '이번 요청에 답변을 받지 못했습니다. 다시 한 번 보내주세요.', accumulatedActions);
+      return;
+    }
+  }
 
   async function sendChatMessage(){
     const text = chatInputEl.value.trim();
@@ -1891,54 +2146,102 @@
       };
     }
 
-    const autoWebFetch = messageContainsUrl(text) && !aiSettings.enableWebFetch;
-    if (autoWebFetch) showToast('메시지에 URL이 있어 이번 요청만 웹페이지 가져오기를 자동으로 켰습니다.', 'info');
+    // [2026.08] "자동" 모드에서 정말 간단하고 자료조회가 필요없어 보이는 질문이면, Haiku(유료)
+    // 보다도 먼저 제미니웹(확장프로그램 경유, 무료)을 시도한다 — 첨부·화면캡처·열린문서 등
+    // NX 쪽 맥락이 이번 메시지에 섞여있으면 애초에 대상에서 뺀다(제미니는 그런 맥락을 볼 수
+    // 없으므로). 실패해도 사용자에게 굳이 알리지 않고 조용히 원래 경로(Haiku)로 넘어간다.
+    const geminiEcosystemRoute = detectGemEcosystemRoute_(text);
+    // [2026.08] 모델 선택(Sonnet/Haiku 등)은 "답변 품질을 얼마나 높게 쓸지"를 정하는 것이고,
+    // 구글 생태계(캘린더·Gmail·드라이브) 조회는 "원본 데이터를 어디서 가져올지"를 정하는
+    // 완전히 다른 축이다 — 세무사님 지적으로 이 둘을 분리했다. 그래서:
+    // - 일반 잡담(isGemWebSafeMessage_)은 "답변 자체"를 제미니로 대체하는 것이므로 모델을
+    //   일부러 비싼 걸로 고정해뒀으면(예: Sonnet) 그 선택을 존중해서 대상에서 뺀다.
+    // - 반면 캘린더/Gmail/드라이브 "조회"는 원본 데이터를 가져오는 것뿐이라, 어떤 모델을
+    //   고정해뒀든 상관없이 항상 먼저 시도한다 — 실패하거나 출처 확인이 안 되면 그대로
+    //   고정된 모델(비싸도)로 넘어가므로 손해가 없다.
+    const geminiWebModelOk = aiSettings.model === 'auto' || aiSettings.model === 'claude-haiku-4-5-20251001';
+    const geminiWebEligible = !extraBlocks.length
+      && !openFileCtx
+      && ((geminiWebModelOk && isGemWebSafeMessage_(text)) || !!geminiEcosystemRoute);
 
     try{
       currentChatAbortController = new AbortController();
-      const res = await fetch(GAS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+
+      if (geminiWebEligible){
+        thinkingBubble.textContent = geminiEcosystemRoute
+          ? ('🔮 먼저 무료로 확인 중 (Gemini·' + geminiEcosystemRoute.label + ')…')
+          : '🔮 먼저 무료로 확인 중 (Gemini)…';
+        try{
+          // [2026.08] 구글 생태계(캘린더·Gmail·드라이브) 조회류는 "@"를 앞에 붙여서 보낸다 —
+          // 제미니웹의 앱 연동 자동완성을 트리거해서 실제 원문을 가져오게 하기 위함
+          // (2026-08-27 캘린더로 실사용 확인됨, 나머지 앱도 같은 방식으로 확장).
+          const gemQuestion = geminiEcosystemRoute ? ('@' + text) : text;
+          // [2026.08] 제미니 탭이 이미 열려있으면 금방 답이 오지만, 탭을 새로 열어야 하는
+          // 경우(창 생성+페이지 로딩+타이핑+응답까지)는 20초로는 부족해서 다 기다리지도
+          // 못하고 Haiku로 넘어가버리는 문제가 실사용으로 확인됐다 — 넉넉하게 늘렸다.
+          // 실패해도 Haiku로 조용히 넘어가는 구조라 길게 잡아도 손해는 없다.
+          const gemResult = await askGemSilent_(gemQuestion, 50000);
+          const gemAnswer = gemResult && gemResult.answer;
+          const gemSources = (gemResult && gemResult.sources) || [];
+          // 생태계 라우팅(캘린더·Gmail·드라이브 조회)인데 확장프로그램이 실제 출처 카드를
+          // 못 찾았으면, 제미니가 근거 없이(일반 지식 추측으로) 답했을 위험이 있다는 뜻이다 —
+          // 무료라고 해서 검증 안 된 답을 그대로 쓰면 안 되므로, 이 경우엔 실패로 취급하고
+          // 아래 Haiku(실제 도구 접근 가능) 경로로 넘어간다.
+          const gemTrustworthy = gemAnswer && gemAnswer.trim() && (!geminiEcosystemRoute || gemSources.length > 0);
+          if (gemTrustworthy){
+            const gemLabel = geminiEcosystemRoute
+              ? ('🔮 (Gemini·' + geminiEcosystemRoute.label + ' 조회, 무료 — ✅ ' + gemSources.join(', ') + ' 확인됨)')
+              : '🔮 (Gemini·무료 답변)';
+            renderAssistantReply(thinkingBubble, gemLabel + '\n\n' + gemAnswer, [], null);
+            const aiMsgObj = { role: 'assistant', content: gemAnswer };
+            chatMessages.push(aiMsgObj);
+            thinkingBubble._nxMsgRef = aiMsgObj;
+            scheduleChatHistorySave();
+            if (isVoiceTurn) speakReply(gemAnswer);
+            return;
+          }
+          // 빈 답이거나 출처 미확인이면 실패로 취급하고 아래 Haiku 경로로 넘어간다.
+        }catch(err){
+          // 미연결·시간초과·확장프로그램 오류 — 조용히 원래 경로(Haiku)로 이어간다.
+        }
+        thinkingBubble.textContent = '생각 중…';
+      }
+
+      await runChatTurn_(requestMessages, {
+        thinkingBubble: thinkingBubble,
         signal: currentChatAbortController.signal,
-        body: JSON.stringify(Object.assign({
-          _key: (window.NX_CONFIG && window.NX_CONFIG.API_SECRET) || '',
-          messages: requestMessages,
-          context: {
-            currentPath: explorerPath,
-            openFile: openFileCtx,
-            openDiagram: openDiagramCtx,
-            attachedItems: attachmentsForThisMessage,
-            attachedTexts: textAttachmentsForThisMessage,
-            // [패치 2026.07 — 버그#6] 이번 턴이 음성으로 시작됐는지 서버에 알려준다.
-            // 예전엔 이 정보가 프론트엔드에만 있어서(isVoiceTurn), AI는 지금 자기 답이
-            // 소리로 읽힐지 화면에 표시될지 전혀 모른 채 항상 문자채팅 방식(마크다운·표·
-            // 굵게 등)으로만 답했다. 그래서 음성모드에서도 "**이렇게** 하시면 됩니다"처럼
-            // 기호까지 그대로 다 읽어버리는 문제가 생겼다.
-            voiceTurn: isVoiceTurn
-          },
-          autoRef: autoRefMode
-        }, buildAiSettingsPayload(messageContainsUrl(text))))
+        context: {
+          currentPath: explorerPath,
+          openFile: openFileCtx,
+          openDiagram: openDiagramCtx,
+          attachedItems: attachmentsForThisMessage,
+          attachedTexts: textAttachmentsForThisMessage,
+          // [패치 2026.07 — 버그#6] 이번 턴이 음성으로 시작됐는지 서버에 알려준다.
+          // 예전엔 이 정보가 프론트엔드에만 있어서(isVoiceTurn), AI는 지금 자기 답이
+          // 소리로 읽힐지 화면에 표시될지 전혀 모른 채 항상 문자채팅 방식(마크다운·표·
+          // 굵게 등)으로만 답했다. 그래서 음성모드에서도 "**이렇게** 하시면 됩니다"처럼
+          // 기호까지 그대로 다 읽어버리는 문제가 생겼다.
+          voiceTurn: isVoiceTurn
+        },
+        autoRef: autoRefMode,
+        aiSettingsPayload: buildAiSettingsPayload(text),
+        onDone: (replyText, clientActions) => {
+          renderAssistantReply(thinkingBubble, replyText, clientActions, editTargetFileSnapshot);
+          const aiMsgObj = { role: 'assistant', content: replyText };
+          chatMessages.push(aiMsgObj);
+          thinkingBubble._nxMsgRef = aiMsgObj;
+          scheduleChatHistorySave();
+          if (isVoiceTurn) speakReply(replyText);
+        },
+        onError: (message) => {
+          thinkingBubble.textContent = message;
+          chatMessages.pop(); // 답을 못 받았으니 방금 push한 사용자 메시지도 취소된 걸로 취급(짝 없는 질문이 대화기록에 남지 않게)
+        },
+        onAbort: () => {
+          thinkingBubble.textContent = '⏹ 중단됨';
+          chatMessages.pop(); // 방금 push한 사용자 메시지도 취소된 걸로 취급 (응답 없이 기록만 남으면 다음 턴에 어색해짐)
+        }
       });
-      const data = await res.json();
-      if (data.error){
-        thinkingBubble.textContent = '오류: ' + data.error;
-        chatMessages.pop(); // 답을 못 받았으니 방금 push한 사용자 메시지도 취소된 걸로 취급(짝 없는 질문이 대화기록에 남지 않게)
-      } else {
-        renderAssistantReply(thinkingBubble, data.reply || '(빈 응답)', data.clientActions, editTargetFileSnapshot);
-        const aiMsgObj = { role: 'assistant', content: data.reply || '' };
-        chatMessages.push(aiMsgObj);
-        thinkingBubble._nxMsgRef = aiMsgObj;
-        scheduleChatHistorySave();
-        if (isVoiceTurn) speakReply(data.reply || '');
-      }
-    }catch(err){
-      if (err && err.name === 'AbortError'){
-        thinkingBubble.textContent = '⏹ 중단됨';
-        chatMessages.pop(); // 방금 push한 사용자 메시지도 취소된 걸로 취급 (응답 없이 기록만 남으면 다음 턴에 어색해짐)
-      } else {
-        thinkingBubble.textContent = '네트워크 오류: ' + (err && err.message ? err.message : err);
-        chatMessages.pop(); // 답을 못 받았으니 방금 push한 사용자 메시지도 취소된 걸로 취급(짝 없는 질문이 대화기록에 남지 않게)
-      }
     }finally{
       currentChatAbortController = null;
       chatInputEl.disabled = false;
@@ -2034,33 +2337,28 @@
       const openDiagramCtx = (typeof diagramView !== 'undefined' && diagramView.style.display !== 'none')
         ? { liveContent: diagramInput.value } : null;
 
-      const res = await fetch(GAS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(Object.assign({
-          _key: (window.NX_CONFIG && window.NX_CONFIG.API_SECRET) || '',
-          messages: chatMessages.slice(),
-          context: {
-            currentPath: explorerPath,
-            openFile: openFileCtx,
-            openDiagram: openDiagramCtx,
-            attachedItems: [],
-            attachedTexts: [],
-            voiceTurn: false
-          },
-          autoRef: autoRefMode
-        }, buildAiSettingsPayload(false)))
+      await runChatTurn_(chatMessages.slice(), {
+        thinkingBubble: thinkingBubble,
+        context: {
+          currentPath: explorerPath,
+          openFile: openFileCtx,
+          openDiagram: openDiagramCtx,
+          attachedItems: [],
+          attachedTexts: [],
+          voiceTurn: false
+        },
+        autoRef: autoRefMode,
+        aiSettingsPayload: buildAiSettingsPayload(lastUserText_(chatMessages)),
+        onDone: (replyText, clientActions) => {
+          renderAssistantReply(thinkingBubble, replyText, clientActions, editTargetFileSnapshot);
+          const newMsgObj = { role: 'assistant', content: replyText };
+          chatMessages.push(newMsgObj);
+          thinkingBubble._nxMsgRef = newMsgObj;
+          scheduleChatHistorySave();
+        },
+        onError: (message) => { thinkingBubble.textContent = message; },
+        onAbort: () => { thinkingBubble.textContent = '⏹ 중단됨'; }
       });
-      const data = await res.json();
-      if (data.error){
-        thinkingBubble.textContent = '오류: ' + data.error;
-        return;
-      }
-      renderAssistantReply(thinkingBubble, data.reply || '(빈 응답)', data.clientActions, editTargetFileSnapshot);
-      const newMsgObj = { role: 'assistant', content: data.reply || '' };
-      chatMessages.push(newMsgObj);
-      thinkingBubble._nxMsgRef = newMsgObj;
-      scheduleChatHistorySave();
     }catch(err){
       thinkingBubble.textContent = '네트워크 오류: ' + (err && err.message ? err.message : err);
     }
@@ -2075,6 +2373,18 @@
     const msgRef = bubbleEl._nxMsgRef;
     if (msgRef.role === 'assistant') copyMessageText_(msgRef);
     else refillInputForEdit_(msgRef);
+  });
+
+  // [2026.08] 지난 내 질문을 더블클릭하면 입력창에 채우는 것에서 그치지 않고 바로 전송까지
+  // 한다 — 같은 질문을 그대로 다시 보내고 싶을 때 "채우기 → 보내기 클릭" 두 단계를 줄여준다.
+  chatBody.addEventListener('dblclick', (e)=>{
+    const bubbleEl = e.target.closest('.msg');
+    if (!bubbleEl || !bubbleEl._nxMsgRef) return;
+    if (e.target.closest('button, a, input, textarea')) return;
+    const msgRef = bubbleEl._nxMsgRef;
+    if (msgRef.role === 'assistant') return; // 답변은 더블클릭도 그냥 복사(단일클릭)만 — 전송 대상이 아님
+    if (!chatInputEl.value.trim() || chatInputEl.disabled) return; // 전송 중이거나 채워지지 않았으면 무시
+    sendChatMessage();
   });
 
   (function setupChatMessageContextMenu_(){

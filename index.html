@@ -66,7 +66,6 @@
      (경과지/계산기 등 각 창의 ✕ 닫기버튼, 패널 제목, 첨부칩의 ✕ 등). 다크모드에서는 밝은
      var(--ink)로 바꿔서 항상 보이게 한다. */
   body.dark-mode .modal-label,
-  body.dark-mode .tax-feature-title,
   body.dark-mode .scan-section-title,
   body.dark-mode .panel-head,
   body.dark-mode .breadcrumb b,
@@ -190,7 +189,6 @@
      못 이긴다(클래스를 아무리 많이 겹쳐도 ID 1개를 못 이긴다). class로 통일한다. */
   .workspace-mode-group{ display:none; } /* 탐색 통합버튼 — full은 레이아웃 버튼(layout-buttons-wide)을 그대로 쓰므로 숨김 */
   .work-tools-group{ display:none; } /* 도구 통합버튼 — full은 개별 버튼(tool-buttons-wide)을 그대로 쓰므로 숨김 */
-  .mode-menu-group{ display:none; } /* 참조 통합버튼(자동참조·웹서치·가져오기·채팅기록지우기) — full(넓은 PC)에선 개별 버튼 자리가 없어 숨김, grouped·compact에서만 보임 */
   .memo-group{ display:flex; } /* 메모는 화면 크기와 무관하게 항상 보임(감싸는 div만 새로 생겼을 뿐 동작은 그대로) */
 
   /* ---- grouped·compact(PC 중간폭·폰) 공용: 상단엔 [작업폴더](고정폭) + [탐색·참조·도구·메모]
@@ -250,8 +248,7 @@
      안 보이게 되는 문제가 있다(클릭은 되는데 뜬 메뉴가 안 보여서 "안 눌리는 것처럼" 보임).
      top을 상단바 실측 높이(--topbar-h)로 고정하고 좌우를 화면 여백 기준으로 잡으면 상단바의
      어느 버튼을 눌러도 팝업이 항상 화면 안에 온전히 들어온다. */
-  body.stage-compact #workToolsPopup,
-  body.stage-compact #modeMenuPopup{
+  body.stage-compact #workToolsPopup{
     position:fixed; left:8px; right:8px; top:calc(var(--topbar-h, 52px) + 6px); bottom:auto;
     min-width:0; width:auto; max-height:60vh; overflow-y:auto;
   }
@@ -351,11 +348,6 @@
 
   .voice-command-list{ display:flex; flex-direction:column; gap:6px; margin-top:6px; max-height:220px; overflow-y:auto; }
 
-  .tax-feature-list{ display:flex; flex-direction:column; gap:8px; margin-top:6px; }
-  .tax-feature-item{ border:1px solid var(--line); border-radius:8px; padding:9px 11px; background:var(--panel); }
-  .tax-feature-title{ font-size:13px; font-weight:700; color:var(--navy); margin-bottom:3px; }
-  .tax-feature-desc{ font-size:11.5px; color:var(--ink); line-height:1.5; }
-  .tax-feature-example{ font-size:11px; color:var(--sub); margin-top:4px; font-style:italic; }
   .voice-command-row{
     display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:8px;
   }
@@ -539,7 +531,14 @@
     top:calc(var(--topbar-h, 50px) + 8px); left:5vw; right:5vw;
     bottom:16px; z-index:91;
     border-radius:12px; overflow:hidden; box-shadow:0 16px 48px rgba(0,0,0,0.4); border:1px solid var(--line);
+    /* 오른쪽 아래 모서리를 드래그해서 크기도 조절할 수 있게 — 브라우저 기본 리사이즈 손잡이 사용.
+       resize는 overflow가 visible이 아니어야 동작하므로 위의 overflow:hidden과 함께 써야 한다. */
+    resize:both; min-width:320px; min-height:240px;
   }
+  /* 헤더를 잡고 화면 아무 곳으로나 옮길 수 있다는 걸 커서로 알려준다(breadcrumb·버튼은 제외). */
+  .workspace.explorer-floating .panel.explorer .panel-head{ cursor:move; }
+  .workspace.explorer-floating .panel.explorer .panel-head .breadcrumb,
+  .workspace.explorer-floating .panel.explorer .panel-head button{ cursor:pointer; }
 
   .panel-head{
     display:flex; align-items:center; gap:8px; height:38px; padding:0 14px;
@@ -582,6 +581,14 @@
   }
   .apply-edit-btn:hover{ background:var(--gold-light); }
   .apply-edit-btn:disabled{ background:#cfd4dc; color:var(--sub); cursor:default; }
+  .apply-pending-notice{ margin-top:6px; font-size:11.5px; font-weight:700; color:#a86b00; }
+  .file-saved-badge{ margin-top:8px; font-size:12px; color:#2f7d4f; }
+  .file-saved-badge a{ color:#2f7d4f; text-decoration:underline; }
+  .unverified-save-warning{
+    margin-top:8px; font-size:12px; font-weight:700; color:#a83232;
+    background:rgba(168,50,50,0.08); border:1px solid rgba(168,50,50,0.35);
+    border-radius:6px; padding:6px 9px;
+  }
   .chat-input-wrap{
     display:flex; align-items:center; gap:8px; padding:8px 12px;
     border-top:1px solid var(--line); flex-shrink:0;
@@ -598,6 +605,22 @@
     flex-shrink:0; font-family:inherit; font-size:11px; padding:4px 2px; width:48px;
     border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--sub);
   }
+  .chat-model-select{
+    flex-shrink:0; font-family:inherit; font-size:11px; padding:4px 4px; max-width:104px;
+    border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--sub);
+  }
+  .chat-model-select:disabled{ opacity:0.7; }
+  /* [2026.08] 체크박스(작은 사각형)와 작은 글자가 같이 있어서 잘 안 보인다는 피드백 —
+     체크박스는 화면에서 숨기고(label 클릭으로 계속 토글은 됨), F/V 글자만 크고 굵게
+     가운데 보여주며 고정(F, 주황)/자동(V, 파랑)을 색으로 구분한다. */
+  .model-lock-label{ display:inline-block; font-size:20px; font-weight:700; line-height:1; text-align:center; }
+  .model-lock-label.auto{ color:#2563eb; }
+  .model-lock-label.locked{ color:#d97706; }
+  /* [2026.08] 체크박스(작은 사각형)와 "+" 글자가 나란히 있어서 "이게 두 개짜리 표시냐"고
+     헷갈린다는 피드백 — 체크박스는 화면에서 숨기고(label 클릭으로 계속 토글은 됨),
+     "+" 하나만 크고 굵게 보여주며 켜짐/꺼짐을 색으로만 구분한다. */
+  .advisor-label{ color:var(--sub); font-size:20px; font-weight:700; line-height:1; }
+  .advisor-label.on{ color:#16a34a; }
   .chat-input-wrap input{
     flex:1; min-width:0; border:1px solid var(--line); border-radius:10px; padding:10px 12px;
     font-family:inherit; font-size:var(--chat-font-size, 13.5px); background:var(--panel); color:var(--ink);
@@ -670,8 +693,7 @@
   }
   #btnExitTalkingMode:hover{ background:#f0f2f6; }
   body.cover-mode .layout-buttons-wide,
-  body.cover-mode .workspace-mode-group,
-  body.cover-mode .mode-menu-group{ display:none !important; } /* 커버화면모드에선 이 모드버튼들은 의미가 없어서 계속 숨김 */
+  body.cover-mode .workspace-mode-group{ display:none !important; } /* 커버화면모드에선 이 모드버튼들은 의미가 없어서 계속 숨김 */
   /* 작업폴더 검색콤보(customerSelect)와 그 옆의 지금 작업폴더 표시(coverPathLabel)는 채팅모드에서는
      그대로 보이게 두고(2026.07 — 기존엔 커버화면모드 전체에서 무조건 숨겼었는데, 마이크만으로 폴더
      이동하기보다 눈으로 확인하고 싶다는 요청으로 되돌림), 토킹모드(화면이 음성전용으로 바뀐 상태)에서만 숨긴다. */
@@ -1052,7 +1074,6 @@
     .note-tb-page,
     .modal-label, .modal-hint, .modal-checkrow,
     .modal-body select, .modal-body input[type="number"], .modal-body textarea,
-    .tax-feature-title, .tax-feature-desc, .tax-feature-example,
     .voice-command-row .vc-label, .voice-command-row input[type="text"],
     .scan-section-title, .scan-controls, .scan-btn-row .scan-action-btn,
     .scan-tray-item .name, .scan-hint, .scan-name-input, .scan-action-btn,
@@ -1102,20 +1123,6 @@
     <div class="topbar-item topbar-equal-btn workspace-mode-group" id="workspaceModeWrap">
       <button id="btnWorkspaceMode" class="tb-btn" title="탐색작업창 배치 (클릭할 때마다 순환: 좌우 → 상하 → 생략 → 띄우기 → 최대)"><span class="tool-menu-icon" id="workspaceModeIcon">⬓</span> <span class="tool-menu-label" id="workspaceModeLabel">Row</span></button>
     </div>
-    <!-- [2026.08] 자동참조·웹서치·가져오기 버튼 3개를 체크박스 팝업 하나로 합쳤다. 셋 다
-         독립적으로 켜고 끌 수 있는 상태라(하나 고르면 닫히는 액션메뉴와 달리) 체크해도 팝업이
-         안 닫혀야 연달아 여러 개를 토글할 수 있다 — .toggle-item 참고. 자주 쓰는 기능은 아니지만
-         AI가 오류로 엉뚱한 맥락을 참조할 때 바로 초기화해야 해서 채팅기록지우기도 여기 같이 뒀다. -->
-    <div class="topbar-item mode-menu-group topbar-equal-btn" id="modeMenuWrap">
-      <button type="button" id="btnModeMenu" class="tb-btn" title="참조 — 자동참조 · 웹서치 · 웹페이지 가져오기 켜고 끄기 · 채팅기록 지우기"><span class="tool-menu-icon">🔗</span> <span class="tool-menu-label">참조</span></button>
-      <div id="modeMenuPopup" class="nx-popup">
-        <label class="toggle-item"><input type="checkbox" id="modeChkAutoRef"> 🔗 자동참조 — AI가 알아서 판단해서 지금 보고 있는 폴더/파일을 확인</label>
-        <label class="toggle-item"><input type="checkbox" id="modeChkWebSearch"> 🌐 웹서치 — 기본으로 항상 켜져 있음</label>
-        <label class="toggle-item"><input type="checkbox" id="modeChkWebFetch"> 📥 웹페이지 가져오기 — URL이 있으면 자동으로도 켜짐</label>
-        <div class="toggle-sep"></div>
-        <button type="button" id="btnNewChat" class="tool-menu-item danger-item" title="지금 이 사건의 대화기록을 지우고 새로 시작합니다 (되돌릴 수 없음)">🗑 채팅기록 지우기</button>
-      </div>
-    </div>
     <div class="layout-buttons-wide">
       <button type="button" id="btnLayoutRow" class="tb-btn" data-mode="row" title="좌우 배치">⬓ Row</button>
       <button type="button" id="btnLayoutCol" class="tb-btn" data-mode="col" title="상하 배치">⬒ Col</button>
@@ -1137,6 +1144,8 @@
       <button type="button" id="btnOpenSearch" class="tb-btn" title="파일·폴더 이름 검색">🔍 검색</button>
       <button type="button" id="btnOpenTrash" class="tb-btn" title="이 폴더에서 최근 삭제한 항목 복원">🗑 휴지통</button>
       <button type="button" id="btnOpenDashboard" class="tb-btn" title="모든 폴더의 처리일지·마감일을 한눈에">📊 현황판</button>
+      <button type="button" id="btnOpenWorkManage" class="tb-btn" title="사건별 세부업무와 법정기한 관리">🗂 작업관리</button>
+      <button type="button" id="btnOpenClientManage" class="tb-btn" title="고객 명단과 상담·자문 이력 관리">👤 고객관리</button>
       <button type="button" id="btnOpenLog" class="tb-btn" title="이 폴더의 경과지 보기">📝 경과지</button>
       <button type="button" id="btnOpenCalc" class="tb-btn" title="이 폴더의 계산 워크시트 보기">🧮 계산기</button>
       <button type="button" id="btnOpenTaxCalc" class="tb-btn" title="양도소득세·증여세·상속세 정밀 계산 (항목별 입력폼)">📐 세액계산</button>
@@ -1184,29 +1193,8 @@
         </div>
         <div class="modal-hint">화면 크기를 보고 자동으로 배치를 정하는데, 기기에 따라 이 판단이 잘 안 맞으면 여기서 직접 지정할 수 있습니다.</div>
 
-        <label class="modal-label">🧾 세무 특화 기능 (AI가 채팅 중 알아서 사용)</label>
-        <div class="modal-hint">아래는 파일탐색·처리일지·계산기 같은 범용 도구와 별도로, 세무자문 업무를 위해 추가된 전용 기능입니다. 버튼을 누르는 게 아니라, 채팅에서 필요할 때 자연스럽게 물어보시면 AI가 알아서 사용합니다.</div>
-        <div class="tax-feature-list">
-          <div class="tax-feature-item">
-            <div class="tax-feature-title">🏠 부동산 실거래가 조회</div>
-            <div class="tax-feature-desc">국토교통부 공공데이터. 아파트(기본·상세)·오피스텔·연립다세대·단독다가구·토지·상업업무용·분양권전매·공장창고 9개 유형. 법정동코드+계약년월 필요.</div>
-            <div class="tax-feature-example">예) "서울 종로구 아파트 2026년 1월 실거래가 알려줘"</div>
-          </div>
-          <div class="tax-feature-item">
-            <div class="tax-feature-title">🏢 건축물대장 조회</div>
-            <div class="tax-feature-desc">건축HUB(국토교통부). 표제부·총괄표제부·층별개요·전유공용면적·주택가격 등 10종. 시군구코드+법정동코드+번지 필요.</div>
-            <div class="tax-feature-example">예) "이 건물 건축물대장 표제부 조회해줘"</div>
-          </div>
-          <div class="tax-feature-item">
-            <div class="tax-feature-title">🏷 사업자등록 상태조회·진위확인</div>
-            <div class="tax-feature-desc">국세청. 사업자번호로 계속사업자/휴업/폐업 상태와 과세유형 확인(상태조회), 대표자명·개업일 등으로 등록정보 일치 여부 확인(진위확인).</div>
-            <div class="tax-feature-example">예) "사업자번호 123-45-67890 상태 확인해줘"</div>
-          </div>
-          <div class="tax-feature-item">
-            <div class="tax-feature-title">🧮 건물 기준시가 계산 (양도·상속·증여)</div>
-            <div class="tax-feature-desc">국세청 2026.1.1. 시행 고시 기준. 구조·용도·위치(공시지가)·신축연도·면적을 알려주면 정확한 공식으로 계산. 공동주택·상업용건물·오피스텔은 대상 아님(별도 고시가액 있음).</div>
-            <div class="tax-feature-example">예) "철근콘크리트조 사무실, 공시지가 ㎡당 200만원, 2010년 신축, 300㎡, 양도소득세 기준시가 계산해줘"</div>
-          </div>
+        <div class="modal-checkrow">
+          <a href="/manual.html" target="_blank" class="modal-label" style="text-decoration:none; display:inline-block;">📖 넥스 사용 설명서 (세무 특화 기능 안내) →</a>
         </div>
 
         <label class="modal-label">🗣 음성명령 (AI 안 거치고 바로 처리)</label>
@@ -1214,22 +1202,14 @@
         <div id="voiceCommandList" class="voice-command-list"></div>
         <button type="button" id="btnResetVoiceCommands" class="ghost-btn" style="margin-top:6px; align-self:flex-start;">기본값으로 복원</button>
 
-        <label class="modal-label">모델</label>
-        <select id="settingsModel">
-          <option value="claude-sonnet-5">Claude Sonnet 5</option>
-          <option value="claude-opus-4-8">Claude Opus 4.8</option>
-          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
-          <option value="claude-fable-5">Claude Fable 5</option>
-          <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Preview)</option>
-          <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
-          <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option>
-        </select>
+        <div class="modal-hint">모델 선택·🔒잠금·어드바이저(+)는 이제 채팅 입력창 아래 도구줄로 옮겼습니다 — 매번 여기 들어올 필요 없이 거기서 바로 바꿀 수 있습니다.</div>
+        <div class="modal-hint">Gemini는 Flash·Flash-Lite 계열이 무료 등급 대상입니다(2026.4.1부터, 사용량 제한 안에서). Pro(3.1 Pro)는 무료 등급이 없습니다. 요금 청구 여부는 이 시스템이 쓰는 구글 API 키의 결제 연동 상태에 달려있습니다. [2026.08 확인] 새로 발급한 키는 Gemini 2.5 계열이 "신규 사용자에게 더 이상 제공 안 함"으로 막혀있고, 3.x 계열은 원인 불명의 "프로젝트 접근 거부" 오류가 났습니다 — 새 키를 만든 직후라면 구글 쪽 권한 반영에 시간이 걸릴 수 있으니 잠시 후 다시 시도해보세요.</div>
 
         <label class="modal-label">사고 강도</label>
         <select id="settingsEffort">
           <option value="low">낮음 (빠름)</option>
-          <option value="medium" selected>보통</option>
-          <option value="high">높음 (신중하게, 느림)</option>
+          <option value="medium">보통</option>
+          <option value="high" selected>높음 (신중하게, 느림)</option>
         </select>
 
         <label class="modal-label">온도 (temperature, 비워두면 모델 기본값)</label>
@@ -1243,9 +1223,6 @@
           <label><input type="checkbox" id="settingsCodeExec"> 코드실행 사용</label>
         </div>
 
-        <div class="modal-checkrow">
-          <label><input type="checkbox" id="settingsAdvisor"> 어드바이저(자문 AI) 사용</label>
-        </div>
         <div id="advisorModelRow" style="display:none;">
           <label class="modal-label">어드바이저 모델</label>
           <select id="settingsAdvisorModel">
@@ -1261,6 +1238,11 @@
         <div class="modal-checkrow">
           <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="ghost-btn" style="text-decoration:none; display:inline-block;">Claude 콘솔 열기 ↗</a>
           <a href="https://aistudio.google.com" target="_blank" rel="noopener" class="ghost-btn" style="text-decoration:none; display:inline-block;">Google AI Studio 열기 ↗</a>
+        </div>
+
+        <label class="modal-label">⚠️ 위험 작업</label>
+        <div class="modal-checkrow">
+          <button type="button" id="btnNewChat" class="ghost-btn danger-item" title="지금 이 사건의 대화기록을 지우고 새로 시작합니다 (되돌릴 수 없음)">🗑 채팅기록 지우기</button>
         </div>
 
       </div>
@@ -1524,6 +1506,21 @@
           <button type="button" id="btnExtStatus" class="icon-round-btn" title="NX 외부조회 커넥터(확장프로그램) 연결상태 — 미설치/미연결">🔌</button>
           <button type="button" id="btnPasteClipboard" class="icon-round-btn" title="클립보드 내용을 입력창에 붙여넣기 (외부조회 사이트에서 복사한 값을 바로 가져올 때)">📋</button>
           <button type="button" id="btnClearInput" class="icon-round-btn" title="입력창 비우기">✕</button>
+          <select id="mainModelSelect" class="chat-model-select" title="AI 모델 — 🔒 잠그지 않으면 질문 내용에 따라 자동으로 바뀝니다(지금 이 값은 마지막으로 실제 쓰인 모델을 보여줍니다)">
+            <option value="claude-sonnet-5">Sonnet 5</option>
+            <option value="claude-opus-4-8">Opus 4.8</option>
+            <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
+            <option value="claude-fable-5">Fable 5</option>
+            <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+            <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+            <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
+            <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+            <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option>
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+          </select>
+          <label class="icon-round-btn" style="cursor:pointer; padding:0 8px;" title="체크: 지금 고른 모델로 고정(F) / 해제: 질문 내용 보고 자동으로 모델 전환(V)"><input type="checkbox" id="mainModelLock" style="display:none;"><span id="mainModelLockLabel" class="model-lock-label"></span></label>
+          <label class="icon-round-btn" style="cursor:pointer; padding:0 8px;" title="어드바이저 — 답변 전에 다른 AI(오퍼스)에게 한 번 더 검토를 받습니다"><input type="checkbox" id="mainAdvisor" style="display:none;"><span id="mainAdvisorLabel" class="advisor-label">+</span></label>
           <select id="gemContextCount" title="Gem에게 물어볼 때 직전 대화를 몇 개(턴) 같이 보낼지 선택 (0=입력창 내용만)">
             <option value="0">0턴</option>
             <option value="1">1턴</option>
@@ -1690,6 +1687,48 @@ graph TD
         <div id="dashboardList" class="log-list"></div>
       </div>
 
+      <div id="workManageView" style="display:none; flex:1; flex-direction:column; min-height:0;">
+        <div class="editor-toolbar">
+          <button class="back-btn" id="btnWorkManageBack" title="닫기">✕</button>
+          <span class="editor-filename">🗂 작업관리 · 사건별 세부업무 · 법정기한</span>
+          <div class="spacer"></div>
+          <select id="workCaseFilterStatus" title="상태로 필터">
+            <option value="">전체 상태</option>
+            <option value="진행중">진행중</option>
+            <option value="완료">완료</option>
+            <option value="보류">보류</option>
+          </select>
+          <button type="button" id="btnWorkCaseNew" class="save-btn">+ 새 사건</button>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:row; min-height:0;">
+          <div id="workCaseListCol" style="width:280px; min-width:220px; border-right:1px solid var(--line); overflow-y:auto;">
+            <div id="workCaseList" class="log-list"></div>
+          </div>
+          <div id="workCaseDetailCol" style="flex:1; overflow-y:auto; padding:16px; box-sizing:border-box;">
+            <div id="workCaseDetail"><div class="explorer-status">왼쪽에서 사건을 선택하거나 "+ 새 사건"을 눌러주세요.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="clientManageView" style="display:none; flex:1; flex-direction:column; min-height:0;">
+        <div class="editor-toolbar">
+          <button class="back-btn" id="btnClientManageBack" title="닫기">✕</button>
+          <span class="editor-filename">👤 고객관리 · 명단 · 상담/자문 이력</span>
+          <div class="spacer"></div>
+          <input type="text" id="clientSearchInput" placeholder="이름으로 검색…" style="border:1px solid var(--line); border-radius:6px; padding:6px 10px; font-family:inherit; font-size:12.5px; background:var(--panel); color:var(--ink);">
+          <button type="button" id="btnClientNew" class="save-btn">+ 새 고객</button>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:row; min-height:0;">
+          <div id="clientListCol" style="width:260px; min-width:200px; border-right:1px solid var(--line); overflow-y:auto;">
+            <div id="clientList" class="log-list"></div>
+          </div>
+          <div id="clientDetailCol" style="flex:1; overflow-y:auto; padding:16px; box-sizing:border-box;">
+            <div id="clientDetail"><div class="explorer-status">왼쪽에서 고객을 선택하거나 "+ 새 고객"을 눌러주세요.</div></div>
+          </div>
+        </div>
+      </div>
+      <datalist id="clientNameOptions"></datalist>
+
       <div id="searchView" style="display:none; flex:1; flex-direction:column; min-height:0;">
         <div class="editor-toolbar">
           <button class="back-btn" id="btnSearchBack" title="닫기">✕</button>
@@ -1718,12 +1757,14 @@ graph TD
     </div>
   </div>
 
-<script src="/core.js?v=20260814a"></script>
+<script src="/core.js?v=20260828c"></script>
 <script src="/tax-calc.js?v=20260814a"></script>
-<script src="/explorer.js?v=20260814a"></script>
+<script src="/explorer.js?v=20260827b"></script>
+<script src="/work-manage.js?v=20260827a"></script>
+<script src="/client-manage.js?v=20260827a"></script>
 <script src="/document-tools.js?v=20260814a"></script>
 <script src="/tax-calculator.js?v=20260814a"></script>
-<script src="/chat.js?v=20260814a"></script>
+<script src="/chat.js?v=20260828a"></script>
 <script src="/pwa.js?v=20260814a"></script>
 
 </body>

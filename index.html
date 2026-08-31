@@ -539,6 +539,8 @@
   .workspace.explorer-floating .panel.explorer .panel-head{ cursor:move; }
   .workspace.explorer-floating .panel.explorer .panel-head .breadcrumb,
   .workspace.explorer-floating .panel.explorer .panel-head button{ cursor:pointer; }
+  /* 띄우기 모드일 때만 닫기(✕) 버튼을 보여준다 — 다른 배치에선 의미가 없어서 숨김. */
+  .workspace.explorer-floating #btnFloatClose{ display:inline-flex !important; }
 
   .panel-head{
     display:flex; align-items:center; gap:8px; height:38px; padding:0 14px;
@@ -1253,6 +1255,20 @@
     </div>
   </div>
 
+  <!-- [2026.08] 작업관리 사건 상세화면에서 의뢰인 이름 옆 👤을 누르면, 고객관리 전체를 새로
+       열지 않고 그 고객 한 명만 빠르게 보고 고칠 수 있는 팝업(client-manage.js의
+       openClientQuickView_). #clientQuickViewMount는 처음엔 비어있다가, 열 때 #clientDetail을
+       그대로 옮겨 넣는다(재사용) — 닫으면 원래 자리(#clientDetailCol)로 돌아간다. -->
+  <div class="modal-overlay" id="clientQuickViewOverlay" style="display:none;">
+    <div class="modal-panel" style="max-width:640px;">
+      <div class="modal-head">
+        <span>👤 고객정보 빠른보기</span>
+        <span class="modal-close" id="btnCloseClientQuickView" title="닫기">✕</span>
+      </div>
+      <div class="modal-body" id="clientQuickViewMount"></div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="scanOverlay" style="display:none;">
     <div class="modal-panel scan-panel">
       <div class="modal-head scan-modal-head">
@@ -1544,6 +1560,7 @@
       <div class="panel-head" id="explorerPanelHead">
         <div class="breadcrumb" id="breadcrumb">&nbsp;</div>
         <div class="spacer"></div>
+        <button type="button" id="btnFloatClose" class="back-btn" title="띄우기 닫기 (원래 배치로 돌아가기)" style="display:none;">✕</button>
       </div>
 
       <div id="diagramView" style="display:none; flex:1; flex-direction:column; min-height:0;">
@@ -1682,8 +1699,12 @@ graph TD
       <div id="dashboardView" style="display:none; flex:1; flex-direction:column; min-height:0;">
         <div class="editor-toolbar">
           <button class="back-btn" id="btnDashboardBack" title="닫기">✕</button>
-          <span class="editor-filename">전체 처리일지 · 마감 현황판</span>
+          <span class="editor-filename">오늘의 현황</span>
         </div>
+        <!-- [2026.08] 홈 재설계 — 로그인 직후 맨 먼저 보이는 화면을 채팅/탐색기 대신 이 현황판으로
+             바꾸면서, 법정일 임박 사건·고객관리 바로가기·이번달 수금 요약·대기 중인 상담신청을
+             여기 추가했다(기존 처리일지 기반 마감현황은 dashboardList에 그대로 유지, 아래에서 스크롤). -->
+        <div id="dashboardHome" style="padding:16px; display:flex; flex-direction:column; gap:16px;"></div>
         <div id="dashboardList" class="log-list"></div>
       </div>
 
@@ -1693,10 +1714,10 @@ graph TD
           <span class="editor-filename">🗂 작업관리 · 사건별 세부업무 · 법정기한</span>
           <div class="spacer"></div>
           <select id="workCaseFilterStatus" title="상태로 필터">
-            <option value="">전체 상태</option>
-            <option value="진행중">진행중</option>
-            <option value="완료">완료</option>
+            <option value="">전체</option>
+            <option value="진행">진행</option>
             <option value="보류">보류</option>
+            <option value="완료">완료</option>
           </select>
           <button type="button" id="btnWorkCaseNew" class="save-btn">+ 새 사건</button>
         </div>
@@ -1757,14 +1778,14 @@ graph TD
     </div>
   </div>
 
-<script src="/core.js?v=20260828c"></script>
+<script src="/core.js?v=20260828h"></script>
 <script src="/tax-calc.js?v=20260814a"></script>
-<script src="/explorer.js?v=20260827b"></script>
-<script src="/work-manage.js?v=20260827a"></script>
-<script src="/client-manage.js?v=20260827a"></script>
+<script src="/explorer.js?v=20260828e"></script>
+<script src="/work-manage.js?v=20260828p"></script>
+<script src="/client-manage.js?v=20260828m"></script>
 <script src="/document-tools.js?v=20260814a"></script>
 <script src="/tax-calculator.js?v=20260814a"></script>
-<script src="/chat.js?v=20260828a"></script>
+<script src="/chat.js?v=20260828e"></script>
 <script src="/pwa.js?v=20260814a"></script>
 
 </body>

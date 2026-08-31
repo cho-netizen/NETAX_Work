@@ -200,7 +200,7 @@
       const 다목 = heirTaxableAmountShare - giftAmount;
       const ratio다나 = 나목 > 0 ? (다목 / 나목) : 0;
       const taxableBaseEquivalent = giftTaxableBase + 가목 * ratio다나; // 상속인별 상속세과세표준상당액
-      const grossTaxShare = overallCalculatedTax * actualValueRatio; // 그 상속인이 납부할 상속세액(§3조의2②)
+      const grossTaxShare = overallCalculatedTax * actualValueRatio; // 그 상속인이 납부할 상속세액(§3조의2①)
       const limit = taxableBaseEquivalent > 0 ? Math.round(grossTaxShare * Math.min(1, giftTaxableBase / taxableBaseEquivalent)) : 0;
       const credit = Math.min(giftTaxPaid, Math.round(grossTaxShare), limit);
       totalCredit += credit;
@@ -2944,8 +2944,8 @@
       무신고가산세: penalties.unreportedPenalty, 과소신고가산세: penalties.underreportedPenalty, 납부지연가산세: penalties.latePenalty,
       납부세액: finalTax,
       안내: transferType === 'direct'
-        ? '증여로 추정되어 배우자등에게 증여세가 부과되면, 당초 양도자·양수자에게는 그 양도에 대한 소득세를 부과하지 않습니다(§44④).'
-        : '재양도 당시의 재산가액을 증여받은 것으로 추정합니다(§44②). 마찬가지로 소득세는 부과되지 않습니다(§44④).'
+        ? '증여로 추정되어 그 재산의 양도 자체가 증여로 재구성되므로(§44①), 애초에 소득세법상 "양도"라는 과세사건이 성립하지 않아 양도소득세가 부과되지 않습니다. (§44④는 문언상 "제2항 본문에 따라"로 한정되어 §44②의 우회양도 사안에만 적용되는 조문이라 직접양도(§44①)의 소득세 비과세 근거로는 인용하지 않습니다.)'
+        : '재양도 당시의 재산가액을 증여받은 것으로 추정합니다(§44②). 그 배우자등에게 증여세가 부과된 경우 당초 양도자·양수자에게는 그 재산 양도에 따른 소득세를 부과하지 않습니다(§44④, 이중과세 방지).'
     };
   };
 
@@ -3596,50 +3596,120 @@
     const eduTax = Math.round(acquisitionValue * eduRate);
     const naTax = naTaxExempt ? 0 : Math.round(acquisitionValue * 0.002);
 
-    let finalTax = tax, finalEduTax = eduTax, finalNaTax = naTax, reliefNote = '';
+    const candidates = [];
     if (acquisitionType === 'paid' && propertyType === 'house' && p.isFirstTimeHomeBuyer && eduMode === 'house118') {
       if (acquisitionValue > 1200000000) {
-        reliefNote = ' §36의3(생애최초 주택 구입 감면, 지방세특례제한법)은 취득당시가액이 12억원을 초과해 적용되지 않습니다.';
+        candidates.push({ finalTax: tax, finalEduTax: eduTax, finalNaTax: naTax, note: ' §36의3(생애최초 주택 구입 감면, 지방세특례제한법)은 취득당시가액이 12억원을 초과해 적용되지 않습니다.' });
       } else {
         const capBase = p.isSmallLowValueHousing ? 3000000 : 2000000;
         const alreadyUsedByCoOwners = Math.max(0, Number(p.firstTimeBuyerReliefAlreadyUsedByCoOwners) || 0);
         const cap = Math.max(0, capBase - alreadyUsedByCoOwners);
         const reduction = Math.min(tax, cap);
-        finalTax = tax - reduction;
+        const ft = tax - reduction;
         const reliefRatio = tax > 0 ? reduction / tax : 0;
-        finalEduTax = Math.round(eduTax * (1 - reliefRatio));
+        const fe = Math.round(eduTax * (1 - reliefRatio));
         const coOwnerNote = alreadyUsedByCoOwners > 0 ? ' §36의3② — 공동취득이라 다른 공동취득자가 이미 사용한 감면액(' + alreadyUsedByCoOwners + '원)을 뺀 잔여 한도(' + cap + '원)까지만 감면했습니다.' : '';
-        reliefNote = ' §36의3(생애최초 주택 구입 감면, 지방세특례제한법) — 산출세액 ' + tax + '원 중 ' + reduction + '원을 감면해 취득세 ' + finalTax + '원만 납부합니다(지방교육세도 같은 비율로 감면되어 ' + finalEduTax + '원).' + coOwnerNote + ' 취득한 날부터 3년 이내에 매각·증여(배우자 제외)하거나 다른 용도(임대 포함)로 사용하면 감면된 취득세가 추징됩니다(§36의3④) — 이 도구는 그 사후관리를 판정하지 않습니다.';
+        candidates.push({ finalTax: ft, finalEduTax: fe, finalNaTax: naTax, note: ' §36의3(생애최초 주택 구입 감면, 지방세특례제한법) — 산출세액 ' + tax + '원 중 ' + reduction + '원을 감면해 취득세 ' + ft + '원만 납부합니다(지방교육세도 같은 비율로 감면되어 ' + fe + '원).' + coOwnerNote + ' 취득한 날부터 3년 이내에 매각·증여(배우자 제외)하거나 다른 용도(임대 포함)로 사용하면 감면된 취득세가 추징됩니다(§36의3④) — 이 도구는 그 사후관리를 판정하지 않습니다.' });
       }
-    } else if (acquisitionType === 'paid' && propertyType === 'farmland' && p.isSelfFarmingFarmer) {
-      finalTax = Math.round(tax * 0.5);
-      finalEduTax = Math.round(eduTax * 0.5);
-      finalNaTax = 0;
-      reliefNote = ' §6①(자경농민 농지 감면, 지방세특례제한법) — 산출세액의 50%를 경감해 취득세 ' + finalTax + '원만 납부합니다(지방교육세도 50% 감면). 농어촌특별세는 농어촌특별세법§4 10호에 따라 비과세됩니다. 취득일부터 2년 이내 직접 경작을 시작하지 않거나 2년 미만 경작 상태에서 매각·증여·다른 용도 사용시 감면된 취득세가 추징됩니다(§6①단서) — 이 도구는 그 사후관리를 판정하지 않습니다.';
-    } else if (p.isNationalMeritorious) {
+    }
+    if (acquisitionType === 'paid' && propertyType === 'farmland' && p.isSelfFarmingFarmer) {
+      const ft = Math.round(tax * 0.5);
+      const fe = Math.round(eduTax * 0.5);
+      candidates.push({ finalTax: ft, finalEduTax: fe, finalNaTax: 0, note: ' §6①(자경농민 농지 감면, 지방세특례제한법) — 산출세액의 50%를 경감해 취득세 ' + ft + '원만 납부합니다(지방교육세도 50% 감면). 농어촌특별세는 농어촌특별세법§4 10호에 따라 비과세됩니다. 취득일부터 2년 이내 직접 경작을 시작하지 않거나 2년 미만 경작 상태에서 매각·증여·다른 용도 사용시 감면된 취득세가 추징됩니다(§6①단서) — 이 도구는 그 사후관리를 판정하지 않습니다.' });
+    }
+    if (p.isNationalMeritorious) {
       if (propertyType === 'house' && p.isSmallHouse85sqmOrLess) {
-        finalTax = 0;
-        finalEduTax = 0;
-        reliefNote = ' §29①1호(국가유공자등 대부금 감면, 지방세특례제한법) — 전용면적 85제곱미터 이하 주택이어서 대부금 초과분을 포함해 취득세 전액을 면제합니다(지방교육세도 전액 감면).';
+        candidates.push({ finalTax: 0, finalEduTax: 0, finalNaTax: naTax, note: ' §29①1호(국가유공자등 대부금 감면, 지방세특례제한법) — 전용면적 85제곱미터 이하 주택이어서 대부금 초과분을 포함해 취득세 전액을 면제합니다(지방교육세도 전액 감면).' });
       } else {
         const loanAmount = Math.max(0, Number(p.meritoriousLoanAmount) || 0);
         const exemptRatio = acquisitionValue > 0 ? Math.min(1, loanAmount / acquisitionValue) : 0;
         if (exemptRatio > 0) {
           const reduction3 = Math.round(tax * exemptRatio);
-          finalTax = tax - reduction3;
-          finalEduTax = Math.round(eduTax * (1 - exemptRatio));
-          reliefNote = ' §29①2호(국가유공자등 대부금 감면, 지방세특례제한법) — 대부금(' + loanAmount + '원)에 해당하는 부분(취득가액의 ' + Math.round(exemptRatio * 10000) / 100 + '%)까지 취득세를 면제하고 초과분만 과세해 취득세 ' + finalTax + '원을 납부합니다(지방교육세도 같은 비율로 감면). 대부금을 초과하는 부분은 면제되지 않습니다(§29①2호 괄호).';
+          const ft = tax - reduction3;
+          const fe = Math.round(eduTax * (1 - exemptRatio));
+          candidates.push({ finalTax: ft, finalEduTax: fe, finalNaTax: naTax, note: ' §29①2호(국가유공자등 대부금 감면, 지방세특례제한법) — 대부금(' + loanAmount + '원)에 해당하는 부분(취득가액의 ' + Math.round(exemptRatio * 10000) / 100 + '%)까지 취득세를 면제하고 초과분만 과세해 취득세 ' + ft + '원을 납부합니다(지방교육세도 같은 비율로 감면). 대부금을 초과하는 부분은 면제되지 않습니다(§29①2호 괄호).' });
         } else {
-          reliefNote = ' §29①2호(국가유공자등 대부금 감면)는 meritoriousLoanAmount(대부금)가 입력되지 않아 적용하지 않았습니다.';
+          candidates.push({ finalTax: tax, finalEduTax: eduTax, finalNaTax: naTax, note: ' §29①2호(국가유공자등 대부금 감면)는 meritoriousLoanAmount(대부금)가 입력되지 않아 적용하지 않았습니다.' });
         }
       }
+    }
+    if (propertyType === 'house' && p.isChildbirthHousingPurchase) {
+      if (acquisitionValue > 1200000000) {
+        candidates.push({ finalTax: tax, finalEduTax: eduTax, finalNaTax: naTax, note: ' §36의5(출산·양육을 위한 주택 취득 감면, 지방세특례제한법)은 취득당시가액이 12억원을 초과해 적용되지 않습니다.' });
+      } else {
+        const reduction = Math.min(tax, 5000000);
+        const ft = tax - reduction;
+        const reliefRatio = tax > 0 ? reduction / tax : 0;
+        const fe = Math.round(eduTax * (1 - reliefRatio));
+        candidates.push({ finalTax: ft, finalEduTax: fe, finalNaTax: naTax, note: ' §36의5(출산·양육을 위한 주택 취득 감면, 지방세특례제한법) — 산출세액 ' + tax + '원 중 ' + reduction + '원을 감면해 취득세 ' + ft + '원만 납부합니다(지방교육세도 같은 비율로 감면되어 ' + fe + '원). 유상취득뿐 아니라 증여·상속으로 취득해도 적용됩니다(§36의3과 달리 "유상거래" 제한이 없음). 자녀 출산일부터 5년 이내(출산 전 1년 이내 포함) 취득, 그 결과 1가구1주택이 될 것(취득일부터 3개월 이내 충족 포함) 등 요건은 이 도구가 자동판정하지 않으니 확인 후 적용하세요. 3년 이내 매각·증여(배우자 제외)·다른 용도 사용시 추징됩니다(§36의5②) — 사후관리는 판정하지 않습니다.' });
+      }
+    }
+    if (p.isJeonseFraudVictimHousing) {
+      const reduction = Math.min(tax, 2000000);
+      const ft = tax - reduction;
+      const reliefRatio = tax > 0 ? reduction / tax : 0;
+      const fe = Math.round(eduTax * (1 - reliefRatio));
+      candidates.push({ finalTax: ft, finalEduTax: fe, finalNaTax: naTax, note: ' §36의4①(전세사기피해자 지원 감면, 지방세특례제한법) — 산출세액 ' + tax + '원 중 ' + reduction + '원을 감면해 취득세 ' + ft + '원만 납부합니다(지방교육세도 같은 비율로 감면). 2026.12.31까지 취득분에 적용됩니다. 전세사기피해주택 보유중 재산세 경감(§36의4②)·임차권등기 등록면허세 면제(§36의4③)는 각각 calculate_property_tax·calculate_registration_license_tax에서 별도로 확인하세요.' });
+    }
+    if (acquisitionType === 'paid' && propertyType === 'house' && p.isCommonPeopleHousingFirstHome) {
+      candidates.push({ finalTax: 0, finalEduTax: 0, finalNaTax: naTax, note: ' §33②(서민주택 감면, 지방세특례제한법) — 상시거주 목적으로 취득가액 1억원 미만·연면적(또는 전용면적) 40제곱미터 이하인 서민주택을 취득해(상속·증여·원시취득은 대상 아님) 1가구1주택이 되는 경우 취득세를 전액 면제합니다(지방교육세도 전액 면제, §177의2①2호 예외목록의 "제33조제2항"에 해당해 85% 상한도 적용되지 않습니다). 취득일부터 3개월 이내 상시거주 시작, 2년 이상 계속 거주 등 요건 미충족시 추징됩니다(§33③) — 사후관리는 판정하지 않습니다. 2027.12.31까지 취득분에 적용됩니다.' });
+    }
+    if (propertyType === 'house' && p.redevelopmentOriginalOwnerType === 'improvement_self') {
+      if (tax <= 2000000) {
+        candidates.push({ finalTax: 0, finalEduTax: 0, finalNaTax: naTax, note: ' §74④3호(주거환경개선사업 원소유자 감면, 지방세특례제한법) — 산출세액이 200만원 이하여서 취득세를 전액 면제합니다(§177의2①1호 예외에 해당해 85% 상한이 적용되지 않습니다).' });
+      } else {
+        const ft = Math.round(tax * 0.15);
+        const fe = Math.round(eduTax * 0.15);
+        candidates.push({ finalTax: ft, finalEduTax: fe, finalNaTax: naTax, note: ' §74④3호(주거환경개선사업 원소유자 감면, 지방세특례제한법) — 정비구역지정 고시일 현재 소유자(상속인 포함)가 스스로 개량하거나 사업시행으로 취득하는 전용 85㎡ 이하 주택이라 본래 전액 면제 대상이지만, §177의2①(감면특례의 제한)에 따라 산출세액이 200만원을 초과하면 85%까지만 감면되어(나머지 15%는 최소납부) 취득세 ' + ft + '원을 납부합니다(지방교육세도 같은 비율). 취득일부터 5년 이내 §13⑤1~4호 사치성재산이 되거나 관계법령 위반 건축시 추징됩니다.' });
+      }
+    } else if (propertyType === 'house' && p.redevelopmentOriginalOwnerType === 'redevelopment_60orless') {
+      const ft = Math.round(tax * 0.25);
+      const fe = Math.round(eduTax * 0.25);
+      candidates.push({ finalTax: ft, finalEduTax: fe, finalNaTax: naTax, note: ' §74⑤3호가목(재개발사업 원소유자 감면, 지방세특례제한법) — 정비구역지정 고시일 현재 소유자(상속인 포함)가 전용 60㎡ 이하 주택을 취득해 1가구1주택(취득 당시 일시적 2주택 포함)이 되는 경우 취득세의 75%를 경감해 ' + ft + '원만 납부합니다(지방교육세도 같은 비율, 100%면제가 아니라 §177의2 85%상한 적용대상 아님). 취득일부터 5년 이내 사치성재산화·법령위반건축, 일시적2주택자가 3년 이내 1가구1주택이 되지 않으면 추징됩니다.' });
+    } else if (propertyType === 'house' && p.redevelopmentOriginalOwnerType === 'redevelopment_60to85') {
+      const ft = Math.round(tax * 0.5);
+      const fe = Math.round(eduTax * 0.5);
+      candidates.push({ finalTax: ft, finalEduTax: fe, finalNaTax: naTax, note: ' §74⑤3호나목(재개발사업 원소유자 감면, 지방세특례제한법) — 전용 60㎡초과~85㎡이하 주택 취득으로 1가구1주택(일시적2주택 포함)이 되어 취득세의 50%를 경감해 ' + ft + '원만 납부합니다(지방교육세도 같은 비율). 사후관리 추징요건은 위와 동일합니다.' });
+    }
+    if (p.isEminentDomainReplacementAcquisition && !p.isAbsenteeOwnerReplacement && !(luxuryFlags.length > 0)) {
+      const priorValue = Math.max(0, Number(p.priorPropertyValueBeforeEminentDomain) || 0);
+      const excessValue = Math.max(0, acquisitionValue - priorValue);
+      if (excessValue <= 0) {
+        candidates.push({ finalTax: 0, finalEduTax: 0, finalNaTax: naTax, note: ' §73①(토지수용 등 대체취득 감면, 지방세특례제한법) — 사업인정고시일 이후 계약체결·건축허가를 받고 보상금 마지막 수령일부터 1년(농지 2년) 이내에 법정 지역 내에서 대체취득해 종전 가액을 초과하지 않아 취득세를 전액 면제합니다(§73②의 사치성재산·부재부동산소유자 예외에 해당하지 않는 것으로 전제).' });
+      } else {
+        const excessRatio = excessValue / acquisitionValue;
+        const ft = Math.round(tax * excessRatio);
+        const fe = Math.round(eduTax * excessRatio);
+        candidates.push({ finalTax: ft, finalEduTax: fe, finalNaTax: naTax, note: ' §73①(토지수용 등 대체취득 감면, 지방세특례제한법) — 종전 부동산등 가액(' + priorValue + '원)을 초과하는 부분(' + excessValue + '원)에 대해서만 과세해(단서) 취득세 ' + ft + '원을 납부합니다.' });
+      }
+    }
+    if (p.isDisasterRestorationAcquisition) {
+      const priorValue = Math.max(0, Number(p.priorPropertyValueBeforeDisaster) || 0);
+      const excessValue = Math.max(0, acquisitionValue - priorValue);
+      if (excessValue <= 0) {
+        candidates.push({ finalTax: 0, finalEduTax: 0, finalNaTax: naTax, note: ' §92①(천재지변 등 재해복구 감면, 지방세특례제한법) — 천재지변 등 불가항력으로 멸실·파손된 건축물·선박·자동차·기계장비를 그 멸실·파손일부터 2년 이내에 복구·대체취득해 종전 가액을 초과하지 않아 취득세를 전액 면제합니다(§177의2①2호 예외목록에 "제92조"가 명시돼 85% 상한도 적용되지 않습니다).' });
+      } else {
+        const excessRatio = excessValue / acquisitionValue;
+        const ft = Math.round(tax * excessRatio);
+        const fe = Math.round(eduTax * excessRatio);
+        candidates.push({ finalTax: ft, finalEduTax: fe, finalNaTax: naTax, note: ' §92①(천재지변 등 재해복구 감면, 지방세특례제한법) — 종전 가액(' + priorValue + '원)을 초과하는 부분(' + excessValue + '원)에 대해서만 과세해(단서) 취득세 ' + ft + '원을 납부합니다(초과 비율만큼만 과세, 나머지는 면제).' });
+      }
+    }
+    let finalTax = tax, finalEduTax = eduTax, finalNaTax = naTax, reliefNote = '';
+    if (candidates.length > 0) {
+      let best = candidates[0];
+      for (let i = 1; i < candidates.length; i++) {
+        if ((candidates[i].finalTax + candidates[i].finalEduTax + candidates[i].finalNaTax) < (best.finalTax + best.finalEduTax + best.finalNaTax)) best = candidates[i];
+      }
+      finalTax = best.finalTax; finalEduTax = best.finalEduTax; finalNaTax = best.finalNaTax; reliefNote = best.note;
+      if (candidates.length > 1) reliefNote += ' §180(중복 특례의 배제) — 둘 이상의 감면 요건에 동시에 해당해, 그중 총 납부세액이 가장 작아지는 감면 하나만 적용했습니다.';
     }
 
     const result = {
       적용세율: Math.round(rate * 100000) / 1000, 적용근거: basis + luxuryNote,
       과세표준: acquisitionValue, 산출세액: tax,
       지방교육세: finalEduTax, 농어촌특별세: finalNaTax, 납부세액_합계: finalTax + finalEduTax + finalNaTax,
-      안내: '지방교육세(§151①1호 — 취득 유형별로 세율이 갈립니다: 일반취득은 표준세율에서 중과기준세율 2%를 뺀 세율×20%, §13의2 법인·다주택 중과는 항상 (4%-2%)×20%=0.4% 고정, §11①8호 일반 주택 유상취득은 적용세율(사치성 가산 전)×50%×20%)와 농어촌특별세(§5①6호 — 취득세 과세표준×2%×10%=0.2%, 지방세법§15①1~3호 특례(1가구1주택 상속 등)는 §4 10호의4로 비과세)를 함께 계산했습니다.' + relatedPartyGateNote + ' 사치성재산(§13⑤) 가산분(+8%p)은 지방교육세 근거조문(§151①1호 가·나목)이 §13②③⑥⑦·§13의2만 지정하고 있어 이 계산에는 반영하지 않았습니다.' + reliefNote + ' 위 세 감면 외 지방세특례제한법상 다른 감면(다자녀는 자동차 취득세만 해당해 부동산과 무관·서민임대주택·전세사기피해자 등)은 이 도구가 아직 다루지 않습니다. 재산세 도시지역분과 마찬가지로 지방자치단체 조례로 세율의 100분의 50 범위에서 가감될 수 있고(§14), 취득 후 5년 이내 본점·주사무소 사업용 부동산·공장 신설증설용 부동산·고급주택·골프장·고급오락장 등으로 용도가 바뀌면 관청이 추징하며(§16), 다주택 여부 등 취득 당시에는 몰랐던 사유로 §13의2① 중과세율 적용대상이 된 경우에는 그 사유가 발생한 날부터 60일 이내에 납세자가 스스로 차액을 신고·납부해야 합니다(§20②).'
+      안내: '지방교육세(§151①1호 — 취득 유형별로 세율이 갈립니다: 일반취득은 표준세율에서 중과기준세율 2%를 뺀 세율×20%, §13의2 법인·다주택 중과는 항상 (4%-2%)×20%=0.4% 고정, §11①8호 일반 주택 유상취득은 적용세율(사치성 가산 전)×50%×20%)와 농어촌특별세(§5①6호 — 취득세 과세표준×2%×10%=0.2%, 지방세법§15①1~3호 특례(1가구1주택 상속 등)는 §4 10호의4로 비과세)를 함께 계산했습니다.' + relatedPartyGateNote + ' 사치성재산(§13⑤) 가산분(+8%p)은 지방교육세 근거조문(§151①1호 가·나목)이 §13②③⑥⑦·§13의2만 지정하고 있어 이 계산에는 반영하지 않았습니다.' + reliefNote + ' 위 아홉 감면(§36의3·§6①·§29①·§36의5·§36의4①·§33②·§74④⑤·§92①·§73①) 외 지방세특례제한법상 다른 감면은 이 도구가 아직 다루지 않습니다 — 다자녀·전기차·경형자동차·장애인용·국가유공자용 자동차 감면은 자동차 취득세만 해당해 부동산과 무관하고, 인구감소지역주택·빈집정비·개발제한구역주택개량 등은 아직 미반영입니다(주택연금·농지연금은 각각 calculate_registration_license_tax·calculate_property_tax에서 반영됨). 재산세 도시지역분과 마찬가지로 지방자치단체 조례로 세율의 100분의 50 범위에서 가감될 수 있고(§14), 취득 후 5년 이내 본점·주사무소 사업용 부동산·공장 신설증설용 부동산·고급주택·골프장·고급오락장 등으로 용도가 바뀌면 관청이 추징하며(§16), 다주택 여부 등 취득 당시에는 몰랐던 사유로 §13의2① 중과세율 적용대상이 된 경우에는 그 사유가 발생한 날부터 60일 이내에 납세자가 스스로 차액을 신고·납부해야 합니다(§20②).'
     };
     if (finalTax !== tax) {
       result.감면전_취득세_산출세액 = tax;
@@ -3672,6 +3742,10 @@
         적용여부: false,
         안내: '§23 1호 본문 — 취득을 원인으로 하는 등기(일반적인 매매·증여·상속으로 인한 소유권보존·이전등기)는 취득세만 부과되고 등록면허세는 부과되지 않습니다. calculate_acquisition_tax 도구로 취득세를 계산하세요. 이 소유권보존·이전등기 세율은 §23 1호 각 목의 예외(광업권등 취득등록, 외국인소유물건 연부취득등기, 취득세 부과제척기간이 지난 물건의 등기, §17 면세점 물건의 등기)에 해당하는 경우에만 적용되므로, 그 경우라면 isAcquisitionTaxExemptCase를 true로 넣어 다시 호출하세요.'
       };
+    }
+
+    if (type === 'lease_right' && p.isJeonseFraudVictimLeaseRegistration) {
+      return { 산출세액: 0, 지방교육세: 0, 납부세액_합계: 0, 적용근거: '§36의4③(전세사기피해자 지원 감면, 지방세특례제한법) — 전세사기피해자가 본인의 임차권 보호를 위해 신청한 임차권등기명령의 집행에 따른 임차권등기', 안내: '2026.12.31까지 신청분에 대해 등록면허세를 전액 면제합니다.' };
     }
 
     const baseAmount = Number(p.baseAmount);
@@ -3708,13 +3782,35 @@
     let tax = Math.round(baseAmount * rate);
     let minApplied = false;
     if (tax < 6000) { tax = 6000; minApplied = true; }
-    const eduTax = Math.round(tax * 0.20);
 
-    return {
-      과세표준: baseAmount, 적용세율: Math.round(rate * 100000) / 1000, 산출세액: tax, 지방교육세: eduTax, 납부세액_합계: tax + eduTax,
+    let finalTax = tax, reliefNote = '';
+    if (type === 'mortgage' && p.isReverseAnnuityMortgageHousing) {
+      const housingValue = Number(p.reverseAnnuityHousingStandardPriceValue);
+      if (p.isOneHouseholdOneHouseForMortgage && housingValue > 0 && housingValue <= 500000000) {
+        finalTax = tax - Math.round(tax * 0.5);
+        reliefNote = ' §35①1호(주택연금 담보 감면, 지방세특례제한법) — 시가표준액 5억원 이하 1가구1주택 담보라 등록면허세의 50%를 경감해 ' + finalTax + '원만 납부합니다(지방교육세도 같은 비율로 감면).';
+      } else if (tax <= 3000000) {
+        finalTax = tax - Math.round(tax * 0.5);
+        reliefNote = ' §35①2호가목(주택연금 담보 감면, 지방세특례제한법) — 등록면허세액이 300만원 이하라 50%를 경감해 ' + finalTax + '원만 납부합니다(지방교육세도 같은 비율로 감면).';
+      } else {
+        const reduction = 1500000;
+        finalTax = tax - reduction;
+        reliefNote = ' §35①2호나목(주택연금 담보 감면, 지방세특례제한법) — 등록면허세액이 300만원을 초과해 150만원을 공제, ' + finalTax + '원만 납부합니다(지방교육세도 같은 비율로 감면).';
+      }
+    }
+    const eduTax = Math.round(finalTax * 0.20);
+
+    const result = {
+      과세표준: baseAmount, 적용세율: Math.round(rate * 100000) / 1000, 산출세액: tax, 지방교육세: eduTax, 납부세액_합계: finalTax + eduTax,
       적용근거: basis + (minApplied ? ' (§28①단서 — 산출세액이 그 밖의 등기 세율인 건당 6,000원보다 적어 6,000원을 적용)' : ''),
-      안내: '지방교육세(§151①2호 — 등록면허세액의 20%)를 함께 계산했습니다. 농어촌특별세는 감면을 받는 경우에만 그 감면세액의 20%로 부과되는데(§5①1호), 이 도구는 지방세특례제한법상 감면 여부를 판단하지 않으므로 포함하지 않았습니다.'
+      안내: '지방교육세(§151①2호 — 등록면허세액의 20%)를 함께 계산했습니다. 농어촌특별세는 감면을 받는 경우에만 그 감면세액의 20%로 부과되는데(§5①1호), 이 도구는 지방세특례제한법상 감면 여부를 판단하지 않으므로 포함하지 않았습니다.' + reliefNote
     };
+    if (finalTax !== tax) {
+      result.감면전_산출세액 = tax;
+      result.감면세액 = tax - finalTax;
+      result.최종납부액 = finalTax;
+    }
+    return result;
   };
 
   const PROPERTY_TAX_LAND_COMPREHENSIVE_BRACKETS_ = [
@@ -3808,13 +3904,54 @@
       }
     }
 
-    const eduTax = Math.round(tax * 0.20);
+    const ptCandidates = [];
+    if (category === 'house' && p.isJeonseFraudVictimHousing) {
+      const reliefRate = p.isSmallUnit60sqmOrLess ? 0.5 : 0.25;
+      const reduction = Math.round(tax * reliefRate);
+      ptCandidates.push({ finalTax: tax - reduction, note: ' §36의4②(전세사기피해자 지원 감면, 지방세특례제한법) — 재산세 납세의무가 최초로 성립하는 날부터 3년간 전용면적 ' + (p.isSmallUnit60sqmOrLess ? '60제곱미터 이하라 50%' : '60제곱미터 초과라 25%') + '를 경감해 재산세 ' + reduction + '원을 감면, ' + (tax - reduction) + '원만 납부합니다(지방교육세도 같은 비율로 감면).' });
+    }
+    if (category === 'house' && p.isOneHouseholdOneHouse && p.isReverseAnnuityMortgageHousing) {
+      if (standardPriceValue <= 500000000) {
+        const reduction = Math.round(tax * 0.25);
+        ptCandidates.push({ finalTax: tax - reduction, note: ' §35②1호(주택연금 담보주택 감면, 지방세특례제한법) — 시가표준액 5억원 이하 1가구1주택이라 재산세의 25%를 경감해 재산세 ' + reduction + '원을 감면, ' + (tax - reduction) + '원만 납부합니다(지방교육세도 같은 비율로 감면).' });
+      } else {
+        const ratioOn5eok = 0.44;
+        const baseOn5eok = Math.round(500000000 * ratioOn5eok);
+        const taxOn5eok = progressiveTax(baseOn5eok, PROPERTY_TAX_HOUSE_ONE_BRACKETS_);
+        const reduction = Math.round(taxOn5eok * 0.25);
+        ptCandidates.push({ finalTax: Math.max(0, tax - reduction), note: ' §35②2호(주택연금 담보주택 감면, 지방세특례제한법) — 시가표준액 5억원 상당 재산세액(' + taxOn5eok + '원)의 25%(' + reduction + '원)를 공제해 ' + Math.max(0, tax - reduction) + '원만 납부합니다(지방교육세도 같은 비율로 감면).' });
+      }
+    }
+    if (category === 'land_farmland_forest' && p.isFarmlandPensionCollateral) {
+      if (standardPriceValue <= 600000000) {
+        ptCandidates.push({ finalTax: 0, note: ' §35의2 1호(농지연금 담보농지 감면, 지방세특례제한법) — 토지공시가격등이 6억원 이하여서 재산세를 전액 면제합니다(지방교육세도 전액 감면, §177의2①2호 예외목록의 "제35조의2"에 해당해 85% 상한도 적용되지 않습니다).' });
+      } else {
+        const baseOn6eok = Math.round(600000000 * 0.70);
+        const taxOn6eok = Math.round(baseOn6eok * 0.0007);
+        ptCandidates.push({ finalTax: Math.max(0, tax - taxOn6eok), note: ' §35의2 2호(농지연금 담보농지 감면, 지방세특례제한법) — 토지공시가격등 6억원에 해당하는 재산세액(' + taxOn6eok + '원)을 전액 공제해 ' + Math.max(0, tax - taxOn6eok) + '원만 납부합니다(지방교육세도 같은 비율로 감면).' });
+      }
+    }
+    let finalTax = tax, reliefNote = '';
+    if (ptCandidates.length > 0) {
+      let best = ptCandidates[0];
+      for (let i = 1; i < ptCandidates.length; i++) { if (ptCandidates[i].finalTax < best.finalTax) best = ptCandidates[i]; }
+      finalTax = best.finalTax; reliefNote = best.note;
+      if (ptCandidates.length > 1) reliefNote += ' §180(중복 특례의 배제) — 둘 이상의 감면 요건에 동시에 해당해, 그중 총 납부세액이 가장 작아지는 감면 하나만 적용했습니다.';
+    }
 
-    return {
-      시가표준액: standardPriceValue, 과세표준: taxBase, 산출세액: tax, 지방교육세: eduTax, 납부세액_합계: tax + eduTax,
+    const eduTax = Math.round(finalTax * 0.20);
+
+    const result = {
+      시가표준액: standardPriceValue, 과세표준: taxBase, 산출세액: tax, 지방교육세: eduTax, 납부세액_합계: finalTax + eduTax,
       적용근거: ratioNote + ' / ' + basis + capNote,
-      안내: '지방교육세(§151①6호 — 재산세액의 20%, 재산세 도시지역분은 제외)를 함께 계산했습니다. 재산세 도시지역분(§112, 지방의회 의결로 고시한 지역에서 조례에 따라 과세표준×최대 0.23%를 추가 부과할 수 있음)과 농어촌특별세(감면을 받는 경우에만 그 감면세액의 20%로 부과, §5①1호 — 이 도구는 지방세특례제한법상 감면 여부를 판단하지 않아 미포함)는 이 도구에 포함되지 않습니다. 토지가 종합합산·별도합산·분리과세 중 어디에 해당하는지는 실제 이용현황에 대한 사실판단이 필요하므로(§106①) 그 판정 자체는 이 도구가 대신하지 않습니다.'
+      안내: '지방교육세(§151①6호 — 재산세액의 20%, 재산세 도시지역분은 제외)를 함께 계산했습니다. 재산세 도시지역분(§112, 지방의회 의결로 고시한 지역에서 조례에 따라 과세표준×최대 0.23%를 추가 부과할 수 있음)과 농어촌특별세(감면을 받는 경우에만 그 감면세액의 20%로 부과, §5①1호 — 이 도구는 지방세특례제한법상 감면 여부를 판단하지 않아 미포함)는 이 도구에 포함되지 않습니다. 토지가 종합합산·별도합산·분리과세 중 어디에 해당하는지는 실제 이용현황에 대한 사실판단이 필요하므로(§106①) 그 판정 자체는 이 도구가 대신하지 않습니다.' + reliefNote
     };
+    if (finalTax !== tax) {
+      result.감면전_재산세_산출세액 = tax;
+      result.재산세_감면세액 = tax - finalTax;
+      result.재산세_최종납부액 = finalTax;
+    }
+    return result;
   };
 
   // 시가 인정범위 판정 (상증세법§60②, 시행령§49) — Code.js toolCalculateFairMarketValueRecognitionGate와 동일 로직.
@@ -3886,7 +4023,7 @@
       gates.push({
         항목: '감정가액 기준금액', 통과: meets,
         감정가액평균: appraisalAvg, 기준금액: hasThreshold ? thresholdBase : null,
-        사유: meets ? undefined : ('감정가액평균이 보충적평가액(§61·62·64·65)과 유사재산시가의 90% 중 적은 금액(기준금액, ' + thresholdBase + '원)에 미달합니다(시행령§49①2호 — 이 조항은 상장주식(§63①1호가목)·가상자산(§65②)에는 적용되지 않습니다). 세무서장등이 다른 감정기관에 재감정을 의뢰할 수 있으며, 그 재감정가액보다 납세자가 제시한 감정가액이 낮으면 원래 감정가액이 그대로 인정됩니다.')
+        사유: meets ? undefined : ('감정가액평균이 보충적평가액(§61·62·64·65)과 유사재산시가의 90% 중 적은 금액(기준금액, ' + thresholdBase + '원)에 미달합니다(시행령§49①2호 — 이 조항은 상장주식(§63①1호가목)·가상자산(§65②)에는 적용되지 않습니다). 세무서장등이 다른 감정기관에 재감정을 의뢰할 수 있으며, 그 재감정가액이 원래 납세자가 제시한 감정가액보다 낮으면 재감정가액을 적용하지 않고 원래 감정가액이 그대로 인정됩니다.')
       });
     }
 
@@ -5137,8 +5274,13 @@
     const limitShares = totalIssuedShares * ratio;
     const combinedShares = donatedShares + priorRelatedShares;
     const excessShares = Math.max(0, combinedShares - limitShares);
-    const excessSharesFromThisDonation = Math.min(excessShares, donatedShares);
+    let excessSharesFromThisDonation = Math.min(excessShares, donatedShares);
     const valuePerShare = donatedAmount / donatedShares;
+    let exemptionNote = '';
+    if (p.isExemptFromExcessInclusion && excessSharesFromThisDonation > 0) {
+      exemptionNote = ' §16③(' + (p.exemptionGround === 'authority_approved' ? '1호, 주무관청이 목적사업 효율수행을 위해 필요하다고 인정' : p.exemptionGround === 'sold_within_3years' ? '2호, §48⑪요건 충족 공익법인이 초과보유일부터 3년 이내 초과분 매각' : p.exemptionGround === 'other_statute' ? '3호, 공익법인의 설립·운영에 관한 법률 등 다른 법령에 따른 출연' : '각 호') + ' 예외에 해당해 초과분(' + excessSharesFromThisDonation + '주 상당 ' + Math.round(valuePerShare * excessSharesFromThisDonation) + '원)을 과세가액에 산입하지 않습니다' + (taxType === 'gift' ? '(§48①단서가 §16③ 각 호를 그대로 인용).' : '.');
+      excessSharesFromThisDonation = 0;
+    }
     const taxableInclusionAmount = Math.round(valuePerShare * excessSharesFromThisDonation);
     const exclusionAmount = donatedAmount - taxableInclusionAmount;
 
@@ -5149,6 +5291,7 @@
       안내: (excessSharesFromThisDonation > 0
         ? '이번 출연분을 포함한 합산 주식수(' + combinedShares + '주)가 발행주식총수등의 ' + Math.round(ratio * 100) + '%(' + Math.round(limitShares) + '주)를 초과해, 그 초과분에 상당하는 가액(' + taxableInclusionAmount + '원)을 과세가액에 산입합니다(' + (taxType === 'inheritance' ? '§16②' : '§48①단서') + ').'
         : '합산 주식수가 한도(' + Math.round(ratio * 100) + '%, ' + Math.round(limitShares) + '주) 이내여서 전액 과세가액에 산입하지 않습니다.')
+        + exemptionNote
         + ' §48②의 8가지 사후관리 위반 사유(용도외사용·3년내미사용·초과주식취득·운용소득미사용 등)에 따른 즉시증여세 부과는 이 계산기가 다루지 않으니 해당 사안이면 별도로 확인하세요.'
     };
   };
@@ -6657,7 +6800,16 @@
   window.calculateMortgagedOrLeasedPropertyValueJS = function (p) {
     p = p || {};
     const baseValue = Number(p.baseValue) || 0;
-    const securedDebtAmount = Number(p.securedDebtAmount) || 0;
+    let securedDebtAmount = Number(p.securedDebtAmount) || 0;
+    let debtNote = '';
+    if (p.isRevolvingMortgage && Number(p.maxSecuredAmount) > 0 && Number(p.maxSecuredAmount) < securedDebtAmount) {
+      debtNote += ' 근저당 채권최고액(' + p.maxSecuredAmount + '원)이 실제 담보채권액보다 적어 채권최고액을 적용했습니다(시행령§63②).';
+      securedDebtAmount = Number(p.maxSecuredAmount);
+    }
+    if (Number(p.creditGuaranteeAmount) > 0) {
+      debtNote += ' 신용보증기관 보증금액(' + p.creditGuaranteeAmount + '원)을 차감했습니다(시행령§63②).';
+      securedDebtAmount = Math.max(0, securedDebtAmount - Number(p.creditGuaranteeAmount));
+    }
     const rentalConversionValue = (Number(p.annualRent) || 0) > 0 || (Number(p.deposit) || 0) > 0
       ? window.calculateRentalConversionValueJS(p.annualRent, p.deposit) : 0;
     const valueBeforeRatio = Math.max(baseValue, securedDebtAmount, rentalConversionValue);
@@ -6668,7 +6820,8 @@
       임대보증금환산가액: rentalConversionValue,
       평가액_지분적용전: valueBeforeRatio,
       지분율: ratio,
-      최종평가액: Math.round(valueBeforeRatio * ratio)
+      최종평가액: Math.round(valueBeforeRatio * ratio),
+      안내: debtNote + ' 동일 재산이 다수의 채권(전세금채권·임차보증금채권 포함)의 담보인 경우에는 그 합계액을, 공동저당인 경우에는 공동저당된 재산들의 평가기준일 현재 가액 비율로 안분한 금액을 securedDebtAmount로 미리 계산해 넣으세요(시행령§63②).'
     };
   };
 
@@ -6828,8 +6981,15 @@
     const RATE = 0.03;
     const annualBenefits = Array.isArray(p.annualBenefits) ? p.annualBenefits : [];
     let incomeInterestValue = 0;
+    let usedTimingSubstitution = false;
     const yearlyDetail = annualBenefits.map(function (item) {
-      const n = Number(item.yearsFromValuation) || 0;
+      let n;
+      if (item.isPaymentTimingUndetermined) {
+        usedTimingSubstitution = true;
+        n = Number(item.lifeExpectancyYears) > 0 ? Math.floor(Number(item.lifeExpectancyYears)) : 20;
+      } else {
+        n = Number(item.yearsFromValuation) || 0;
+      }
       const benefit = item.isRateUndetermined ? trustPropertyValue * RATE : (Number(item.annualBenefit) || 0);
       const withholding = Number(item.withholdingTaxEquivalent) || 0;
       const pv = (benefit - withholding) / Math.pow(1 + RATE, n);
@@ -6844,7 +7004,40 @@
       평가방법: beneficiaryType === 'income' ? '수익을 받을 권리(§61①2호나목)' : '원본을 받을 권리(§61①2호가목)',
       적용이자율: RATE, 연도별_현재가치_내역: yearlyDetail,
       수익권_평가액: incomeInterestValue, 원본권_평가액: principalInterestValue,
-      해지시일시금: cancellationValue, 평가액: value
+      해지시일시금: cancellationValue, 평가액: value,
+      안내: usedTimingSubstitution ? '시행령§61②에 따라 수익시기가 정해지지 않은 항목은 평가기준일부터 수익시기까지의 연수를 20년(또는 기대여명 연수가 입력된 경우 그 연수)으로 대체해 계산했습니다.' : ''
+    };
+  };
+
+  window.calculatePreIpoStockValueJS = function (p) {
+    p = p || {};
+    const offeringPrice = Number(p.publicOfferingPrice);
+    const regularValue = Number(p.regularValuationValue);
+    if (!(offeringPrice >= 0)) return { error: 'publicOfferingPrice(공모가격)가 필요합니다.' };
+    if (!(regularValue >= 0)) return { error: 'regularValuationValue(§63①1호가목·나목 평가액)가 필요합니다.' };
+    const value = Math.max(offeringPrice, regularValue);
+    return {
+      공모가격: offeringPrice, 일반평가액: regularValue, 평가액: value,
+      안내: '§63②1호·2호(시행령§57①②) — 공모가격(' + offeringPrice + '원)과 §63①1호가목·나목 방식 평가액(' + regularValue + '원) 중 큰 금액인 ' + value + '원을 적용했습니다.'
+    };
+  };
+
+  window.calculateVirtualAssetValueJS = function (p) {
+    p = p || {};
+    if (p.isDesignatedExchange) {
+      const values = Array.isArray(p.dailyAverageValues) ? p.dailyAverageValues.map(Number).filter(function (v) { return !isNaN(v); }) : [];
+      if (values.length === 0) return { error: 'isDesignatedExchange가 true이면 dailyAverageValues(평가기준일 전·후 각 1개월 일평균가액 배열)가 필요합니다.' };
+      const avg = values.reduce(function (a, b) { return a + b; }, 0) / values.length;
+      return {
+        평가액: Math.round(avg), 표본개수: values.length,
+        안내: '시행령§60②1호 — 국세청장이 고시하는 가상자산사업자 거래분은 평가기준일 전·후 각 1개월간 그 사업자가 공시한 일평균가액 ' + values.length + '개의 평균액(' + Math.round(avg) + '원)으로 평가합니다.'
+      };
+    }
+    const otherValue = Number(p.otherReasonableValue);
+    if (!(otherValue >= 0)) return { error: 'isDesignatedExchange가 false이면 otherReasonableValue(거래일 일평균가액 등)가 필요합니다.' };
+    return {
+      평가액: Math.round(otherValue),
+      안내: '시행령§60②2호 — 국세청장 고시 가상자산사업자 외의 사업장에서 거래되는 가상자산은 거래일의 일평균가액 또는 종료시각 공시 시세가액 등 합리적으로 인정되는 가액을 그대로 적용합니다.'
     };
   };
 

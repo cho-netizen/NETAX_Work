@@ -218,6 +218,17 @@
   }
   floatDragHandleEl.addEventListener('pointerup', endFloatDrag);
   floatDragHandleEl.addEventListener('pointercancel', endFloatDrag);
+
+  // [2026.08] 띄우기 모드도 다른 창(작업관리·고객관리 팝업, 관계도 등)처럼 닫기(✕) 버튼을
+  // 줘야 한다는 지적 — 헤더 드래그로 옮기는 것과 별개로, 눌러서 원래 배치로 돌아가는
+  // 명확한 방법이 있어야 한다. 헤더 드래그 클릭과 겹치지 않도록 stopPropagation.
+  const btnFloatClose = document.getElementById('btnFloatClose');
+  if (btnFloatClose){
+    btnFloatClose.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      setWorkspaceMode(detectDefaultMode());
+    });
+  }
   // (예전 버전 데이터 마이그레이션은 아래 최종 초기화 지점에서 한 번에 처리한다 — 여기서
   // 클래스를 미리 건드리면 나중에 applyWorkspaceMode가 그대로 덮어써서 의미가 없어짐)
 
@@ -327,6 +338,13 @@
   // 방법이 없었다. applyWorkspaceMode만 호출하고 setWorkspaceMode(localStorage 저장)는 쓰지
   // 않으므로, 펼쳤을 때의 원래 배치 설정 자체는 그대로 보존되며 폰을 다시 펼치면 복원된다.
   document.addEventListener('nx:covermode', (e)=>{
+    // [2026.08] 작업관리·고객관리를 독립된 새 창(?view=workmanage 또는 clientmanage)으로
+    // 열었을 때는 채팅이 아예 없는 전용 창이므로, 창을 좁혀서 커버화면모드가 되어도 탐색
+    // 작업창을 숨기고 채팅을 보여줄 이유가 없다 — 오히려 그러면 작업관리 화면이 사라지고
+    // 텅 빈 채팅만 남는 이상한 상황이 된다(사용자가 실제로 겪음). 그런 창에서는 이 로직을
+    // 통째로 건너뛴다.
+    const standaloneView = new URLSearchParams(location.search).get('view');
+    if (standaloneView === 'workmanage' || standaloneView === 'clientmanage') return;
     if (e.detail.on){
       applyWorkspaceMode('hide');
     } else {
@@ -348,5 +366,23 @@
     if (workspace.classList.contains('explorer-collapsed')){
       setWorkspaceMode('float');
     }
+  }
+
+  // [2026.08] 작업관리·고객관리를 새 창으로 여는 공용 함수 — 이 창을 여는 곳이 여러 군데라
+  // (상단 툴바의 두 버튼, 채팅창의 "도구" 팝업 메뉴) 하나만 고치고 다른 델 놓치는 실수가
+  // 있었다(도구 메뉴는 openWorkManageView를 직접 불러서 탐색창 자리에 그대로 열리고 있었음).
+  // 앞으로는 이 함수 하나로 통일한다. window.open의 두 번째 인자로 매번 다른 이름('_blank')이
+  // 아니라 view별 고정 이름을 주면, 이미 열려있는 창은 새로 또 만들지 않고 그 창에 포커스만
+  // 주므로 버튼을 여러 번 눌러도 창이 계속 늘어나지 않는다.
+  // [2026.08 재수정] 한때 작업관리+고객관리를 한 창에 좌우로 나눠 동시에 보여주는 실험을
+  // 했었는데("workclient" 뷰), 실제로 필요했던 건 그게 아니라 "작업관리 안에서 의뢰인 이름을
+  // 클릭하면 그 고객 한 명만 빠르게 보고 고칠 수 있는 것"이었다(client-manage.js의
+  // openClientQuickView_ 참고) — 그래서 각자 화면은 다시 예전처럼 따로따로 창으로 연다.
+  function openStandaloneManageWindow_(view){
+    const sw = screen.availWidth || 1600, sh = screen.availHeight || 900;
+    const w = Math.round(sw / 2), h = sh;
+    const left = view === 'clientmanage' ? w : 0;
+    window.open(location.origin + location.pathname + '?view=' + view, 'nx_' + view,
+      'width=' + w + ',height=' + h + ',left=' + left + ',top=0,resizable=yes,scrollbars=yes,toolbar=no,location=no,menubar=no,status=no');
   }
 

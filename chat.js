@@ -96,14 +96,30 @@
   // 완료 시점을 알 수 있는 프로미스를 전역에 걸어둔다.
   window.__nxCustomersLoaded = loadCustomers();
 
+  // [2026.08] 홈 재설계 — 로그인 직후 채팅+탐색기 대신 "오늘의 현황"(법정일 임박 사건·고객관리
+  // 바로가기·수금 요약·대기 중인 상담신청)이 먼저 보이게 한다. 탐색기 초기화(기본 고객 폴더
+  // 로딩)는 그대로 백그라운드에서 끝내고 그 위에 현황판을 띄우는 방식이라, 현황판을 닫으면(✕)
+  // 이미 준비된 첫 고객 폴더가 바로 나온다 — 탐색기 관련 상태·기능은 전혀 건드리지 않는다.
+  // 작업관리/고객관리를 새 창(?view=...)으로 열었을 때는 그 창 전용 화면을 그대로 보여줘야
+  // 하므로 건너뛴다.
+  window.__nxCustomersLoaded.then(() => {
+    const standaloneView = new URLSearchParams(location.search).get('view');
+    if (standaloneView === 'workmanage' || standaloneView === 'clientmanage') return;
+    if (typeof openDashboardView === 'function') openDashboardView();
+  });
+
 
   // ---- 업무도구 통합 팝업 — 예전엔 PC/탭(grouped)은 도구1/도구2 2그룹, 폰(compact)은 하단
   // 고정바의 기록·분석·도구 3그룹으로 나뉘어 있었는데, 어차피 같은 기능들이라 하나로 합쳤다.
   // (2026.08) 검색·휴지통은 여기 없다 — 탐색기 빈 공간 우클릭(길게 누르기) 메뉴로 옮겼다.
+  // [2026.08] 작업관리·고객관리는 항상 새 창으로 열려야 하는데(work-manage.js/client-manage.js
+  // 참고) 여기서는 openWorkManageView/openClientManageView를 직접 불러서 탐색창 자리에
+  // 그대로 열리고 있었다 — 상단 버튼만 고치고 이 도구 메뉴는 놓쳤던 실수. core.js의
+  // openStandaloneManageWindow_()로 통일한다.
   const WORK_TOOLS = [
     { icon: '📊', label: '현황판', handler: openDashboardView },
-    { icon: '🗂', label: '작업관리', handler: openWorkManageView },
-    { icon: '👤', label: '고객관리', handler: openClientManageView },
+    { icon: '🗂', label: '작업관리', handler: () => openStandaloneManageWindow_('workmanage') },
+    { icon: '👤', label: '고객관리', handler: () => openStandaloneManageWindow_('clientmanage') },
     { icon: '📝', label: '경과지', handler: openLogView },
     { icon: '🧮', label: '계산기', handler: openCalcView },
     { icon: '📐', label: '세액계산', handler: openTaxCalcView },

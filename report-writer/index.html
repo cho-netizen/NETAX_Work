@@ -1215,6 +1215,22 @@ let docs = loadDocs();
 let selectedId = localStorage.getItem(SELECTED_KEY);
 if (!docs.find(d => d.id === selectedId)) selectedId = docs.length ? docs[0].id : null;
 
+// ---------- ?saveFolderId=...(&saveFileName=...)로 열린 경우: 아직 드라이브에 존재하지 않는
+// 새 문서를 "처음 저장(저장 버튼 클릭)할 때" 이 폴더 안에 자동으로 만들어 넣기 위한 대기 상태.
+// ?fileId=...가 같이 있으면(이미 있는 파일을 불러오는 경우) 그쪽이 우선이므로 무시한다 —
+// updateSaveToDriveButton()/saveToDrive()가 이 값을 읽어서 "드라이브에 저장 가능" 여부와
+// 실제 업로드 방식(fileId 덮어쓰기 vs folderId 새로 만들기)을 판단한다.
+let pendingSaveFolderId = null;
+let pendingSaveFolderName = null;
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('fileId')) return; // fileId가 있으면 그쪽이 우선
+  const folderId = params.get('saveFolderId');
+  if (!folderId) return;
+  pendingSaveFolderId = folderId;
+  pendingSaveFolderName = params.get('saveFileName') || null; // URLSearchParams가 이미 디코딩해줌
+})();
+
 function getSelected(){ return docs.find(d => d.id === selectedId) || null; }
 
 // 저장 성공 여부를 반환한다(Promise) — 호출부는 이 값을 보고 "저장됨" 표시 여부를 결정해야 한다.
@@ -2775,7 +2791,9 @@ function currentDriveFileId_(){
 function updateSaveToDriveButton(){
   const btn = document.getElementById('btnSaveToDrive');
   if (!btn) return;
-  const isDriveDoc = !!currentDriveFileId_();
+  // 이미 드라이브 파일을 열고 있거나(fileId), 아직은 새 문서지만 저장하면 특정 폴더에
+  // 만들어 넣을 예정(pendingSaveFolderId)이면 둘 다 "드라이브에 저장 가능" 상태로 취급한다.
+  const isDriveDoc = !!currentDriveFileId_() || !!pendingSaveFolderId;
   btn.disabled = !isDriveDoc;
   btn.style.opacity = isDriveDoc ? '' : '0.4';
   btn.title = isDriveDoc
@@ -2785,7 +2803,7 @@ function updateSaveToDriveButton(){
 
 async function saveToDrive(){
   const fileId = currentDriveFileId_();
-  if (!fileId){
+  if (!fileId && !pendingSaveFolderId){
     flashSaveState('저장할 원본 파일이 없습니다');
     return;
   }
@@ -2794,22 +2812,48 @@ async function saveToDrive(){
   const btn = document.getElementById('btnSaveToDrive');
   btn.disabled = true;
   try {
+    const body = {
+      action: 'uploadFile',
+      // 새로 만드는 경우(폴더 저장) ?saveFileName=이 있으면 그걸 우선 쓰고, 없으면 기존과
+      // 동일하게 지금 편집 중인 문서의 이름을 쓴다.
+      name: (!fileId && pendingSaveFolderName) ? pendingSaveFolderName : ((d && d.name) ? d.name : '문서'),
+      base64Data: utf8ToBase64_(content),
+      _key: (window.NX_CONFIG && window.NX_CONFIG.API_SECRET) || ''
+    };
+    if (fileId) {
+      body.fileId = fileId;
+    } else {
+      body.folderId = pendingSaveFolderId;
+    }
     const res = await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        action: 'uploadFile',
-        fileId: fileId,
-        name: (d && d.name) ? d.name : '문서',
-        base64Data: utf8ToBase64_(content),
-        _key: (window.NX_CONFIG && window.NX_CONFIG.API_SECRET) || ''
-      })
+      body: JSON.stringify(body)
     });
     const data = await res.json();
     if (!data || data.error){
       flashSaveState((data && data.error) ? data.error : '저장 실패');
     } else {
       flashSaveState('드라이브에 저장됨');
+      // 폴더에 새로 만든 첫 저장이었다면, 이 순간부터는 ?fileId=로 열었던 문서와 완전히
+      // 동일하게 동작하도록(다음 저장부터는 덮어쓰기) 내부 상태와 주소창을 갱신해둔다.
+      if (!fileId && data.id) {
+        const newFileId = data.id;
+        const newDocId = 'drive-' + newFileId;
+        if (d) d.id = newDocId;
+        selectedId = newDocId;
+        pendingSaveFolderId = null;
+        pendingSaveFolderName = null;
+        await persist();
+        refreshDocSelect();
+
+        const params = new URLSearchParams(window.location.search);
+        params.set('fileId', newFileId);
+        params.delete('saveFolderId');
+        params.delete('saveFileName');
+        const newUrl = window.location.pathname + '?' + params.toString() + window.location.hash;
+        history.replaceState(null, '', newUrl);
+      }
     }
   } catch (err) {
     flashSaveState('네트워크 오류: ' + (err && err.message ? err.message : err));
